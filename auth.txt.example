@@ -1,0 +1,8 @@
+# Шаблон auth.txt для OpenVPN.
+#
+# Скопіюй у auth.txt і встав свій логін ОДНИМ рядком (тільки username):
+#   cp auth.txt.example auth.txt && chmod 600 auth.txt
+#
+# OTP вводиться інтерактивно при кожному підключенні — тут його НЕ зберігати.
+# Файл auth.txt має бути chmod 600, інакше OpenVPN відмовиться його читати.
+your_vpn_username

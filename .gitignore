@@ -1,0 +1,33 @@
+# ── Логи та runtime ──
+*.log
+*.pid
+
+# ── Секрети / credentials (НЕ комітити) ──
+secrets/
+.env
+*.key
+# WireGuard/OpenVPN конфіги містять приватні ключі
+*.conf
+# OpenVPN-профілі містять вбудовані сертифікати/ключі
+*.ovpn
+*.ovpn.bak
+# містить VPN-логін
+auth.txt
+
+# ── Локальний конфіг та стан (не комітити; є config.env.example) ──
+config.env
+state.env
+
+# ── Ключі WireGuard ──
+privatekey
+publickey
+*.privatekey
+*.publickey
+*.psk
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+
+# ── macOS ──
+.DS_Store
