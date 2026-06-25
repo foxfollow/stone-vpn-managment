@@ -21,7 +21,8 @@ Brew-версія OpenVPN (на відміну від GUI OpenVPN Connect) пр�
 ├── state.env               # (gitignored, авто) останні вибори: LAST_GATEWAY, LAST_USERNAME
 ├── auth.txt.example        # шаблон файлу логіну
 ├── auth.txt                # (gitignored, опц.) дефолтний OpenVPN-логін, chmod 600
-├── wire-first              # порожній плейсхолдер; назва WireGuard-тунелю
+├── LICENSE                 # MIT
+├── SECURITY.md             # дисклеймер + правила поводження з секретами
 └── scripts/                # допоміжні скрипти
     ├── vpn-up.sh                       # OpenVPN: підключення (динамічне меню + логін + route-fix)
     ├── vpn-down.sh                     # OpenVPN: відключення
@@ -128,3 +129,16 @@ cp auth.txt.example auth.txt && chmod 600 auth.txt   # (опц.) дефолтн�
   `.gitignore`; комітяться лише `*.example`-шаблони.
 - **Не змінювати** системні шляхи WireGuard — `wg-quick` очікує конфіги саме
   у своїх стандартних директоріях.
+
+---
+
+## Безпека
+
+Інструмент для **особистого використання**, надається «як є», без гарантій;
+виконує команди з `sudo` і змінює маршрути/DNS/інтерфейси. Перед запуском —
+прочитай скрипти. Деталі та правила поводження з секретами — у
+[SECURITY.md](SECURITY.md).
+
+## Ліцензія
+
+[MIT](LICENSE) © 2026 foxfollow

@@ -27,8 +27,8 @@ config.env            Local defaults (LAN_GATEWAY, OVPN_USERNAME, ...). GITIGNOR
 state.env             Auto-written last choices (LAST_GATEWAY, LAST_USERNAME). GITIGNORED.
 auth.txt.example      Template for auth.txt (committed).
 auth.txt              Optional default OpenVPN username, one line, chmod 600. GITIGNORED.
-wire-first            Empty placeholder; "wire-first" is a WireGuard tunnel NAME (its
-                      real config is /etc/wireguard/wire-first.conf in the system path).
+LICENSE               MIT license.
+SECURITY.md           Personal-use disclaimer + secret-handling rules.
 scripts/
   vpn-up.sh           OpenVPN connect: dynamic profile menu, optional login, route-fix.
   vpn-down.sh         OpenVPN disconnect: kill by PID file, fallback pkill -x openvpn.
