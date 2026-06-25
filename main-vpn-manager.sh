@@ -9,12 +9,17 @@
 #   ./main-vpn-manager.sh up <tunnel>       підняти тунель (назва WG-тунелю або 'openvpn')
 #   ./main-vpn-manager.sh down [tunnel]     опустити тунель; без аргументу — всі
 #   ./main-vpn-manager.sh cert <wg|openvpn> керування конфігами/сертифікатами
+#   ./main-vpn-manager.sh dns               показати DNS по сервісах і встановити на вибраних
 #   ./main-vpn-manager.sh help              ця довідка
 #
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS="$SCRIPT_DIR/scripts"
+
+# Опціональний локальний конфіг (дефолти: RESTORE_DNS, DNS_SERVICES тощо).
+# shellcheck source=/dev/null
+[ -f "$SCRIPT_DIR/config.env" ] && . "$SCRIPT_DIR/config.env"
 
 # Стандартні шляхи WireGuard (wg-quick шукає конфіги саме тут). НЕ міняти.
 WG_DIRS=(/opt/homebrew/etc/wireguard /usr/local/etc/wireguard /etc/wireguard)
@@ -108,6 +113,22 @@ ovpn_pid() {
         echo "$pid"; return 0
     fi
     pgrep -x openvpn 2>/dev/null | head -1
+}
+
+# ─── DNS ────────────────────────────────────────────────────────────────────
+
+# Відновити DNS після відключення VPN (config.env: RESTORE_DNS). Порожньо = не чіпати.
+restore_dns() {
+    [ -n "${RESTORE_DNS:-}" ] || return 0
+    local svc available
+    available=$(networksetup -listallnetworkservices 2>/dev/null)
+    for svc in "${DNS_SERVICES[@]:-Wi-Fi}"; do
+        if printf '%s\n' "$available" | grep -qxF "$svc"; then
+            echo "Відновлюю DNS на '$svc': $RESTORE_DNS"
+            # shellcheck disable=SC2086
+            sudo networksetup -setdnsservers "$svc" $RESTORE_DNS
+        fi
+    done
 }
 
 # ─── команди ────────────────────────────────────────────────────────────────
@@ -209,16 +230,20 @@ cmd_down() {
             echo "Опускаю OpenVPN..."
             "$SCRIPTS/vpn-down.sh"
         fi
+        restore_dns
         echo "${G}Готово.${N}"
         return
     fi
 
     if [ "$tunnel" = "openvpn" ]; then
-        exec "$SCRIPTS/vpn-down.sh"
+        "$SCRIPTS/vpn-down.sh"
+        restore_dns
+        return
     fi
 
     echo "Опускаю WireGuard '$tunnel'..."
     sudo wg-quick down "$(wg_target "$tunnel")"
+    restore_dns
 }
 
 cmd_cert() {
@@ -241,6 +266,68 @@ cmd_cert() {
     esac
 }
 
+cmd_dns() {
+    command -v networksetup >/dev/null 2>&1 || die "networksetup недоступний"
+    echo "${B}=== DNS по мережевих сервісах ===${N}"
+    local default_dns="${RESTORE_DNS:-8.8.8.8}"
+    local svc dns svc_names=() svc_dns=()
+    while IFS= read -r svc; do
+        [ -n "$svc" ] || continue
+        case "$svc" in \**) continue ;; esac          # вимкнені сервіси (з *)
+        dns=$(networksetup -getdnsservers "$svc" 2>/dev/null)
+        if printf '%s' "$dns" | grep -qi "aren't any"; then
+            dns="(немає)"
+        else
+            dns=$(printf '%s' "$dns" | tr '\n' ' ')
+        fi
+        svc_names+=("$svc"); svc_dns+=("$dns")
+    done < <(networksetup -listallnetworkservices 2>/dev/null | tail -n +2)
+
+    [ "${#svc_names[@]}" -gt 0 ] || { echo "  (активних сервісів не знайдено)"; return 0; }
+
+    local i mark
+    for i in "${!svc_names[@]}"; do
+        # позначити жовтим ті, де DNS нема або збігається з поточним «поганим» дефолтом немає сенсу;
+        # підсвічуємо лише відсутній DNS
+        if [ "${svc_dns[$i]}" = "(немає)" ]; then mark="${Y}"; else mark="${G}"; fi
+        printf "  ${mark}%2d)${N} %-24s ${D}%s${N}\n" "$((i + 1))" "${svc_names[$i]}" "${svc_dns[$i]}"
+    done
+
+    echo ""
+    read -rp "Встановити DNS — на яких сервісах? [номери через кому / all / n=ні]: " pick
+    [ -n "$pick" ] || { echo "Скасовано."; return 0; }
+    case "$pick" in n|N) echo "Скасовано."; return 0 ;; esac
+
+    read -rp "Який DNS? [Enter=$default_dns]: " dns_in
+    local dns_val="${dns_in:-$default_dns}"
+    [ -n "$dns_val" ] || { echo "Порожньо — скасовано."; return 0; }
+
+    local targets=()
+    case "$pick" in
+        all|ALL|всі) targets=("${svc_names[@]}") ;;
+        *)
+            local idx idxs
+            IFS=',' read -ra idxs <<< "$pick"
+            for idx in "${idxs[@]}"; do
+                idx="${idx// /}"
+                if [[ "$idx" =~ ^[0-9]+$ ]] && [ "$idx" -ge 1 ] && [ "$idx" -le "${#svc_names[@]}" ]; then
+                    targets+=("${svc_names[$((idx - 1))]}")
+                else
+                    echo "Пропускаю невірний номер: $idx"
+                fi
+            done
+            ;;
+    esac
+
+    [ "${#targets[@]}" -gt 0 ] || { echo "Нічого не вибрано."; return 0; }
+    for svc in "${targets[@]}"; do
+        echo "DNS '$dns_val' → '$svc'"
+        # shellcheck disable=SC2086
+        sudo networksetup -setdnsservers "$svc" $dns_val
+    done
+    echo "${G}Готово.${N}"
+}
+
 cmd_help() {
     cat <<EOF
 ${B}main-vpn-manager.sh${N} — керування VPN-тунелями (WireGuard + OpenVPN)
@@ -255,6 +342,7 @@ ${B}Команди:${N}
   ${G}down${N} [тунель]     опустити тунель; без аргументу — всі
                     (перед вимкненням завжди показує статус)
   ${G}cert${N} <wg|openvpn> додати/керувати конфігами та сертифікатами
+  ${G}dns${N}               показати DNS по сервісах і встановити на вибраних
   ${G}help${N}              ця довідка
 
 ${B}Приклади:${N}
@@ -265,6 +353,7 @@ ${B}Приклади:${N}
   ./main-vpn-manager.sh down               # опустити все
   ./main-vpn-manager.sh cert wg            # додати/згенерувати WireGuard-тунель
   ./main-vpn-manager.sh cert openvpn       # керування .ovpn профілями
+  ./main-vpn-manager.sh dns                # перевірити/додати DNS на інтерфейсах
 
 ${B}Примітки:${N}
   • потребує sudo (створення tun-інтерфейсу, wg-quick)
@@ -281,6 +370,7 @@ case "${1:-help}" in
     up|start)        shift; cmd_up "$@" ;;
     down|stop)       shift; cmd_down "$@" ;;
     cert)            shift; cmd_cert "$@" ;;
+    dns)             cmd_dns ;;
     help|-h|--help)  cmd_help ;;
     *)               die "невідома команда '${1}'. Див. './main-vpn-manager.sh help'" ;;
 esac

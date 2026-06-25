@@ -18,12 +18,12 @@ build, no test framework, and no package — scripts run directly. Repo-facing d
 
 ```
 main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t> | down [t]
-                      | cert <wg|openvpn> | help. WireGuard via wg-quick; "openvpn" and
-                      "cert" delegate to scripts/*.sh.
+                      | cert <wg|openvpn> | dns | help. WireGuard via wg-quick; "openvpn"
+                      and "cert" delegate to scripts/*.sh.
 README.md             User-facing overview + usage (Ukrainian).
 OPENVPN_CLI.md        Detailed OpenVPN reference (Ukrainian).
 config.env.example    Template for config.env (committed).
-config.env            Local defaults (LAN_GATEWAY, OVPN_USERNAME, ...). GITIGNORED.
+config.env            Local defaults (LAN_GATEWAY, OVPN_USERNAME, RESTORE_DNS, DNS_SERVICES). GITIGNORED.
 state.env             Auto-written last choices (LAST_GATEWAY, LAST_USERNAME). GITIGNORED.
 auth.txt.example      Template for auth.txt (committed).
 auth.txt              Optional default OpenVPN username, one line, chmod 600. GITIGNORED.
@@ -81,7 +81,15 @@ There are no unit tests. Validate changes like this:
   ms-timestamp); override the dir via `config.env` OVPN_PROFILES_DIR.
 - **Local config/state.** `vpn-up.sh` sources `config.env` (optional defaults) and `state.env`
   (written via the inline `set_state KEY VAL` helper, which rewrites one key). Both gitignored;
-  `state.env` is created on first connect.
+  `state.env` is created on first connect. `main-vpn-manager.sh` also sources `config.env`.
+- **DNS restore after `down`.** `wg-quick` can leave a dead WG DNS after teardown, so `cmd_down`
+  calls `restore_dns()`: if `config.env` RESTORE_DNS is non-empty it runs
+  `networksetup -setdnsservers` for each service in the `DNS_SERVICES` array (default `Wi-Fi`).
+  Empty RESTORE_DNS = DNS left untouched.
+- **`dns` command (`cmd_dns`).** Interactive audit: lists every enabled network service
+  (`networksetup -listallnetworkservices`, skipping `*`-disabled) with its current DNS, then
+  sets a chosen DNS (default `RESTORE_DNS`) on selected services or `all`. Complements the
+  automatic `restore_dns()` for interfaces not in `DNS_SERVICES` (Ethernet/USB LAN, etc.).
 - **`wg-cert.sh` mirrors `vpn-cert.sh`'s UX** for WireGuard: list / generate keypair
   (`wg genkey|pubkey`, optional `wg genpsk`) + scaffold `.conf` from a template / import an
   existing `.conf` / delete. Writes to the wg system dirs via `sudo` (chmod 600); tunnel names
