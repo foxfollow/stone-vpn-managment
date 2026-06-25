@@ -32,9 +32,15 @@ die() { echo "${R}Помилка:${N} $*" >&2; exit 1; }
 
 # ─── WireGuard ──────────────────────────────────────────────────────────────
 
-# Перша наявна директорія конфігів WireGuard.
+# Директорія конфігів WireGuard: спершу та, що містить *.conf, інакше перша наявна.
 wg_config_dir() {
     local d
+    shopt -s nullglob
+    for d in "${WG_DIRS[@]}"; do
+        [ -d "$d" ] || continue
+        local f=("$d"/*.conf)
+        [ ${#f[@]} -gt 0 ] && { echo "$d"; return 0; }
+    done
     for d in "${WG_DIRS[@]}"; do
         [ -d "$d" ] && { echo "$d"; return 0; }
     done
@@ -62,7 +68,8 @@ wg_target() {
 }
 
 # Активні WG-тунелі: друкує рядки "configname realiface" (utunN).
-# wg-quick на macOS пише назву тунелю у $WG_RUN/<utun>.name.
+# wg-quick на macOS пише <utunN> у файл $WG_RUN/<tunnel-name>.name
+# (тобто ІМ'Я ФАЙЛУ = назва тунелю, ВМІСТ = інтерфейс).
 wg_active_map() {
     [ -d "$WG_RUN" ] || return 0
     local out="" nf need_sudo=0
@@ -72,7 +79,7 @@ wg_active_map() {
         [ ${#files[@]} -gt 0 ] || return 0          # читається і порожня → тунелів немає
         for nf in "${files[@]}"; do
             if [ -r "$nf" ]; then
-                out+="$(cat "$nf") $(basename "$nf" .name)"$'\n'
+                out+="$(basename "$nf" .name) $(cat "$nf")"$'\n'
             else
                 need_sudo=1                          # .name належить root
             fi
@@ -81,10 +88,10 @@ wg_active_map() {
         need_sudo=1                                  # директорію не видно без sudo
     fi
     if [ -z "$out" ] && [ "$need_sudo" -eq 1 ]; then
-        out=$(sudo bash -c '
+        out=$(sudo -p "[sudo] пароль (статус WireGuard): " bash -c '
             shopt -s nullglob
             for nf in '"$WG_RUN"'/*.name; do
-                printf "%s %s\n" "$(cat "$nf")" "$(basename "$nf" .name)"
+                printf "%s %s\n" "$(basename "$nf" .name)" "$(cat "$nf")"
             done
         ' 2>/dev/null)
     fi
