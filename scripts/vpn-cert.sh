@@ -72,19 +72,23 @@ import_profile() {
     if [ -n "$existing" ]; then
         echo "Вже є профіль з remote $new_remote:"
         echo "  $(basename "$existing")"
-        read -rp "Замінити? [y/N]: " CONFIRM
-        [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Скасовано."; exit 0; }
-        cp "$src" "$existing"
-        echo "Замінено: $(basename "$existing")"
-    else
-        # Генеруємо числове ім'я як у OpenVPN Connect
-        local ts
-        ts=$(date +%s%3N)
-        local dest="$PROFILES/${ts}.ovpn"
-        cp "$src" "$dest"
-        echo "Додано: $(basename "$dest")"
-        echo "Remote: $new_remote"
+        read -rp "Замінити існуючий? [y/N]: " CONFIRM
+        if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+            cp "$src" "$existing"
+            echo "Замінено: $(basename "$existing")"
+            return
+        fi
+        read -rp "Додати як новий окремий профіль? [y/N]: " ADD_NEW
+        [[ "$ADD_NEW" =~ ^[Yy]$ ]] || { echo "Скасовано."; exit 0; }
     fi
+
+    # Генеруємо числове ім'я як у OpenVPN Connect
+    local ts
+    ts=$(date +%s%3N)
+    local dest="$PROFILES/${ts}.ovpn"
+    cp "$src" "$dest"
+    echo "Додано: $(basename "$dest")"
+    echo "Remote: $new_remote"
 }
 
 # ─── Видалити профіль ───────────────────────────────────────────────────────

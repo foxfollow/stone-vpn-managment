@@ -101,15 +101,63 @@ fi
 # ─── Route-fix (per-connection, з пам'яттю; можна пропустити/змінити) ─────────
 # Хости беруться з рядка(ів) `remote` ОБРАНОГО профілю. Шлюз — інтерактивно.
 echo ""
+
+# Detect active IPv4 default gateways from the routing table
+GW_IFACES=()
+GW_ADDRS=()
+while IFS=' ' read -r _iface _gw; do
+    GW_IFACES+=("$_iface")
+    GW_ADDRS+=("$_gw")
+done < <(netstat -rn -f inet 2>/dev/null | awk '$1=="default" && $2~/^[0-9]+\./{print $4, $2}')
+
+echo "Route-fix шлюз:"
+n=1
+for _idx in "${!GW_ADDRS[@]}"; do
+    printf "  %d) %-12s %s\n" "$n" "${GW_IFACES[$_idx]}" "${GW_ADDRS[$_idx]}"
+    n=$((n+1))
+done
+LAST_ENTRY=0
 if [ -n "$DEFAULT_GW" ]; then
-    read -rp "Route-fix шлюз [Enter=$DEFAULT_GW, '-' пропустити, або інший IP]: " GW_IN
-else
-    read -rp "Route-fix шлюз [Enter=пропустити, або введи IP]: " GW_IN
+    printf "  %d) (останній)   %s\n" "$n" "$DEFAULT_GW"
+    LAST_ENTRY=$n
+    n=$((n+1))
 fi
+TOTAL_GW=$((n-1))
+
+echo ""
+if [ "$TOTAL_GW" -gt 0 ]; then
+    if [ -n "$DEFAULT_GW" ]; then
+        read -rp "Вибір [Enter=$DEFAULT_GW / 1-${TOTAL_GW} / IP / '-' пропустити]: " GW_IN
+    else
+        read -rp "Вибір [1-${TOTAL_GW} / IP / Enter=пропустити]: " GW_IN
+    fi
+else
+    if [ -n "$DEFAULT_GW" ]; then
+        read -rp "Route-fix шлюз [Enter=$DEFAULT_GW / IP / '-' пропустити]: " GW_IN
+    else
+        read -rp "Route-fix шлюз [IP / Enter=пропустити]: " GW_IN
+    fi
+fi
+
+GATEWAY=""
 case "$GW_IN" in
-    "")            GATEWAY="$DEFAULT_GW" ;;
-    "-"|n|N|skip)  GATEWAY="" ;;
-    *)             GATEWAY="$GW_IN" ;;
+    "")
+        GATEWAY="${DEFAULT_GW:-}"
+        ;;
+    "-"|n|N|skip)
+        GATEWAY=""
+        ;;
+    *)
+        if [[ "$GW_IN" =~ ^[0-9]+$ ]] && [ "$GW_IN" -ge 1 ] && [ "$GW_IN" -le "$TOTAL_GW" ]; then
+            if [ "$LAST_ENTRY" -gt 0 ] && [ "$GW_IN" -eq "$LAST_ENTRY" ]; then
+                GATEWAY="${DEFAULT_GW:-}"
+            else
+                GATEWAY="${GW_ADDRS[$((GW_IN-1))]}"
+            fi
+        else
+            GATEWAY="$GW_IN"
+        fi
+        ;;
 esac
 
 if [ -n "$GATEWAY" ]; then
@@ -130,20 +178,42 @@ fi
 
 echo "Підключення..."
 
-sudo /opt/homebrew/sbin/openvpn \
+# Профіль GUI часто не має рядка `dev` — GUI додає його сам, а CLI вимагає явно.
+# Додаємо --dev tun (на macOS виділяє utun), лише якщо профіль його не задає.
+DEV_ARGS=()
+if ! grep -qE '^[[:space:]]*dev[[:space:]]' "$PROFILE"; then
+    DEV_ARGS=(--dev tun)
+fi
+
+# Capture stdout+stderr so pre-daemon noise doesn't clutter the terminal.
+# set -e is temporarily disabled to get the real exit code without silent death.
+set +e
+LAUNCH_OUT=$(sudo /opt/homebrew/sbin/openvpn \
     --config "$PROFILE" \
+    "${DEV_ARGS[@]}" \
     "${AUTH_ARGS[@]}" \
     --daemon \
     --writepid "$PIDFILE" \
     --log "$LOGFILE" \
     --script-security 2 \
-    --connect-retry-max 1
+    --connect-retry-max 1 2>&1)
+LAUNCH_RC=$?
+set -e
+if [ "$LAUNCH_RC" -ne 0 ]; then
+    echo "OpenVPN не вдалося запустити (код $LAUNCH_RC):"
+    [ -n "$LAUNCH_OUT" ] && echo "$LAUNCH_OUT"
+    sudo cat "$LOGFILE" 2>/dev/null || true
+    exit 1
+fi
 
-# Чекаємо поки підніметься тунель, потім видаляємо tmpauth
+FAIL_PAT="AUTH_FAILED|auth-failure|fatal error|TLS Error|TLS handshake failed|Exiting due to fatal|SIGTERM received|Connection refused|Network unreachable"
+
+# Чекаємо поки підніметься тунель (до 45 секунд), потім видаляємо tmpauth
 echo -n "Очікування тунелю"
-for i in $(seq 1 20); do
+for i in $(seq 1 45); do
     sleep 1
     echo -n "."
+
     if sudo grep -q "Initialization Sequence Completed" "$LOGFILE" 2>/dev/null; then
         echo ""
         echo "Підключено!"
@@ -153,14 +223,25 @@ for i in $(seq 1 20); do
         netstat -rn -f inet | grep "$IFACE" | grep -v fe80 || true
         exit 0
     fi
-    if sudo grep -q "AUTH_FAILED\|auth-failure\|fatal error" "$LOGFILE" 2>/dev/null; then
+
+    if sudo grep -qE "$FAIL_PAT" "$LOGFILE" 2>/dev/null; then
         echo ""
         echo "Помилка підключення:"
-        sudo grep -E "AUTH_FAILED|auth-failure|fatal error|ERROR" "$LOGFILE" | tail -3
+        sudo grep -E "$FAIL_PAT|ERROR" "$LOGFILE" | tail -5
+        exit 1
+    fi
+
+    # Якщо процес вже завершився — немає сенсу чекати далі
+    OPID=$(sudo cat "$PIDFILE" 2>/dev/null || true)
+    if [ -n "$OPID" ] && ! sudo kill -0 "$OPID" 2>/dev/null; then
+        echo ""
+        echo "OpenVPN завершився несподівано. Лог:"
+        sudo tail -10 "$LOGFILE"
         exit 1
     fi
 done
 
 echo ""
-echo "Тунель не піднявся за 20 секунд. Перевір лог:"
-echo "  sudo tail -30 $LOGFILE"
+echo "Тунель не піднявся за 45 секунд. Останні рядки логу:"
+sudo tail -10 "$LOGFILE"
+echo "(повний лог: sudo tail -50 $LOGFILE)"

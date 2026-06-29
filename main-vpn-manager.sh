@@ -17,6 +17,10 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS="$SCRIPT_DIR/scripts"
 
+# Defaults (config.env may override any of these).
+RESTORE_DNS=""
+DNS_SERVICES=("Wi-Fi")
+
 # Опціональний локальний конфіг (дефолти: RESTORE_DNS, DNS_SERVICES тощо).
 # shellcheck source=/dev/null
 [ -f "$SCRIPT_DIR/config.env" ] && . "$SCRIPT_DIR/config.env"
@@ -28,9 +32,9 @@ OVPN_PID="/tmp/openvpn.pid"
 
 # ─── кольори (вимикаються коли вивід не в термінал) ──────────────────────────
 if [ -t 1 ]; then
-    B=$'\033[1m'; G=$'\033[32m'; R=$'\033[31m'; D=$'\033[2m'; N=$'\033[0m'
+    B=$'\033[1m'; G=$'\033[32m'; R=$'\033[31m'; Y=$'\033[33m'; D=$'\033[2m'; N=$'\033[0m'
 else
-    B=''; G=''; R=''; D=''; N=''
+    B=''; G=''; R=''; Y=''; D=''; N=''
 fi
 
 die() { echo "${R}Помилка:${N} $*" >&2; exit 1; }
@@ -119,16 +123,19 @@ ovpn_pid() {
 
 # Відновити DNS після відключення VPN (config.env: RESTORE_DNS). Порожньо = не чіпати.
 restore_dns() {
-    [ -n "${RESTORE_DNS:-}" ] || return 0
+    [ -n "$RESTORE_DNS" ] || return 0
     local svc available
     available=$(networksetup -listallnetworkservices 2>/dev/null)
-    for svc in "${DNS_SERVICES[@]:-Wi-Fi}"; do
+    for svc in "${DNS_SERVICES[@]}"; do
         if printf '%s\n' "$available" | grep -qxF "$svc"; then
             echo "Відновлюю DNS на '$svc': $RESTORE_DNS"
             # shellcheck disable=SC2086
             sudo networksetup -setdnsservers "$svc" $RESTORE_DNS
         fi
     done
+    sudo dscacheutil -flushcache
+    sudo killall -HUP mDNSResponder
+    echo "DNS кеш очищено."
 }
 
 # ─── команди ────────────────────────────────────────────────────────────────
