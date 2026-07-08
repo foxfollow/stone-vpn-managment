@@ -18,8 +18,8 @@ build, no test framework, and no package — scripts run directly. Repo-facing d
 
 ```
 main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t> | down [t]
-                      | cert <wg|openvpn> | dns | help. WireGuard via wg-quick; "openvpn"
-                      and "cert" delegate to scripts/*.sh.
+                      | cert <wg|openvpn> | dns [fix [servers]] | help. WireGuard via
+                      wg-quick; "openvpn" and "cert" delegate to scripts/*.sh.
 README.md             User-facing overview + usage (Ukrainian).
 OPENVPN_CLI.md        Detailed OpenVPN reference (Ukrainian).
 config.env.example    Template for config.env (committed).
@@ -83,13 +83,50 @@ There are no unit tests. Validate changes like this:
   (written via the inline `set_state KEY VAL` helper, which rewrites one key). Both gitignored;
   `state.env` is created on first connect. `main-vpn-manager.sh` also sources `config.env`.
 - **DNS restore after `down`.** `wg-quick` can leave a dead WG DNS after teardown, so `cmd_down`
-  calls `restore_dns()`: if `config.env` RESTORE_DNS is non-empty it runs
-  `networksetup -setdnsservers` for each service in the `DNS_SERVICES` array (default `Wi-Fi`).
-  Empty RESTORE_DNS = DNS left untouched.
+  calls `restore_dns()`: if `config.env` RESTORE_DNS is non-empty it `dns_bounce()`es each
+  service in the `DNS_SERVICES` array (default `Wi-Fi`), then purges orphaned resolvers and
+  flushes. Empty RESTORE_DNS = DNS left untouched.
 - **`dns` command (`cmd_dns`).** Interactive audit: lists every enabled network service
   (`networksetup -listallnetworkservices`, skipping `*`-disabled) with its current DNS, then
   sets a chosen DNS (default `RESTORE_DNS`) on selected services or `all`. Complements the
   automatic `restore_dns()` for interfaces not in `DNS_SERVICES` (Ethernet/USB LAN, etc.).
+  It also prints the *effective* resolver (`dns_global_servers`) and the primary service,
+  because per-service DNS in the list is often not what the resolver actually uses.
+
+- **macOS DNS has two layers, and `networksetup` only touches the weaker one.**
+  `Setup:/Network/Service/<uuid>/DNS` = preferences (what `networksetup -setdnsservers`
+  writes). `State:/Network/Service/<uuid>/DNS` = runtime, written directly by
+  NetworkExtension VPNs (ClearVPN, FortiClient). **State beats Setup.** So setting DNS on a
+  VPN service via `networksetup` is a silent no-op while the extension holds its State entry.
+  Ground truth is `State:/Network/Global/DNS` (`scutil`), never `-getdnsservers`.
+
+- **SystemConfiguration only recomputes global DNS on a *real value change*.** Writing the
+  same DNS a service already has produces no notification, so a stale global resolver left by
+  a dead tunnel survives. Hence `dns_bounce()`: `-setdnsservers <svc> empty` then the real
+  value — two genuine transitions. This is the whole reason the old `restore_dns()` and
+  `cmd_dns` appeared to "succeed" while `ping` still hung.
+
+- **`dns fix` (`cmd_dns_fix`) is the recovery path** for "VPN died, DNS is gone, ping hangs
+  with no output". It (1) purges orphaned resolvers — service UUIDs that have a State `DNS`
+  key but no State `IPv4` key and aren't the primary service (`dns_orphan_uuids`), (2)
+  bounces DNS on a *real* service. If the primary service is a VPN with no BSD device (exactly
+  what ClearVPN does), it falls back to the first service in `DNS_SERVICES`.
+
+- **`scutil` always exits 0** — even on `Permission denied`. A successful `remove` prints
+  nothing, so `dns_purge_orphans()` treats *any* output as failure. Never check `$?` there.
+
+- **A network service with an empty `Device:` in `networksetup -listnetworkserviceorder` is a
+  VPN service** (NE or IPSec) — that's how `svc_is_vpn()` flags rows whose DNS is controlled
+  by the tunnel itself. Real interfaces always report a BSD device (`en0`, `bridge0`, …).
+
+- **`scripts/nuclear-clean-dns.sh` is superseded by `dns fix`.** It only ever worked by
+  accident: setting Wi-Fi to `empty` is a real change, which forced the recompute. It still
+  hardcodes Wi-Fi / iPhone USB and leaves DNS empty.
+
+- **utun parsing in `cmd_status` must reset the interface name on every interface header.**
+  Most utuns carry only link-local IPv6; an awk that keeps the last-seen utun name until it
+  finds an `inet` line will attribute the *next* interface's IPv4 to that utun (utun0 showing
+  en0's address). A utun with no IPv4 is not a live tunnel.
 - **`wg-cert.sh` mirrors `vpn-cert.sh`'s UX** for WireGuard: list / generate keypair
   (`wg genkey|pubkey`, optional `wg genpsk`) + scaffold `.conf` from a template / import an
   existing `.conf` / delete. Writes to the wg system dirs via `sudo` (chmod 600); tunnel names
