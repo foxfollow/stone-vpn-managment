@@ -18,6 +18,9 @@ auth.txt
 config.env
 state.env
 
+# ── Локальні нотатки/TODO (містять деталі реальних мереж і VPN) ──
+TODO/
+
 # ── Ключі WireGuard ──
 privatekey
 publickey
