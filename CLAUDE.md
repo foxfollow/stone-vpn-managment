@@ -106,11 +106,35 @@ There are no unit tests. Validate changes like this:
   value — two genuine transitions. This is the whole reason the old `restore_dns()` and
   `cmd_dns` appeared to "succeed" while `ping` still hung.
 
-- **`dns fix` (`cmd_dns_fix`) is the recovery path** for "VPN died, DNS is gone, ping hangs
-  with no output". It (1) purges orphaned resolvers — service UUIDs that have a State `DNS`
-  key but no State `IPv4` key and aren't the primary service (`dns_orphan_uuids`), (2)
-  bounces DNS on a *real* service. If the primary service is a VPN with no BSD device (exactly
-  what ClearVPN does), it falls back to the first service in `DNS_SERVICES`.
+- **`dns fix` (`cmd_dns_fix`) is a three-case doctor** for "VPN broke DNS, ping hangs with no
+  output". It probes every effective resolver (`dns_probe`: `dig +time=2 +tries=1`, `nslookup`
+  fallback, neither → assume alive). Cases: (1) healthy — resolver answers, no orphans → touch
+  nothing, no sudo; (2) dead tunnel left a stale resolver → purge orphans (State `DNS` key
+  without State `IPv4`, not primary — `dns_orphan_uuids`) and bounce a *real* service (falls
+  back to `DNS_SERVICES` when the primary maps to no networksetup service); (3) primary is a
+  *live but broken* VPN utun — see next bullet. It always re-probes at the end and reports
+  failure honestly instead of printing success.
+
+- **A live-but-broken NE VPN black-holes everything; no DNS edit can fix it.** When a
+  NetworkExtension tunnel (ClearVPN) is primary, it owns both the default route and State DNS.
+  If its in-tunnel resolvers (10.1.0.x) don't answer, *all* traffic dies — including other VPN
+  clients' control channels (observed: Cisco Secure Client "Unable to contact <head-end>"
+  purely because ClearVPN held the route; after reboot Cisco connected fine). Bouncing Wi-Fi
+  while the VPN stays primary changes nothing — `dns fix` case 3 instead lists candidate
+  tunnel-owner processes and offers to `sudo kill` them, then repairs DNS normally.
+  `vpn_tunnel_procs` uses `pgrep -fl` (`ps | grep` would match its own grep — the user's grep
+  is aliased to ugrep, whose argv contains the pattern) over `SystemExtensions/` paths matching
+  vpn|wireguard|tunnel|anyconnect plus Cisco's `vpnagentd`, excluding ClearVPN's
+  `security-monitor`; repo-managed `openvpn`/`wireguard-go` are deliberately not matched (they
+  go through `down`). `scutil --nc stop` is not an option: ClearVPN's sessions show `(Invalid)`
+  in `scutil --nc list` even while its tunnel is up.
+
+- **Liveness checks on root processes must use `ps -p`, not `kill -0`.** Without root,
+  `kill -0 <pid>` returns EPERM for a *live* root-owned process, so a "still alive → kill -9"
+  escalation silently never fires. All NE extensions run as root.
+
+- **`status` prints a "Мережа:" block first** (primary service + effective resolver) — that,
+  not the utun list, is what shows a foreign VPN owning the network.
 
 - **`scutil` always exits 0** — even on `Permission denied`. A successful `remove` prints
   nothing, so `dns_purge_orphans()` treats *any* output as failure. Never check `$?` there.

@@ -176,6 +176,28 @@ svc_device()    { svc_device_pairs | awk -F'\t' -v n="$1" '$1 == n { print $2; e
 # Сервіс без BSD-пристрою — VPN (NE/IPSec). Його DNS задає сам тунель, не networksetup.
 svc_is_vpn() { [ -z "$(svc_device "$1")" ]; }
 
+iface_is_utun() { case "${1:-}" in utun[0-9]*) return 0 ;; esac; return 1; }
+
+# Чи відповідає DNS-сервер на запити (таймаут ~2с). 0 = живий.
+dns_probe() {
+    if command -v dig >/dev/null 2>&1; then
+        dig +time=2 +tries=1 +short "@$1" apple.com >/dev/null 2>&1
+    elif command -v nslookup >/dev/null 2>&1; then
+        nslookup -timeout=2 -retry=1 apple.com "$1" >/dev/null 2>&1
+    else
+        return 0        # нема чим перевірити — вважаємо живим, аби не радити зайвого
+    fi
+}
+
+# Процеси сторонніх VPN, що можуть тримати utun: NE-розширення (ClearVPN,
+# FortiClient, Cisco acsockext) + vpnagentd (Cisco). pgrep, а не ps|grep — щоб
+# не зловити власний grep. Наші openvpn/wireguard-go сюди навмисно не входять:
+# їх опускає звичайний 'down'.
+vpn_tunnel_procs() {
+    pgrep -fl 'SystemExtensions/.*(vpn|wireguard|tunnel|anyconnect)|vpnagentd' 2>/dev/null \
+        | grep -vi 'security-monitor'
+}
+
 # Осиротілі резолвери: State-DNS є, а State-IPv4 вже немає — тунель мертвий,
 # а його DNS лишився. Первинний сервіс не чіпаємо ніколи.
 dns_orphan_uuids() {
@@ -244,6 +266,25 @@ restore_dns() {
 
 cmd_status() {
     echo "${B}=== Статус VPN ===${N}"
+    echo ""
+
+    # Хто насправді володіє мережею: цей блок, а не список utun, показує,
+    # що сторонній VPN (ClearVPN/Cisco) захопив маршрути й DNS.
+    echo "${B}Мережа:${N}"
+    local piface presolver psvc
+    piface=$(dns_primary_iface)
+    presolver=$(dns_global_servers); presolver="${presolver% }"
+    if [ -n "$piface" ]; then
+        if iface_is_utun "$piface"; then
+            printf "  первинний: %s ${Y}(VPN-тунель тримає маршрути й DNS)${N}\n" "$piface"
+        else
+            psvc=$(svc_for_iface "$piface")
+            printf "  первинний: %s${D}%s${N}\n" "$piface" "${psvc:+ ($psvc)}"
+        fi
+        printf "  діючий DNS: %s\n" "${presolver:-${R}(порожньо — резолюція зламана; спробуй 'dns fix')${N}}"
+    else
+        echo "  ${R}немає первинного сервісу — мережа не сконфігурована${N}"
+    fi
     echo ""
 
     echo "${B}WireGuard:${N}"
@@ -382,28 +423,112 @@ cmd_cert() {
     esac
 }
 
-# Ремонт «після VPN зник DNS»: викинути резолвери мертвих тунелів і змусити
-# SystemConfiguration перерахувати глобальний DNS (bounce на РЕАЛЬНОМУ сервісі).
+# Ремонт «DNS зник / усе висить». Три випадки:
+#   1) все здорове — нічого не чіпаємо;
+#   2) мертвий тунель лишив резолвер у State — purge осиротілих + bounce (класика);
+#   3) первинний — ЖИВИЙ, але зламаний VPN (utunN, резолвери мовчать): він тримає
+#      default route і DNS → чорна діра для ВСЬОГО трафіку, інші VPN теж не
+#      з'єднаються зі своїм сервером. Конфігурацією DNS це не лікується — треба
+#      опустити тунель; пропонуємо вбити його процес, потім відновлюємо DNS.
 cmd_dns_fix() {
-    local want="${1:-}" iface svc cand available cur
+    local want="${1:-}" iface svc cand available cur servers s alive=0 probeline=""
 
     echo "${B}=== Ремонт DNS ===${N}"
     iface=$(dns_primary_iface)
-    svc=$(svc_for_iface "$iface")
-    printf "  первинний інтерфейс : %s\n" "${iface:-—}"
-    printf "  діючий резолвер     : %s\n" "$(dns_global_servers)"
+    servers=$(dns_global_servers)
+    printf "  первинний інтерфейс : %s\n" "${iface:-${R}немає${N}}"
+    # shellcheck disable=SC2086
+    for s in $servers; do
+        if dns_probe "$s"; then alive=$((alive + 1)); probeline+="${G}${s} ✓${N} "
+        else probeline+="${R}${s} ✗${N} "; fi
+    done
+    printf "  діючий резолвер     : %s\n" "${probeline:-${R}(порожньо)${N}}"
 
-    # Первинним може стати VPN-сервіс без BSD-пристрою (саме так ламає ClearVPN):
-    # тоді bounce робимо на першому реальному сервісі з DNS_SERVICES.
+    # ── Випадок 3: первинний — живий VPN-тунель ─────────────────────────────
+    if iface_is_utun "$iface"; then
+        if [ "$alive" -gt 0 ]; then
+            echo ""
+            echo "  Первинний — VPN-тунель ($iface), і його DNS відповідає. Лагодити нічого."
+            return 0
+        fi
+        echo ""
+        echo "  ${R}Первинний — VPN-тунель ($iface), але його резолвери НЕ відповідають.${N}"
+        echo "  Він тримає default route і DNS → чорна діра для всього трафіку"
+        echo "  (навіть інші VPN не досягнуть свого сервера). Поки тунель живий,"
+        echo "  перенастроювання DNS безсиле — треба опустити тунель."
+        echo ""
+        local -a kpids=() knames=()
+        local line pid cmd0
+        while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            pid=$(printf '%s' "$line" | awk '{print $1}')
+            cmd0=$(printf '%s' "$line" | awk '{print $2}')
+            kpids+=("$pid"); knames+=("$(basename "$cmd0")")
+        done < <(vpn_tunnel_procs)
+        if [ "${#kpids[@]}" -eq 0 ]; then
+            echo "  Процесів тунелю не бачу. Відключи VPN у його застосунку і повтори."
+            return 1
+        fi
+        echo "  Процеси, що можуть тримати тунель:"
+        local i
+        for i in "${!kpids[@]}"; do
+            printf "   %2d) PID %-7s %s\n" "$((i + 1))" "${kpids[$i]}" "${knames[$i]}"
+        done
+        echo ""
+        local pick
+        read -rp "  Вбити — які? [номери через кому / all / n=ні]: " pick
+        local -a ksel=()
+        case "$pick" in
+            ""|n|N) echo "  Скасовано. Відключи VPN у застосунку і повтори 'dns fix'."; return 1 ;;
+            all|ALL|всі) ksel=("${kpids[@]}") ;;
+            *)
+                local idx idxs
+                IFS=',' read -ra idxs <<< "$pick"
+                for idx in "${idxs[@]}"; do
+                    idx="${idx// /}"
+                    if [[ "$idx" =~ ^[0-9]+$ ]] && [ "$idx" -ge 1 ] && [ "$idx" -le "${#kpids[@]}" ]; then
+                        ksel+=("${kpids[$((idx - 1))]}")
+                    else
+                        echo "  Пропускаю невірний номер: $idx"
+                    fi
+                done
+                ;;
+        esac
+        [ "${#ksel[@]}" -gt 0 ] || { echo "  Нічого не вибрано."; return 1; }
+        local p
+        for p in "${ksel[@]}"; do
+            echo "  kill $p"
+            sudo kill "$p" 2>/dev/null
+        done
+        sleep 2
+        # НЕ kill -0: для root-процесу без root він дає EPERM і на живому.
+        for p in "${ksel[@]}"; do
+            if ps -p "$p" >/dev/null 2>&1; then
+                echo "  ще живий — kill -9 $p"
+                sudo kill -9 "$p" 2>/dev/null
+            fi
+        done
+        sleep 1
+        echo ""
+    elif [ "$alive" -gt 0 ] && [ -z "$want" ] && [ -z "$(dns_orphan_uuids)" ]; then
+        # ── Випадок 1: все здорове ──────────────────────────────────────────
+        echo ""
+        echo "  Все здорове: резолвер відповідає, осиротілих записів немає."
+        echo "  ${D}Форсувати перевстановлення: ./main-vpn-manager.sh dns fix <сервери>${N}"
+        return 0
+    fi
+
+    # ── Випадок 2 (і хвіст 3-го): purge осиротілих + bounce реального сервісу ──
+    iface=$(dns_primary_iface)
+    svc=$(svc_for_iface "$iface")
     if [ -z "$svc" ]; then
         available=$(networksetup -listallnetworkservices 2>/dev/null)
         for cand in "${DNS_SERVICES[@]}"; do
             printf '%s\n' "$available" | grep -qxF "$cand" && { svc="$cand"; break; }
         done
         [ -n "$svc" ] || die "не знайшов реального сервісу для ремонту (див. DNS_SERVICES у config.env)"
-        echo "  ${Y}первинний — VPN без BSD-пристрою; ремонтую через '$svc'${N}"
     fi
-    printf "  ремонтую через      : %s\n\n" "$svc"
+    printf "  ремонтую через '%s'\n" "$svc"
 
     dns_purge_orphans
 
@@ -417,8 +542,24 @@ cmd_dns_fix() {
     echo "  перевстановлюю DNS на '$svc': $want"
     dns_bounce "$svc" "$want" || die "не вдалося встановити DNS на '$svc'"
     dns_flush
-    printf "\n  діючий резолвер тепер: ${G}%s${N}\n" "$(dns_global_servers)"
-    echo "${G}Готово.${N} ${D}Перевірка: dscacheutil -q host -a name google.com${N}"
+
+    # ── Чесна перевірка: правильна конфігурація — ще не робочий DNS ─────────
+    local ok=0
+    iface=$(dns_primary_iface)
+    servers=$(dns_global_servers)
+    # shellcheck disable=SC2086
+    for s in $servers; do dns_probe "$s" && { ok=1; break; }; done
+    printf "\n  первинний: %s, діючий резолвер: %s\n" "${iface:-—}" "${servers:-(порожньо)}"
+    if [ "$ok" -eq 1 ]; then
+        echo "${G}Готово — DNS відповідає.${N}"
+    else
+        echo "${R}Резолвер досі не відповідає.${N} Конфігурацію DNS виправлено, тож проблема"
+        echo "нижче — маршрути/мережа."
+        if iface_is_utun "$iface"; then
+            echo "Первинний досі $iface — VPN не відпустив мережу; відключи його в застосунку."
+        fi
+        return 1
+    fi
 }
 
 cmd_dns() {
@@ -537,11 +678,15 @@ ${B}Приклади:${N}
   ./main-vpn-manager.sh dns fix 1.1.1.1    # те саме, з явними серверами
 
 ${B}Про 'dns fix':${N}
-  VPN-розширення (ClearVPN, FortiClient) пишуть DNS у рантайм-стор macOS, і він
-  перемагає все, що ставить 'networksetup'. Коли тунель падає, його резолвер може
-  там лишитись — DNS «зникає», ping зависає без виводу. 'dns fix' викидає резолвери
-  мертвих тунелів і форсує перерахунок глобального DNS. Просто перезаписати те саме
-  значення не допомагає: macOS реагує лише на реальну зміну.
+  VPN-розширення (ClearVPN, FortiClient, Cisco) пишуть DNS у рантайм-стор macOS
+  (State), який перемагає все, що ставить 'networksetup'. Звідси два зломи:
+  1) тунель помер, а його резолвер лишився — 'dns fix' викидає осиротілі записи
+     і форсує перерахунок (перезапис тим самим значенням macOS ігнорує);
+  2) тунель ЖИВИЙ, але зламаний: він первинний (utunN), а його резолвери мовчать.
+     Тоді він тримає default route і DNS → висне ВЕСЬ трафік, і навіть інші VPN
+     не з'єднаються зі своїм сервером. Це не лікується конфігурацією — 'dns fix'
+     знаходить процес тунелю, пропонує його вбити і потім відновлює DNS.
+  Наприкінці 'dns fix' сам перевіряє резолвер і чесно скаже, якщо не допомогло.
 
 ${B}Примітки:${N}
   • потребує sudo (створення tun-інтерфейсу, wg-quick)
