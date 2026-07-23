@@ -153,6 +153,20 @@ dns_global_servers() {
 dns_primary_iface() { sc_show State:/Network/Global/IPv4 | awk '/PrimaryInterface/ { print $NF }'; }
 dns_primary_uuid()  { sc_show State:/Network/Global/IPv4 | awk '/PrimaryService/   { print $NF }'; }
 
+# ─── Маршрути ────────────────────────────────────────────────────────────────
+# Хто справді несе трафік — маршрут, а не DNS. `route -n get` надійніший за
+# парсинг netstat: питає ядро про конкретний напрямок.
+route_default_iface() { route -n get default 2>/dev/null | awk '/interface:/{print $2}'; }
+route_default_gw()    { route -n get default   2>/dev/null | awk '/gateway:/{print $2}'; }
+route_iface_for()     { route -n get "$1" 2>/dev/null | awk '/interface:/{print $2}'; }
+
+# Split-default: повнотунельні VPN (ClearVPN) перехоплюють УВЕСЬ трафік двома
+# /1-маршрутами (0/1 + 128.0/1), що б'ють `default`, не видаляючи його. Друкує
+# інтерфейси, на які вони вказують (напр. utun8), якщо такі є — це і є «викрадач».
+route_split_default() {
+    netstat -rn -f inet 2>/dev/null | awk '$1=="0/1" || $1=="128.0/1" { print $NF }' | sort -u
+}
+
 # "ім'я<TAB>BSD-пристрій" по кожному увімкненому сервісу.
 # svc_is_vpn() смикається на кожен рядок списку, а networksetup — недешевий процес,
 # тож кеш прогріваємо явно (svc_device_load) у батьківському шелі: самі svc_device*
@@ -196,6 +210,21 @@ dns_probe() {
 vpn_tunnel_procs() {
     pgrep -fl 'SystemExtensions/.*(vpn|wireguard|tunnel|anyconnect)|vpnagentd' 2>/dev/null \
         | grep -vi 'security-monitor'
+}
+
+# Роль процесу за його cmdline. Критично для 'dns fix': Cisco vpnagentd та
+# acsockext крутяться 24/7, НАВІТЬ коли AnyConnect не під'єднаний, — вони не
+# тримають чужий тунель. Тобто коли живий лише ClearVPN, у списку все одно
+# висять 2 демони Cisco. Провайдера активного тунелю (ClearVPN) — ось кого
+# опускати. Друкує "kind|коротка_мітка"; kind = tunnel | daemon.
+vpn_proc_role() {
+    case "$1" in
+        *vpnagentd*|*acsockext*|*anyconnect*) echo "daemon|Cisco-демон (фоновий)" ;;
+        *clearvpn*)                           echo "tunnel|ClearVPN" ;;
+        *wireguard*)                          echo "tunnel|NE WireGuard-тунель" ;;
+        *forti*)                              echo "tunnel|FortiClient" ;;
+        *)                                    echo "tunnel|NE VPN-тунель" ;;
+    esac
 }
 
 # Осиротілі резолвери: State-DNS є, а State-IPv4 вже немає — тунель мертвий,
@@ -285,6 +314,23 @@ cmd_status() {
     else
         echo "  ${R}немає первинного сервісу — мережа не сконфігурована${N}"
     fi
+
+    # Маршрут за замовчуванням + перехоплення. Саме тут видно VPN-на-VPN
+    # конфлікт: повнотунельний VPN забирає default або ставить split 0/1+128/1.
+    local diface dgw split
+    diface=$(route_default_iface); dgw=$(route_default_gw)
+    if [ -n "$diface" ]; then
+        if iface_is_utun "$diface"; then
+            printf "  маршрут: default → %s ${Y}(VPN тримає весь трафік)${N}\n" "$diface"
+        else
+            printf "  маршрут: default → %s${D}%s${N}\n" "$diface" "${dgw:+ ($dgw)}"
+        fi
+    else
+        echo "  ${R}маршрут: немає default — трафік нікуди не піде${N}"
+    fi
+    split=$(route_split_default | tr '\n' ' ')
+    [ -n "${split// /}" ] && \
+        printf "  ${Y}перехоплення: 0/1+128.0/1 → %s — повнотунельний VPN обходить default${N}\n" "${split% }"
     echo ""
 
     echo "${B}WireGuard:${N}"
@@ -456,24 +502,49 @@ cmd_dns_fix() {
         echo "  Він тримає default route і DNS → чорна діра для всього трафіку"
         echo "  (навіть інші VPN не досягнуть свого сервера). Поки тунель живий,"
         echo "  перенастроювання DNS безсиле — треба опустити тунель."
+        local diface split
+        diface=$(route_default_iface)
+        split=$(route_split_default | tr '\n' ' ')
+        printf "  ${D}маршрут: default → %s${N}\n" "${diface:-—}"
+        [ -n "${split// /}" ] && \
+            printf "  ${D}перехоплення 0/1+128.0/1 → %s${N}\n" "${split% }"
         echo ""
-        local -a kpids=() knames=()
-        local line pid cmd0
+        local -a rpids=() rnames=() rkind=() rlabel=()
+        local line pid cmd0 role
         while IFS= read -r line; do
             [ -n "$line" ] || continue
             pid=$(printf '%s' "$line" | awk '{print $1}')
-            cmd0=$(printf '%s' "$line" | awk '{print $2}')
-            kpids+=("$pid"); knames+=("$(basename "$cmd0")")
+            cmd0=$(printf '%s' "$line" | cut -d' ' -f2-)   # повний cmd — для класифікації
+            role=$(vpn_proc_role "$cmd0")
+            rpids+=("$pid"); rnames+=("$(basename "$(printf '%s' "$line" | awk '{print $2}')")")
+            rkind+=("${role%%|*}"); rlabel+=("${role#*|}")
         done < <(vpn_tunnel_procs)
-        if [ "${#kpids[@]}" -eq 0 ]; then
+        if [ "${#rpids[@]}" -eq 0 ]; then
             echo "  Процесів тунелю не бачу. Відключи VPN у його застосунку і повтори."
             return 1
         fi
-        echo "  Процеси, що можуть тримати тунель:"
-        local i
+        # Провайдери живих тунелів — вперед, фонові демони — назад. Так номер 1
+        # майже завжди і є винуватець, а не Cisco-демон, який тут просто крутиться.
+        local -a kpids=() knames=() kkind=() klabel=()
+        local i tuncount=0
+        for i in "${!rpids[@]}"; do [ "${rkind[$i]}" = "tunnel" ] && {
+            kpids+=("${rpids[$i]}"); knames+=("${rnames[$i]}"); kkind+=("tunnel"); klabel+=("${rlabel[$i]}"); tuncount=$((tuncount+1)); }; done
+        for i in "${!rpids[@]}"; do [ "${rkind[$i]}" = "daemon" ] && {
+            kpids+=("${rpids[$i]}"); knames+=("${rnames[$i]}"); kkind+=("daemon"); klabel+=("${rlabel[$i]}"); }; done
+
+        echo "  Процеси, що можуть тримати тунель ${D}(первинний: $iface)${N}:"
+        local mk
         for i in "${!kpids[@]}"; do
-            printf "   %2d) PID %-7s %s\n" "$((i + 1))" "${kpids[$i]}" "${knames[$i]}"
+            mk="${Y}"; [ "${kkind[$i]}" = "daemon" ] && mk="${D}"
+            printf "   %2d) ${mk}%-20s${N} ${D}PID %-6s %s${N}\n" \
+                "$((i + 1))" "${klabel[$i]}" "${kpids[$i]}" "${knames[$i]}"
         done
+        echo ""
+        echo "  ${D}Cisco-демони (vpnagentd/acsockext) крутяться завжди — тунель вони тримають${N}"
+        echo "  ${D}лише коли AnyConnect під'єднаний. Опускай ПРОВАЙДЕРА активного VPN (жовті).${N}"
+        [ "$tuncount" -eq 1 ] && \
+            echo "  ${G}Схоже, винуватець — №1 (${klabel[0]}).${N}"
+        echo "  ${D}Для ClearVPN надійніше Disconnect у застосунку: kill відроджує systemextensionsd.${N}"
         echo ""
         local pick
         read -rp "  Вбити — які? [номери через кому / all / n=ні]: " pick
@@ -508,7 +579,29 @@ cmd_dns_fix() {
                 sudo kill -9 "$p" 2>/dev/null
             fi
         done
-        sleep 1
+
+        # macOS зриває маршрут+DNS тунелю АСИНХРОННО: процес помер миттєво, а
+        # SystemConfiguration ще ~5-10с тримає utun первинним і його резолвери
+        # глобальними. Без очікування re-probe нижче ловить цей проміжний стан
+        # і бреше «маршрути/мережа», хоча kill спрацював (ping оживає за мить).
+        # Тож чекаємо, поки первинний перестане бути utun, а не фіксовану паузу.
+        printf "  чекаю, поки тунель відпустить мережу"
+        local waited=0
+        while [ "$waited" -lt 20 ]; do
+            iface=$(dns_primary_iface)
+            iface_is_utun "$iface" || break
+            printf "."
+            sleep 1
+            waited=$((waited + 1))
+        done
+        echo ""
+        if iface_is_utun "$iface"; then
+            echo "  ${Y}тунель ($iface) досі первинний після ${waited}с${N} — розширення,"
+            echo "  ${Y}схоже, перезапустилось і знову підняло тунель.${N} kill тут — глухий кут:"
+            echo "  systemextensionsd відроджує процес. Відключи VPN у ЙОГО застосунку"
+            echo "  (кнопкою Disconnect), тоді повтори 'dns fix'."
+            return 1
+        fi
         echo ""
     elif [ "$alive" -gt 0 ] && [ -z "$want" ] && [ -z "$(dns_orphan_uuids)" ]; then
         # ── Випадок 1: все здорове ──────────────────────────────────────────
@@ -647,6 +740,74 @@ cmd_dns() {
     echo "${G}Готово.${N}"
 }
 
+# Підтвердити, хто ВОЛОДІЄ поточним маршрутом. Суто read-only (без sudo): показує
+# default-інтерфейс, split-default 0/1+128.0/1 (як повнотунельні VPN обходять
+# default), куди реально йдуть тестові адреси, і які utun живі (мають IPv4). Не
+# чіпає маршрути навмисне: видаляти те, що встановив VPN, крихко — його чинить
+# лише опускання тунелю (це вже робить 'dns fix' / кнопка Disconnect у застосунку).
+cmd_route() {
+    command -v route >/dev/null 2>&1 || die "route недоступний"
+    echo "${B}=== Маршрут (хто несе трафік) ===${N}"
+
+    local diface dgw split
+    diface=$(route_default_iface); dgw=$(route_default_gw)
+    if [ -n "$diface" ]; then
+        if iface_is_utun "$diface"; then
+            printf "  default → %s ${Y}(VPN-тунель тримає весь трафік)${N}\n" "$diface"
+        else
+            printf "  default → %s${D}%s${N}\n" "$diface" "${dgw:+ (шлюз $dgw)}"
+        fi
+    else
+        echo "  ${R}default відсутній — трафік нікуди не піде${N}"
+    fi
+
+    split=$(route_split_default | tr '\n' ' ')
+    if [ -n "${split// /}" ]; then
+        printf "  ${Y}перехоплення: 0/1+128.0/1 → %s${N}\n" "${split% }"
+        echo "  ${D}(повнотунельний VPN, напр. ClearVPN, обходить default цими /1-маршрутами)${N}"
+    else
+        echo "  ${D}split-default (0/1,128.0/1): немає${N}"
+    fi
+
+    # Куди РЕАЛЬНО підуть пакети до тестових адрес — це і є ground truth.
+    local t ti
+    echo ""
+    echo "  ${D}куди йдуть тестові адреси:${N}"
+    for t in 1.1.1.1 8.8.8.8; do
+        ti=$(route_iface_for "$t")
+        if iface_is_utun "$ti"; then
+            printf "    %-9s → %s ${Y}(через VPN)${N}\n" "$t" "$ti"
+        else
+            printf "    %-9s → %s\n" "$t" "${ti:-${R}—${N}}"
+        fi
+    done
+
+    # Живі тунелі (utun з IPv4) — кандидати на «викрадача» маршруту.
+    local utuns
+    utuns=$(ifconfig 2>/dev/null | awk '
+        /^[a-z][a-z0-9]*:/ { i = /^utun[0-9]/ ? substr($1, 1, length($1) - 1) : "" ; next }
+        i && /^[[:space:]]*inet [0-9]/ { print i" "$2; i="" }')
+    echo ""
+    echo "  ${D}живі utun (мають IPv4):${N}"
+    if [ -n "$utuns" ]; then
+        echo "$utuns" | sed 's/^/    /'
+    else
+        echo "    ${D}немає${N}"
+    fi
+
+    # Діагноз: конфлікт = utun несе default або є split на utun.
+    echo ""
+    if iface_is_utun "$diface" || [ -n "${split// /}" ]; then
+        echo "  ${R}Повнотунельний VPN тримає маршрут.${N} Коли це ClearVPN/Cisco поверх"
+        echo "  робочих VPN — вони душать одне одного: робочий тунель втрачає підложку,"
+        echo "  зривається й перепідключається (utun блимає). Лікується лише опусканням"
+        echo "  зайвого тунелю: ${G}./main-vpn-manager.sh dns fix${N} (запропонує вбити) або"
+        echo "  Disconnect у самому застосунку VPN."
+        return 1
+    fi
+    echo "  ${G}Конфлікту немає:${N} default несе реальний інтерфейс, перехоплення немає."
+}
+
 cmd_help() {
     cat <<EOF
 ${B}main-vpn-manager.sh${N} — керування VPN-тунелями (WireGuard + OpenVPN)
@@ -663,6 +824,7 @@ ${B}Команди:${N}
   ${G}cert${N} <wg|openvpn> додати/керувати конфігами та сертифікатами
   ${G}dns${N}               показати DNS по сервісах і встановити на вибраних
   ${G}dns fix${N} [сервери] полагодити DNS, що зник після VPN (ClearVPN тощо)
+  ${G}route${N}             підтвердити, хто володіє маршрутом (default + перехоплення)
   ${G}help${N}              ця довідка
 
 ${B}Приклади:${N}
@@ -676,6 +838,7 @@ ${B}Приклади:${N}
   ./main-vpn-manager.sh dns                # перевірити/додати DNS на інтерфейсах
   ./main-vpn-manager.sh dns fix            # DNS зник після VPN — полагодити
   ./main-vpn-manager.sh dns fix 1.1.1.1    # те саме, з явними серверами
+  ./main-vpn-manager.sh route              # хто тримає default / чи є перехоплення
 
 ${B}Про 'dns fix':${N}
   VPN-розширення (ClearVPN, FortiClient, Cisco) пишуть DNS у рантайм-стор macOS
@@ -704,6 +867,7 @@ case "${1:-help}" in
     down|stop)       shift; cmd_down "$@" ;;
     cert)            shift; cmd_cert "$@" ;;
     dns)             shift; cmd_dns "$@" ;;
+    route|rt)        cmd_route ;;
     help|-h|--help)  cmd_help ;;
     *)               die "невідома команда '${1}'. Див. './main-vpn-manager.sh help'" ;;
 esac
