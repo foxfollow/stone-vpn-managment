@@ -18,8 +18,9 @@ build, no test framework, and no package — scripts run directly. Repo-facing d
 
 ```
 main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t> | down [t]
-                      | cert <wg|openvpn> | dns [fix [servers]] | help. WireGuard via
-                      wg-quick; "openvpn" and "cert" delegate to scripts/*.sh.
+                      | cert <wg|openvpn> | dns [fix [servers]] | route | net [auto |
+                      top <svc>] | help. WireGuard via wg-quick; "openvpn" and "cert"
+                      delegate to scripts/*.sh.
 README.md             User-facing overview + usage (Ukrainian).
 OPENVPN_CLI.md        Detailed OpenVPN reference (Ukrainian).
 config.env.example    Template for config.env (committed).
@@ -132,6 +133,30 @@ There are no unit tests. Validate changes like this:
 - **Liveness checks on root processes must use `ps -p`, not `kill -0`.** Without root,
   `kill -0 <pid>` returns EPERM for a *live* root-owned process, so a "still alive → kill -9"
   escalation silently never fires. All NE extensions run as root.
+
+- **macOS picks the primary interface by *service order*, not by reachability.** The
+  highest-ordered service that has an IPv4 address *with a router* wins — a USB-Ethernet
+  plugged into a router with no uplink therefore steals the default route from Wi-Fi
+  (gateway present, internet absent). `cmd_net` lists services in order with a real
+  per-interface reachability probe (`net_iface_online`: `ping -c1 -W 1200 -b <dev>` to
+  1.1.1.1/8.8.8.8, then `curl --interface` to captive.apple.com — ICMP is filtered on some
+  LANs), marks the primary, and can reorder. `net auto` = "primary has no internet → put
+  the highest service that does on top". Fixing this with `route change default` is
+  pointless: `configd` rewrites the route on the next network-state change; only the
+  service order is persistent. `networksetup -ordernetworkservices` needs the **full**
+  service list (partial list → "parameters were not valid"), so `net_apply_top` re-emits
+  every name, disabled ones included.
+
+- **`route -n get default` and `State:/Network/Global/IPv4` can disagree.** With two
+  default routes (scoped `UGScIg` + unscoped) `route get` may report the non-primary
+  interface. `cmd_route` uses the routing table (what packets actually do); `cmd_net`/
+  `dns_primary_iface` use the global state (what SystemConfiguration considers primary).
+  Both are needed — do not "unify" them.
+
+- **`cmd_route`'s "no conflict" verdict now includes a liveness probe.** A physical default
+  can be just as dead as a VPN one; without the probe the old code cheerfully printed
+  "Конфлікту немає" while nothing resolved. It ends with `net_first_online` and points at
+  `net auto`.
 
 - **`status` prints a "Мережа:" block first** (primary service + effective resolver) — that,
   not the utun list, is what shows a foreign VPN owning the network.

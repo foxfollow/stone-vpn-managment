@@ -805,7 +805,176 @@ cmd_route() {
         echo "  Disconnect у самому застосунку VPN."
         return 1
     fi
-    echo "  ${G}Конфлікту немає:${N} default несе реальний інтерфейс, перехоплення немає."
+
+    # Фізичний default буває так само мертвим: USB-Ethernet у роутер без аплінку
+    # перебиває Wi-Fi за порядком сервісів — шлюз є, інтернету немає.
+    if [ -n "$diface" ] && ! net_iface_online "$diface"; then
+        local dsvc alt
+        dsvc=$(svc_for_iface "$diface")
+        echo "  ${R}default несе ${dsvc:-$diface} ($diface), але інтернету через нього немає.${N}"
+        if alt=$(net_first_online "$diface"); then
+            printf "  А ось тут інтернет є: ${G}%s${N} (%s).\n" "${alt%%$'\t'*}" "${alt##*$'\t'}"
+            echo "  Це не VPN, а порядок мережевих сервісів macOS:"
+            echo "  ${G}./main-vpn-manager.sh net auto${N} — підняти робочий сервіс на верх."
+        else
+            echo "  ${D}Інші інтерфейси теж не бачать мережу — проблема вище за macOS.${N}"
+        fi
+        return 1
+    fi
+
+    echo "  ${G}Конфлікту немає:${N} default несе реальний інтерфейс з інтернетом."
+}
+
+# ─── пріоритет мережевих сервісів (Wi-Fi vs Ethernet) ───────────────────────
+#
+# macOS обирає ПЕРВИННИЙ сервіс не за наявністю інтернету, а за «Service Order»:
+# виграє найвищий сервіс, у якого є IPv4 + шлюз. Тому USB-Ethernet у роутер без
+# аплінку (шлюз є, інтернету немає) забирає default у Wi-Fi. Лікується порядком
+# сервісів, а не маршрутами: ручний `route change default` живе до першої зміни
+# стану мережі, після чого configd переписує все назад.
+
+# Порядок сервісів: "enabled<TAB>назва<TAB>device". Порожній device = VPN-сервіс.
+net_services() {
+    networksetup -listnetworkserviceorder 2>/dev/null | awk '
+        /^\([0-9]+\) |^\(\*\) / {
+            en = ($0 ~ /^\(\*\)/) ? 0 : 1
+            name = $0; sub(/^\([0-9*]+\) /, "", name)
+            if ((getline dline) <= 0) next
+            dev = dline; sub(/.*Device: /, "", dev); sub(/\).*$/, "", dev)
+            print en "\t" name "\t" dev
+        }'
+}
+
+# Чи є в інтерфейсу справжній аплінк (не просто шлюз). ICMP подекуди ріжуть —
+# тому фолбек на HTTP через той самий інтерфейс.
+net_iface_online() {
+    local dev="$1" t
+    [ -n "$dev" ] || return 1
+    for t in 1.1.1.1 8.8.8.8; do
+        ping -c1 -W 1200 -b "$dev" "$t" >/dev/null 2>&1 && return 0
+    done
+    command -v curl >/dev/null 2>&1 &&
+        curl -sfm 3 --interface "$dev" http://captive.apple.com/hotspot-detect.html >/dev/null 2>&1
+}
+
+# Перший увімкнений сервіс (за порядком), у якого є адреса й реальний інтернет.
+# Аргумент — device, який треба пропустити (поточний зламаний default).
+net_first_online() {
+    local skip="${1:-}" en name dev
+    while IFS=$'\t' read -r en name dev; do
+        [ "$en" = 1 ] && [ -n "$dev" ] || continue
+        [ "$dev" = "$skip" ] && continue
+        [ -n "$(ipconfig getifaddr "$dev" 2>/dev/null)" ] || continue
+        net_iface_online "$dev" && { printf '%s\t%s\n' "$name" "$dev"; return 0; }
+    done < <(net_services)
+    return 1
+}
+
+# Підняти сервіс на верх Service Order. Порядок задається ПОВНИМ списком —
+# networksetup приймає лише перелік усіх сервісів, інакше «parameters not valid».
+net_apply_top() {
+    local target="$1" en name dev found=0
+    local -a rest=()
+    while IFS=$'\t' read -r en name dev; do
+        [ -n "$name" ] || continue
+        if [ "$name" = "$target" ]; then found=1; else rest+=("$name"); fi
+    done < <(net_services)
+    [ "$found" = 1 ] || die "немає такого сервісу: $target"
+    echo "${D}sudo networksetup -ordernetworkservices \"$target\" …${N}"
+    sudo networksetup -ordernetworkservices "$target" "${rest[@]}" || return 1
+    echo "${G}✓${N} «$target» тепер перший у порядку сервісів."
+    # Порядок застосовується миттєво, але глобальний стан оновлюється не в ту ж мить.
+    sleep 1
+    local pi; pi=$(dns_primary_iface)
+    printf "  первинний інтерфейс: %s\n" "${pi:-—}"
+}
+
+# Автофікс: первинний сервіс без інтернету → підняти найвищий, у якого він є.
+net_auto() {
+    local primary; primary=$(dns_primary_iface)
+    if [ -z "$primary" ]; then
+        echo "${R}Первинного інтерфейсу немає взагалі.${N} Мережа не піднята."
+        return 1
+    fi
+    if iface_is_utun "$primary"; then
+        echo "  default тримає VPN-тунель ${Y}$primary${N} — це не питання порядку сервісів."
+        echo "  Дивись: ${G}./main-vpn-manager.sh route${N} / ${G}dns fix${N}"
+        return 1
+    fi
+    local psvc; psvc=$(svc_for_iface "$primary")
+    if net_iface_online "$primary"; then
+        echo "${G}Все гаразд:${N} первинний ${psvc:-$primary} ($primary) має інтернет."
+        return 0
+    fi
+    echo "  ${R}Первинний ${psvc:-$primary} ($primary) без інтернету.${N} Шукаю робочий…"
+    local alt
+    if ! alt=$(net_first_online "$primary"); then
+        echo "  ${R}Жоден інший інтерфейс теж не бачить мережу.${N} Піднімати нічого."
+        return 1
+    fi
+    net_apply_top "${alt%%$'\t'*}"
+}
+
+cmd_net() {
+    command -v networksetup >/dev/null 2>&1 || die "networksetup недоступний"
+    case "${1:-show}" in
+        auto) net_auto; return $? ;;
+        top)  shift; [ $# -ge 1 ] || die 'вкажіть сервіс: net top "Wi-Fi"'
+              net_apply_top "$*"; return $? ;;
+        show) ;;
+        *)    die "невідомий підрежим: $1 (є: auto | top <сервіс>)" ;;
+    esac
+
+    echo "${B}=== Пріоритет мережевих сервісів ===${N}"
+    echo "${D}(первинним стає найвищий сервіс зі шлюзом — навіть якщо інтернету там немає)${N}"
+    echo ""
+    local primary; primary=$(dns_primary_iface)
+    local -a pick=()
+    local i=0 en name dev ip gw online mark
+    while IFS=$'\t' read -r en name dev; do
+        [ -n "$name" ] || continue
+        i=$((i + 1)); pick[i]="$name"
+        mark="  "; [ -n "$dev" ] && [ "$dev" = "$primary" ] && mark="${G}→${N} "
+        if [ "$en" = 0 ]; then
+            printf "  %s%2d) ${D}%-32s %-7s вимкнений${N}\n" "$mark" "$i" "$name" "${dev:--}"
+            continue
+        fi
+        if [ -z "$dev" ]; then
+            printf "  %s%2d) %-32s ${D}%-7s VPN-сервіс${N}\n" "$mark" "$i" "$name" "-"
+            continue
+        fi
+        ip=$(ipconfig getifaddr "$dev" 2>/dev/null)
+        if [ -z "$ip" ]; then
+            printf "  %s%2d) ${D}%-32s %-7s без адреси${N}\n" "$mark" "$i" "$name" "$dev"
+            continue
+        fi
+        gw=$(ipconfig getoption "$dev" router 2>/dev/null)
+        if net_iface_online "$dev"; then online="${G}інтернет є${N}"; else online="${R}інтернету НЕМАЄ${N}"; fi
+        printf "  %s%2d) %-32s %-7s %-15s ${D}шлюз %-15s${N} %s\n" \
+            "$mark" "$i" "$name" "$dev" "$ip" "${gw:--}" "$online"
+    done < <(net_services)
+
+    echo ""
+    printf "  ${D}→ = первинний зараз (%s)${N}\n" "${primary:-немає}"
+    echo ""
+    printf "Підняти сервіс на верх — номер; вимкнути сервіс — ${D}off <номер>${N}; Enter — нічого: "
+    local ans; read -r ans
+    case "$ans" in
+        "" | n | N) echo "Нічого не змінено."; return 0 ;;
+        off\ *|off*)
+            local num="${ans#off}"; num="${num// /}"
+            case "$num" in ""|*[!0-9]*) die "потрібен номер: off <номер>" ;; esac
+            [ -n "${pick[$num]:-}" ] || die "немає такого номера: $num"
+            echo "${D}sudo networksetup -setnetworkserviceenabled \"${pick[$num]}\" off${N}"
+            sudo networksetup -setnetworkserviceenabled "${pick[$num]}" off &&
+                echo "${G}✓${N} «${pick[$num]}» вимкнено (вмикається тим самим із 'on')."
+            ;;
+        *[!0-9]*) die "потрібен номер або 'off <номер>'" ;;
+        *)
+            [ -n "${pick[$ans]:-}" ] || die "немає такого номера: $ans"
+            net_apply_top "${pick[$ans]}"
+            ;;
+    esac
 }
 
 cmd_help() {
@@ -825,6 +994,9 @@ ${B}Команди:${N}
   ${G}dns${N}               показати DNS по сервісах і встановити на вибраних
   ${G}dns fix${N} [сервери] полагодити DNS, що зник після VPN (ClearVPN тощо)
   ${G}route${N}             підтвердити, хто володіє маршрутом (default + перехоплення)
+  ${G}net${N}               порядок мережевих сервісів + де реально є інтернет
+  ${G}net auto${N}          підняти на верх той сервіс, у якого інтернет справді є
+  ${G}net top${N} <сервіс>  вручну зробити сервіс первинним (напр. "Wi-Fi")
   ${G}help${N}              ця довідка
 
 ${B}Приклади:${N}
@@ -839,6 +1011,9 @@ ${B}Приклади:${N}
   ./main-vpn-manager.sh dns fix            # DNS зник після VPN — полагодити
   ./main-vpn-manager.sh dns fix 1.1.1.1    # те саме, з явними серверами
   ./main-vpn-manager.sh route              # хто тримає default / чи є перехоплення
+  ./main-vpn-manager.sh net                # список сервісів за пріоритетом
+  ./main-vpn-manager.sh net auto           # Ethernet без інтернету перебив Wi-Fi — полагодити
+  ./main-vpn-manager.sh net top "Wi-Fi"    # завжди спершу Wi-Fi
 
 ${B}Про 'dns fix':${N}
   VPN-розширення (ClearVPN, FortiClient, Cisco) пишуть DNS у рантайм-стор macOS
@@ -850,6 +1025,15 @@ ${B}Про 'dns fix':${N}
      не з'єднаються зі своїм сервером. Це не лікується конфігурацією — 'dns fix'
      знаходить процес тунелю, пропонує його вбити і потім відновлює DNS.
   Наприкінці 'dns fix' сам перевіряє резолвер і чесно скаже, якщо не допомогло.
+
+${B}Про 'net':${N}
+  macOS обирає первинний інтерфейс за порядком сервісів, а не за наявністю
+  інтернету: перемагає найвищий сервіс, у якого є IPv4 зі шлюзом. Тому
+  USB-Ethernet, увімкнений у роутер без аплінку, забирає весь трафік у Wi-Fi —
+  шлюз є, інтернету немає. 'net' показує, де інтернет РЕАЛЬНО є (пінг з
+  прив'язкою до інтерфейсу), 'net auto' піднімає робочий сервіс на верх.
+  Правити 'route change default' марно: configd перепише при першій же зміні
+  стану мережі — лікує тільки порядок сервісів (він постійний).
 
 ${B}Примітки:${N}
   • потребує sudo (створення tun-інтерфейсу, wg-quick)
@@ -868,6 +1052,7 @@ case "${1:-help}" in
     cert)            shift; cmd_cert "$@" ;;
     dns)             shift; cmd_dns "$@" ;;
     route|rt)        cmd_route ;;
+    net|prio)        shift; cmd_net "$@" ;;
     help|-h|--help)  cmd_help ;;
     *)               die "невідома команда '${1}'. Див. './main-vpn-manager.sh help'" ;;
 esac
