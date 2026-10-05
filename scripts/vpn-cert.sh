@@ -9,6 +9,21 @@ PROFILES="$HOME/Library/Application Support/OpenVPN Connect/profiles"
 
 # ─── Допоміжні функції ──────────────────────────────────────────────────────
 
+# Шлях, введений руками/перетягнутий у Terminal: прибрати пробіли по краях, обгорткові
+# лапки ('...' / "...") або екранування (\ , \( ), розгорнути ~.
+clean_path() {
+    local p="$1"
+    p="${p#"${p%%[![:space:]]*}"}"
+    p="${p%"${p##*[![:space:]]}"}"
+    if [[ ${#p} -ge 2 && ( "$p" == \'*\' || "$p" == \"*\" ) ]]; then
+        p="${p:1:${#p}-2}"
+    else
+        p=$(printf '%s' "$p" | sed 's/\\\(.\)/\1/g')
+    fi
+    [[ "$p" == "~" || "$p" == "~/"* ]] && p="$HOME${p:1}"
+    printf '%s' "$p"
+}
+
 list_profiles() {
     echo ""
     echo "Існуючі профілі:"
@@ -42,7 +57,8 @@ pick_profile() {
 # ─── Додати / замінити профіль ──────────────────────────────────────────────
 
 import_profile() {
-    local src="$1"
+    local src
+    src=$(clean_path "$1")
 
     if [ ! -f "$src" ]; then
         echo "Файл не знайдено: $src"
@@ -84,7 +100,8 @@ import_profile() {
 
     # Генеруємо числове ім'я як у OpenVPN Connect
     local ts
-    ts=$(date +%s%3N)
+    # BSD date не знає %N — мілісекунди через python3 (вже потрібен для replace_cert)
+    ts=$(python3 -c 'import time; print(int(time.time() * 1000))' 2>/dev/null || echo "$(date +%s)000")
     local dest="$PROFILES/${ts}.ovpn"
     cp "$src" "$dest"
     echo "Додано: $(basename "$dest")"
@@ -149,6 +166,7 @@ replace_cert() {
     esac
 
     read -rp "Шлях до PEM файлу (.pem/.crt/.key): " PEM_PATH
+    PEM_PATH=$(clean_path "$PEM_PATH")
     if [ ! -f "$PEM_PATH" ]; then
         echo "Файл не знайдено: $PEM_PATH"
         exit 1
@@ -189,11 +207,8 @@ EOF
 if [ -n "$1" ]; then
     if [ "$1" = "--delete" ]; then
         delete_profile
-    elif [ -f "$1" ]; then
-        import_profile "$1"
     else
-        echo "Файл не знайдено: $1"
-        exit 1
+        import_profile "$1"
     fi
     exit 0
 fi
