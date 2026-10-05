@@ -23,8 +23,8 @@ load_state
 
 PROFILES="${OVPN_PROFILES_DIR:-$HOME/Library/Application Support/OpenVPN Connect/profiles}"
 AUTH="$REPO_ROOT/auth.txt"
-PIDFILE="/tmp/openvpn.pid"
-LOGFILE="/tmp/openvpn.log"
+# PID/лог — окремі на кожен профіль (/tmp/openvpn-<id>.pid|.log), щоб кілька тунелів
+# могли працювати одночасно. Задаються після вибору профілю.
 
 # Дефолти (стан → config.env → auth.txt)
 DEFAULT_GW="${LAST_GATEWAY:-${LAN_GATEWAY:-}}"
@@ -33,11 +33,16 @@ if [ -z "$DEFAULT_USER" ] && [ -f "$AUTH" ]; then
     DEFAULT_USER="$(head -1 "$AUTH")"
 fi
 
-# Перевірка що вже не запущено
-if sudo test -f "$PIDFILE" 2>/dev/null && sudo kill -0 "$(sudo cat "$PIDFILE")" 2>/dev/null; then
-    echo "VPN вже запущено (PID $(sudo cat "$PIDFILE")). Спочатку виконай ./main-vpn-manager.sh down openvpn"
-    exit 1
-fi
+# PID запущеного openvpn з цим профілем (за --config у командному рядку), або порожньо.
+running_pid_for() {
+    local pid
+    for pid in $(pgrep -x openvpn 2>/dev/null); do
+        if ps -p "$pid" -o command= 2>/dev/null | grep -qF -- "--config $1 "; then
+            echo "$pid"; return 0
+        fi
+    done
+    return 0
+}
 
 # ─── Динамічне меню профілів ─────────────────────────────────────────────────
 if [ ! -d "$PROFILES" ]; then
@@ -54,7 +59,8 @@ for f in "$PROFILES"/*.ovpn; do
     [ -f "$f" ] || continue
     remote=$(grep -E '^[[:space:]]*remote ' "$f" | head -1 | awk '{print $2":"$3}')
     PROFILE_LIST+=("$f")
-    printf "  %d) %-30s %s\n" "$i" "$(basename "$f" .ovpn)" "$remote"
+    mark=""; [ -n "$(running_pid_for "$f")" ] && mark="  ● запущено"
+    printf "  %2d) %-16s %-36s%s\n" "$i" "$(basename "$f" .ovpn)" "$remote" "$mark"
     i=$((i + 1))
 done
 
@@ -70,6 +76,16 @@ if ! [[ "$CHOICE" =~ ^[0-9]+$ ]] || [ "$CHOICE" -lt 1 ] || [ "$CHOICE" -gt "${#P
     exit 1
 fi
 PROFILE="${PROFILE_LIST[$((CHOICE - 1))]}"
+PROFILE_ID="$(basename "$PROFILE" .ovpn)"
+PIDFILE="/tmp/openvpn-$PROFILE_ID.pid"
+LOGFILE="/tmp/openvpn-$PROFILE_ID.log"
+
+RUNNING_PID=$(running_pid_for "$PROFILE")
+if [ -n "$RUNNING_PID" ]; then
+    echo "Профіль $PROFILE_ID вже запущено (PID $RUNNING_PID)."
+    echo "Опустити: ./main-vpn-manager.sh down openvpn"
+    exit 1
+fi
 
 # ─── Логін (лише якщо профіль його потребує) ─────────────────────────────────
 # Профіль потребує user/pass, якщо має голий рядок `auth-user-pass` (без inline-файлу).
@@ -98,82 +114,146 @@ else
     echo "Профіль не потребує логіну (auth-user-pass відсутній) — пропускаю."
 fi
 
+# utun-інтерфейс, через який іде найточніший маршрут до IP (longest-prefix), або порожньо.
+# Повний тунель (default/def1 через utun) не рахується — route-fix для нього якраз і потрібен.
+# Статичні -host маршрути не через utun (залишки route-fix) ігноруються — інакше вони
+# маскують тунельний маршрут і VPN-у-VPN ніколи не визначиться.
+tunnel_iface_for() {
+    netstat -rn -f inet 2>/dev/null | python3 -c '
+import sys, ipaddress
+ip = ipaddress.ip_address(sys.argv[1])
+best = None
+for line in sys.stdin:
+    p = line.split()
+    if len(p) < 4 or not (p[0][0].isdigit() or p[0] == "default"):
+        continue
+    dest, flags, iface = p[0], p[2], p[3]
+    if dest == "default":
+        net = ipaddress.ip_network("0.0.0.0/0")
+    else:
+        addr, _, plen = dest.partition("/")
+        octs = addr.split(".")
+        try:
+            net = ipaddress.ip_network("%s/%s" % (".".join((octs + ["0"] * 4)[:4]),
+                                                  plen or 8 * len(octs)), strict=False)
+        except ValueError:
+            continue
+    if ip not in net:
+        continue
+    if "H" in flags and "S" in flags and not iface.startswith("utun"):
+        continue
+    if best is None or net.prefixlen > best[0]:
+        best = (net.prefixlen, iface)
+if best and best[0] > 1 and best[1].startswith("utun"):
+    print(best[1])
+' "$1" 2>/dev/null
+}
+
 # ─── Route-fix (per-connection, з пам'яттю; можна пропустити/змінити) ─────────
-# Хости беруться з рядка(ів) `remote` ОБРАНОГО профілю. Шлюз — інтерактивно.
+# Хости беруться з рядка(ів) `remote` ОБРАНОГО профілю. Сервери, що вже доступні через
+# інший тунель (VPN-у-VPN), route-fix не потребують — для них шлюз навіть не питаємо.
 echo ""
 
-# Detect active IPv4 default gateways from the routing table
-GW_IFACES=()
-GW_ADDRS=()
-while IFS=' ' read -r _iface _gw; do
-    GW_IFACES+=("$_iface")
-    GW_ADDRS+=("$_gw")
-done < <(netstat -rn -f inet 2>/dev/null | awk '$1=="default" && $2~/^[0-9]+\./{print $4, $2}')
-
-echo "Route-fix шлюз:"
-n=1
-for _idx in "${!GW_ADDRS[@]}"; do
-    printf "  %d) %-12s %s\n" "$n" "${GW_IFACES[$_idx]}" "${GW_ADDRS[$_idx]}"
-    n=$((n+1))
+NEED_IPS=(); NEED_HOSTS=()
+for VPN_HOST in $(grep -E '^[[:space:]]*remote ' "$PROFILE" | awk '{print $2}' | sort -u); do
+    HOST_IP=$(python3 -c "import socket; print(socket.gethostbyname('$VPN_HOST'))" 2>/dev/null || echo "$VPN_HOST")
+    VIA_TUN=$(tunnel_iface_for "$HOST_IP")
+    if [ -n "$VIA_TUN" ]; then
+        echo "Сервер $VPN_HOST ($HOST_IP) доступний через тунель $VIA_TUN — route-fix не потрібен."
+        # Якщо фактичний маршрут іде повз тунель — це статичний -host залишок route-fix; прибрати.
+        ROUTE_NOW=$(route -n get "$HOST_IP" 2>/dev/null)
+        NOW_IF=$(awk '/interface:/{print $2}' <<< "$ROUTE_NOW")
+        if [ "$NOW_IF" != "$VIA_TUN" ] && grep -q 'HOST' <<< "$ROUTE_NOW" && grep -q 'STATIC' <<< "$ROUTE_NOW"; then
+            echo "  прибираю старий маршрут повз тунель ($NOW_IF)"
+            sudo route -q delete -host "$HOST_IP" >/dev/null 2>&1 || true
+        fi
+    else
+        NEED_IPS+=("$HOST_IP"); NEED_HOSTS+=("$VPN_HOST")
+    fi
 done
-LAST_ENTRY=0
-if [ -n "$DEFAULT_GW" ]; then
-    printf "  %d) (останній)   %s\n" "$n" "$DEFAULT_GW"
-    LAST_ENTRY=$n
-    n=$((n+1))
-fi
-TOTAL_GW=$((n-1))
 
-echo ""
-if [ "$TOTAL_GW" -gt 0 ]; then
-    if [ -n "$DEFAULT_GW" ]; then
-        read -rp "Вибір [Enter=$DEFAULT_GW / 1-${TOTAL_GW} / IP / '-' пропустити]: " GW_IN
-    else
-        read -rp "Вибір [1-${TOTAL_GW} / IP / Enter=пропустити]: " GW_IN
-    fi
-else
-    if [ -n "$DEFAULT_GW" ]; then
-        read -rp "Route-fix шлюз [Enter=$DEFAULT_GW / IP / '-' пропустити]: " GW_IN
-    else
-        read -rp "Route-fix шлюз [IP / Enter=пропустити]: " GW_IN
-    fi
-fi
-
-GATEWAY=""
-case "$GW_IN" in
-    "")
-        GATEWAY="${DEFAULT_GW:-}"
-        ;;
-    "-"|n|N|skip)
-        GATEWAY=""
-        ;;
-    *)
-        if [[ "$GW_IN" =~ ^[0-9]+$ ]] && [ "$GW_IN" -ge 1 ] && [ "$GW_IN" -le "$TOTAL_GW" ]; then
-            if [ "$LAST_ENTRY" -gt 0 ] && [ "$GW_IN" -eq "$LAST_ENTRY" ]; then
-                GATEWAY="${DEFAULT_GW:-}"
-            else
-                GATEWAY="${GW_ADDRS[$((GW_IN-1))]}"
-            fi
-        else
-            GATEWAY="$GW_IN"
-        fi
-        ;;
-esac
-
-if [ -n "$GATEWAY" ]; then
-    set_state LAST_GATEWAY "$GATEWAY"
-    REMOTE_HOSTS=$(grep -E '^[[:space:]]*remote ' "$PROFILE" | awk '{print $2}' | sort -u)
-    for VPN_HOST in $REMOTE_HOSTS; do
-        HOST_IP=$(python3 -c "import socket; print(socket.gethostbyname('$VPN_HOST'))" 2>/dev/null || echo "$VPN_HOST")
-        CURRENT_GW=$(route -n get "$HOST_IP" 2>/dev/null | awk '/gateway:/{print $2}')
-        if [ "$CURRENT_GW" != "$GATEWAY" ]; then
-            sudo route -q delete -host "$HOST_IP" 2>/dev/null || true
-            sudo route -q add -host "$HOST_IP" "$GATEWAY" 2>/dev/null || true
-        fi
-    done
-    echo "Route-fix застосовано через $GATEWAY"
-else
+if [ "${#NEED_IPS[@]}" -eq 0 ]; then
     echo "Route-fix пропущено."
+else
+    # Кандидати: LAN default-шлюзи + шлюзи активних тунелів (для сервера, який сидить за
+    # тунелем, але тунель не роздає до нього маршрут) + останній використаний.
+    GW_IFACES=(); GW_ADDRS=(); GW_TAGS=()
+    while IFS=' ' read -r _iface _gw; do
+        GW_IFACES+=("$_iface"); GW_ADDRS+=("$_gw"); GW_TAGS+=("")
+    done < <(netstat -rn -f inet 2>/dev/null | awk '$1=="default" && $2~/^[0-9]+\./ && $4!~/^utun/{print $4, $2}')
+    while IFS=' ' read -r _iface _gw; do
+        [ -n "$_iface" ] || continue
+        # Маршрут на власну адресу тунелю (10.x.y/24 → 10.x.y.2) — не шлюз.
+        ifconfig "$_iface" 2>/dev/null | awk '/inet /{print $2}' | grep -qxF "$_gw" && continue
+        GW_IFACES+=("$_iface"); GW_ADDRS+=("$_gw"); GW_TAGS+=("(тунель)")
+    done < <(netstat -rn -f inet 2>/dev/null | awk '$4~/^utun/ && $2~/^[0-9]+\./ && $3~/G/{print $4, $2}' | sort -u)
+
+    echo "Route-fix для: ${NEED_HOSTS[*]} (${NEED_IPS[*]})"
+    echo "Шлюз:"
+    n=1
+    for _idx in "${!GW_ADDRS[@]}"; do
+        printf "  %d) %-7s %-15s %s\n" "$n" "${GW_IFACES[$_idx]}" "${GW_ADDRS[$_idx]}" "${GW_TAGS[$_idx]}"
+        n=$((n+1))
+    done
+    LAST_ENTRY=0
+    if [ -n "$DEFAULT_GW" ]; then
+        printf "  %d) %-7s %s\n" "$n" "-" "$DEFAULT_GW (останній)"
+        LAST_ENTRY=$n
+        n=$((n+1))
+    fi
+    TOTAL_GW=$((n-1))
+    [ "${#GW_TAGS[@]}" -gt 0 ] && [[ " ${GW_TAGS[*]} " == *"(тунель)"* ]] && \
+        echo "  Сервер за іншим VPN, але маршруту до нього немає? Обери шлюз тунелю."
+
+    echo ""
+    if [ "$TOTAL_GW" -gt 0 ]; then
+        if [ -n "$DEFAULT_GW" ]; then
+            read -rp "Вибір [Enter=$DEFAULT_GW / 1-${TOTAL_GW} / IP / '-' пропустити]: " GW_IN
+        else
+            read -rp "Вибір [1-${TOTAL_GW} / IP / Enter=пропустити]: " GW_IN
+        fi
+    else
+        if [ -n "$DEFAULT_GW" ]; then
+            read -rp "Route-fix шлюз [Enter=$DEFAULT_GW / IP / '-' пропустити]: " GW_IN
+        else
+            read -rp "Route-fix шлюз [IP / Enter=пропустити]: " GW_IN
+        fi
+    fi
+
+    GATEWAY=""
+    case "$GW_IN" in
+        "")
+            GATEWAY="${DEFAULT_GW:-}"
+            ;;
+        "-"|n|N|skip)
+            GATEWAY=""
+            ;;
+        *)
+            if [[ "$GW_IN" =~ ^[0-9]+$ ]] && [ "$GW_IN" -ge 1 ] && [ "$GW_IN" -le "$TOTAL_GW" ]; then
+                if [ "$LAST_ENTRY" -gt 0 ] && [ "$GW_IN" -eq "$LAST_ENTRY" ]; then
+                    GATEWAY="${DEFAULT_GW:-}"
+                else
+                    GATEWAY="${GW_ADDRS[$((GW_IN-1))]}"
+                fi
+            else
+                GATEWAY="$GW_IN"
+            fi
+            ;;
+    esac
+
+    if [ -n "$GATEWAY" ]; then
+        set_state LAST_GATEWAY "$GATEWAY"
+        for HOST_IP in "${NEED_IPS[@]}"; do
+            CURRENT_GW=$(route -n get "$HOST_IP" 2>/dev/null | awk '/gateway:/{print $2}')
+            if [ "$CURRENT_GW" != "$GATEWAY" ]; then
+                sudo route -q delete -host "$HOST_IP" >/dev/null 2>&1 || true
+                sudo route -q add -host "$HOST_IP" "$GATEWAY" >/dev/null 2>&1 || true
+            fi
+        done
+        echo "Route-fix застосовано через $GATEWAY"
+    else
+        echo "Route-fix пропущено."
+    fi
 fi
 
 echo "Підключення..."
@@ -187,6 +267,8 @@ fi
 
 # Capture stdout+stderr so pre-daemon noise doesn't clutter the terminal.
 # set -e is temporarily disabled to get the real exit code without silent death.
+# Залишки попереднього запуску цього ж профілю дали б хибний успіх/падіння в циклі нижче.
+sudo rm -f "$PIDFILE" "$LOGFILE"
 set +e
 LAUNCH_OUT=$(sudo /opt/homebrew/sbin/openvpn \
     --config "$PROFILE" \
@@ -205,6 +287,9 @@ if [ "$LAUNCH_RC" -ne 0 ]; then
     sudo cat "$LOGFILE" 2>/dev/null || true
     exit 1
 fi
+# Лог читабельний для свого користувача (staff) — щоб `status` бачив стан тунелю без sudo.
+# Секретів у ньому немає (пароль/OTP openvpn не логує).
+sudo chgrp staff "$LOGFILE" 2>/dev/null && sudo chmod 640 "$LOGFILE" 2>/dev/null || true
 
 FAIL_PAT="AUTH_FAILED|auth-failure|fatal error|TLS Error|TLS handshake failed|Exiting due to fatal|SIGTERM received|Connection refused|Network unreachable"
 
@@ -218,9 +303,11 @@ for i in $(seq 1 45); do
         echo ""
         echo "Підключено!"
         [ -n "$TMPAUTH" ] && rm -f "$TMPAUTH"
-        IFACE=$(ifconfig 2>/dev/null | awk '/^utun[0-9]/{cur=$1; sub(/:$/,"",cur)} cur && /inet [0-9]/{print cur; exit}')
+        # Інтерфейс саме цього екземпляра — з його логу (інших тунелів може бути кілька).
+        IFACE=$(sudo grep -oE 'Opened utun device utun[0-9]+' "$LOGFILE" 2>/dev/null | tail -1 | awk '{print $NF}')
+        [ -n "$IFACE" ] || IFACE=$(sudo grep -oE '/sbin/ifconfig utun[0-9]+' "$LOGFILE" 2>/dev/null | tail -1 | awk '{print $NF}')
         echo "Інтерфейс: $IFACE"
-        netstat -rn -f inet | grep "$IFACE" | grep -v fe80 || true
+        [ -n "$IFACE" ] && { netstat -rn -f inet | grep -w "$IFACE" | grep -v fe80 || true; }
         exit 0
     fi
 

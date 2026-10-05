@@ -17,8 +17,8 @@ build, no test framework, and no package — scripts run directly. Repo-facing d
 ## Project layout & purpose of each file
 
 ```
-main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t> | down [t]
-                      | cert <wg|openvpn> | dns [fix [servers]] | route | net [auto |
+main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t> | down [t|openvpn|cisco]
+                      | cert <wg|openvpn> | dns [fix [servers] | split ...] | route | net [auto |
                       top <svc>] | help. WireGuard via wg-quick; "openvpn" and "cert"
                       delegate to scripts/*.sh.
 README.md             User-facing overview + usage (Ukrainian).
@@ -76,6 +76,10 @@ There are no unit tests. Validate changes like this:
   gateway is prompted each connect (default `state.env` LAST_GATEWAY → `config.env`
   LAN_GATEWAY), can be overridden/skipped, and is remembered. Target hosts are derived from the
   chosen profile's `remote` line(s) — nothing network-specific is committed.
+  Hosts reachable through *another* tunnel (VPN-in-VPN, `tunnel_iface_for`: longest-prefix
+  match over `netstat -rn`, ignoring our own stale `-host` route via the gateway and utun
+  default/def1 routes) are skipped and the stale host route is removed — forcing them via
+  the LAN gateway sends the handshake out en0 and it times out (`TLS key negotiation failed`).
 - **OpenVPN profile menu is dynamic** in `vpn-up.sh` — built by scanning the profiles dir and
   reading each `remote` line (no hardcoded filenames/hosts). Profiles live in
   `~/Library/Application Support/OpenVPN Connect/profiles/` (shared with the GUI, named by
@@ -168,6 +172,20 @@ There are no unit tests. Validate changes like this:
   VPN service** (NE or IPSec) — that's how `svc_is_vpn()` flags rows whose DNS is controlled
   by the tunnel itself. Real interfaces always report a BSD device (`en0`, `bridge0`, …).
 
+- **Cisco Secure Client overrides the global resolver without being primary.** It writes
+  `State:/Network/Service/com.cisco.anyconnect/DNS` as a *Supplemental* config with order 1
+  (`__CONFIGURATION_ID__` in `State:/Network/Global/DNS` names it — `dns_global_owner`),
+  listing its own servers (8.8.8.8) *before* the pre-existing WG DNS. macOS moves to the
+  next nameserver only on timeout, not NXDOMAIN, so WG-internal names stop resolving while
+  IPs still work. Not fixable via networksetup or by reordering; the durable fix is
+  `/etc/resolver/<domain>` (`dns split add`), which neither Cisco nor wg-quick touch.
+  `down` detects a live Cisco session via `vpn -s state` (its daemons run 24/7, so process
+  presence means nothing) and disconnects it via the same CLI.
+
+- **`networksetup -getdnsservers` shows the WG DNS on *every* service while a WG tunnel is
+  up** — wg-quick's darwin backend sets it on all services and restores them on `down`.
+  That's expected, not a leak.
+
 - **`scripts/nuclear-clean-dns.sh` is superseded by `dns fix`.** It only ever worked by
   accident: setting Wi-Fi to `empty` is a real change, which forced the recompute. It still
   hardcodes Wi-Fi / iPhone USB and leaves DNS empty.
@@ -180,7 +198,18 @@ There are no unit tests. Validate changes like this:
   (`wg genkey|pubkey`, optional `wg genpsk`) + scaffold `.conf` from a template / import an
   existing `.conf` / delete. Writes to the wg system dirs via `sudo` (chmod 600); tunnel names
   are validated against wg-quick's `[a-zA-Z0-9_=+.-]{1,15}` interface-name rule.
-- **State files:** PID `/tmp/openvpn.pid`, log `/tmp/openvpn.log`. `vpn-up.sh` polls the log
+- **Multiple OpenVPN tunnels can run at once** (one per profile). Running instances are
+  discovered from the process table (`pgrep -x openvpn` + `--config` in `ps -o command=`),
+  not from PID files, so legacy/foreign launches are visible too; `vpn-down.sh [all|<id>|<PID>]`
+  stops one/all/menu. Same profile twice is refused.
+  A live process ≠ a live tunnel (it may loop on TLS retries). `ovpn_state` parses the
+  instance's log (path from `--log` in its argv): `Initialization Sequence Completed` after
+  the last restart → up + `Opened utun device utunN`; otherwise connecting + last error.
+  `vpn-up.sh` makes the log `root:staff 640` so `status` reads it sudo-free; legacy/foreign
+  logs (root 600) fall back to `sudo -n`, else "стан невідомий". `status` then lists the
+  utun's live routes (`iface_routes`).
+- **State files:** per profile — PID `/tmp/openvpn-<id>.pid`, log `/tmp/openvpn-<id>.log`
+  (`<id>` = profile basename). `vpn-up.sh` polls the log
   for `Initialization Sequence Completed` (success) vs `AUTH_FAILED`/`fatal error`.
 - **The ovpnagent watchdog is a separate concern** from the brew-CLI connection path: the
   plist + `fix-ovpnagent.sh` keep the *GUI* agent's socket alive and are independent.

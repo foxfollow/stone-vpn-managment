@@ -7,10 +7,11 @@
 #   ./main-vpn-manager.sh status            показати всі активні тунелі (швидкий статус)
 #   ./main-vpn-manager.sh list              показати доступні тунелі
 #   ./main-vpn-manager.sh up <tunnel>       підняти тунель (назва WG-тунелю або 'openvpn')
-#   ./main-vpn-manager.sh down [tunnel]     опустити тунель; без аргументу — всі
+#   ./main-vpn-manager.sh down [tunnel]     опустити тунель; без аргументу — меню
 #   ./main-vpn-manager.sh cert <wg|openvpn> керування конфігами/сертифікатами
 #   ./main-vpn-manager.sh dns               показати DNS по сервісах і встановити на вибраних
 #   ./main-vpn-manager.sh dns fix [сервери] полагодити DNS, що зник після VPN
+#   ./main-vpn-manager.sh dns split ...     split-DNS через /etc/resolver
 #   ./main-vpn-manager.sh help              ця довідка
 #
 set -uo pipefail
@@ -29,7 +30,7 @@ DNS_SERVICES=("Wi-Fi")
 # Стандартні шляхи WireGuard (wg-quick шукає конфіги саме тут). НЕ міняти.
 WG_DIRS=(/opt/homebrew/etc/wireguard /usr/local/etc/wireguard /etc/wireguard)
 WG_RUN="/var/run/wireguard"        # тут wg-quick тримає <iface>.name (назва тунелю)
-OVPN_PID="/tmp/openvpn.pid"
+OVPN_PROFILES="${OVPN_PROFILES_DIR:-$HOME/Library/Application Support/OpenVPN Connect/profiles}"
 
 # ─── кольори (вимикаються коли вивід не в термінал) ──────────────────────────
 if [ -t 1 ]; then
@@ -110,14 +111,85 @@ wg_active_map() {
 
 # ─── OpenVPN ────────────────────────────────────────────────────────────────
 
-# PID запущеного openvpn (через PID-файл або pgrep), або порожньо.
-ovpn_pid() {
-    local pid=""
-    [ -r "$OVPN_PID" ] && pid=$(cat "$OVPN_PID" 2>/dev/null)
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-        echo "$pid"; return 0
+# Запущені openvpn (їх може бути кілька): "PID<TAB>id" — id = профіль з --config.
+ovpn_instances() {
+    local pid cfg
+    for pid in $(pgrep -x openvpn 2>/dev/null); do
+        cfg=$(ps -p "$pid" -o command= 2>/dev/null | sed -n 's/.*--config \(.*\.ovpn\).*/\1/p')
+        printf '%s\t%s\n' "$pid" "$(basename "${cfg:-?}" .ovpn)"
+    done
+}
+
+ovpn_remote() {
+    grep -E '^[[:space:]]*remote ' "$OVPN_PROFILES/$1.ovpn" 2>/dev/null | head -1 | awk '{print $2":"$3}'
+}
+
+# Стан екземпляра з його логу (шлях — з --log у командному рядку процесу):
+# "up<TAB>utunN" | "connecting<TAB><остання помилка>" | "unknown<TAB>"  (лог недоступний).
+# Лог від vpn-up.sh читається без sudo (640, staff); старі/чужі запуски — лише через sudo -n.
+ovpn_state() {
+    local pid="$1" log txt
+    log=$(ps -p "$pid" -o command= 2>/dev/null | sed -n 's/.*--log \([^ ]*\).*/\1/p')
+    [ -n "$log" ] || { printf 'unknown\t\n'; return; }
+    if [ -r "$log" ]; then txt=$(cat "$log" 2>/dev/null)
+    else txt=$(sudo -n cat "$log" 2>/dev/null) || { printf 'unknown\t\n'; return; }
     fi
-    pgrep -x openvpn 2>/dev/null | head -1
+    awk '
+        /Initialization Sequence Completed/ { up = NR }
+        /process restarting|Restart pause|SIGUSR1|SIGHUP/ { rs = NR }
+        /Opened utun device/ { dev = $NF }
+        /TLS Error|AUTH_FAILED|ERROR|Connection refused|unreachable|Exiting/ {
+            err = $0; sub(/^[0-9-]+ [0-9:]+ /, "", err)
+        }
+        END {
+            if (up && up > rs) printf "up\t%s\n", dev
+            else printf "connecting\t%s\n", err
+        }' <<< "$txt"
+}
+
+# Маршрути через інтерфейс (крім власної адреси тунелю), одним рядком.
+iface_routes() {
+    local own; own=$(ifconfig "$1" 2>/dev/null | awk '/inet /{print $2}')
+    netstat -rn -f inet 2>/dev/null | awk -v i="$1" -v own="$own" '
+        $4 == i && $1 != own { r = r (r ? ", " : "") $1 }
+        END { print r }'
+}
+
+# Один рядок статусу OpenVPN-екземпляра (+ маршрути / помилка рядком нижче).
+ovpn_status_line() {
+    local pid="$1" id="$2" st info routes
+    IFS=$'\t' read -r st info <<< "$(ovpn_state "$pid")"
+    case "$st" in
+        up)
+            printf "  ${G}● %-16s${N} %-32s ${G}підключено${N} ${D}(%s, PID %s)${N}\n" "$id" "$(ovpn_remote "$id")" "${info:-?}" "$pid"
+            routes=$(iface_routes "$info")
+            [ -n "$info" ] && printf "      ${D}маршрути: %s${N}\n" "${routes:-немає}"
+            ;;
+        connecting)
+            printf "  ${Y}◐ %-16s${N} %-32s ${Y}НЕ підключено${N} ${D}(PID %s, повторює спроби)${N}\n" "$id" "$(ovpn_remote "$id")" "$pid"
+            [ -n "$info" ] && printf "      ${D}%s${N}\n" "$info"
+            ;;
+        *)
+            printf "  ${D}? %-16s${N} %-32s ${D}стан невідомий — лог лише для root (PID %s)${N}\n" "$id" "$(ovpn_remote "$id")" "$pid"
+            ;;
+    esac
+}
+
+# ─── Cisco Secure Client (сторонній, але опускається через його ж CLI) ───────
+
+cisco_cli() {
+    local p
+    for p in /opt/cisco/secureclient/bin/vpn /opt/cisco/anyconnect/bin/vpn; do
+        [ -x "$p" ] && { echo "$p"; return 0; }
+    done
+    return 1
+}
+
+# Сервер, до якого під'єднаний Cisco, або порожньо (= не під'єднаний).
+# Демони Cisco крутяться завжди — живий тунель видно лише з 'vpn state'.
+cisco_connected_host() {
+    local cli; cli=$(cisco_cli) || return 0
+    "$cli" -s state 2>/dev/null | sed -n 's/.*Connected to \(.*\)\.$/\1/p' | head -1
 }
 
 # ─── DNS ────────────────────────────────────────────────────────────────────
@@ -148,6 +220,25 @@ dns_global_servers() {
         /ServerAddresses/                             { inblock = 1; next }
         inblock && /^[[:space:]]*}/                   { inblock = 0 }
         inblock && /^[[:space:]]*[0-9]+[[:space:]]*:/ { printf "%s ", $NF }'
+}
+
+# Хто записав глобальний DNS: "Supplemental: com.cisco.anyconnect 0" → com.cisco.anyconnect.
+# UUID = звичайний мережевий сервіс; reverse-DNS назва = VPN-клієнт перехопив резолвер.
+dns_global_owner() {
+    sc_show State:/Network/Global/DNS | awk -F' : ' '/__CONFIGURATION_ID__/ { print $2 }' \
+        | awk '{ print ($1 ~ /:$/ ? $2 : $1) }'
+}
+
+# Підказка, коли резолвер — список від чужого VPN. macOS переходить до наступного
+# сервера лише на ТАЙМАУТ, не на NXDOMAIN: якщо першим стоїть 8.8.8.8, внутрішні
+# імена тунелю (чий DNS далі у списку) не резолвляться ніколи.
+dns_owner_hint() {
+    local owner servers
+    owner=$(dns_global_owner); servers=$(dns_global_servers)
+    case "$owner" in ""|*-*-*-*-*) return 0 ;; esac          # UUID сервісу — норм
+    printf "  ${Y}резолвер задає %s${N} — першим питається %s; наступні лише на таймаут.\n" \
+        "$owner" "${servers%% *}"
+    echo "  ${D}Внутрішні імена іншого тунелю не резолвляться? → './main-vpn-manager.sh dns split'${N}"
 }
 
 dns_primary_iface() { sc_show State:/Network/Global/IPv4 | awk '/PrimaryInterface/ { print $NF }'; }
@@ -311,6 +402,7 @@ cmd_status() {
             printf "  первинний: %s${D}%s${N}\n" "$piface" "${psvc:+ ($psvc)}"
         fi
         printf "  діючий DNS: %s\n" "${presolver:-${R}(порожньо — резолюція зламана; спробуй 'dns fix')${N}}"
+        dns_owner_hint
     else
         echo "  ${R}немає первинного сервісу — мережа не сконфігурована${N}"
     fi
@@ -351,13 +443,26 @@ cmd_status() {
     echo ""
 
     echo "${B}OpenVPN:${N}"
-    local pid; pid=$(ovpn_pid)
-    if [ -n "$pid" ]; then
-        printf "  ${G}● запущено${N} ${D}(PID %s)${N}\n" "$pid"
+    local pid id ovpn; ovpn=$(ovpn_instances)
+    if [ -n "$ovpn" ]; then
+        while IFS=$'\t' read -r pid id; do
+            ovpn_status_line "$pid" "$id"
+        done <<< "$ovpn"
     else
         echo "  ${D}не запущено${N}"
     fi
     echo ""
+
+    if cisco_cli >/dev/null; then
+        echo "${B}Cisco Secure Client:${N}"
+        local chost; chost=$(cisco_connected_host)
+        if [ -n "$chost" ]; then
+            printf "  ${G}● під'єднано${N} ${D}(%s)${N}\n" "$chost"
+        else
+            echo "  ${D}не під'єднано${N}"
+        fi
+        echo ""
+    fi
 
     echo "${B}utun-інтерфейси:${N}"
     local utuns
@@ -409,6 +514,27 @@ cmd_up() {
     sudo wg-quick up "$(wg_target "$tunnel")"
 }
 
+# Опустити один елемент меню down: wg:<name> | openvpn | cisco.
+down_one() {
+    case "$1" in
+        wg:*)
+            echo "Опускаю WireGuard '${1#wg:}'..."
+            sudo wg-quick down "$(wg_target "${1#wg:}")"
+            ;;
+        openvpn)
+            "$SCRIPTS/vpn-down.sh"
+            ;;
+        ovpn:*)
+            "$SCRIPTS/vpn-down.sh" "${1#ovpn:}"
+            ;;
+        cisco)
+            # Cisco сам відкочує свій DNS, restore_dns тут не потрібен.
+            echo "Від'єдную Cisco Secure Client..."
+            "$(cisco_cli)" -s disconnect | grep -E 'state:|error' | sed 's/^[[:space:]]*>> /  /'
+            ;;
+    esac
+}
+
 cmd_down() {
     local tunnel="${1:-}"
 
@@ -416,37 +542,66 @@ cmd_down() {
     cmd_status
     echo ""
 
-    if [ -z "$tunnel" ]; then
-        read -rp "Опустити ${R}ВСІ${N} активні тунелі? [y/N]: " c
-        [[ "$c" =~ ^[Yy]$ ]] || { echo "Скасовано."; exit 0; }
-
-        local map name iface
-        map=$(wg_active_map)
-        if [ -n "$map" ]; then
-            while read -r name iface; do
-                [ -n "$name" ] || continue
-                echo "Опускаю WireGuard '$name'..."
-                sudo wg-quick down "$(wg_target "$name")"
-            done <<< "$map"
-        fi
-        if [ -n "$(ovpn_pid)" ]; then
-            echo "Опускаю OpenVPN..."
-            "$SCRIPTS/vpn-down.sh"
-        fi
-        restore_dns
-        echo "${G}Готово.${N}"
+    if [ -n "$tunnel" ]; then
+        case "$tunnel" in
+            openvpn|cisco) down_one "$tunnel" ;;
+            *)             down_one "wg:$tunnel" ;;
+        esac
+        if [ "$tunnel" = cisco ]; then dns_flush; else restore_dns; fi
         return
     fi
 
-    if [ "$tunnel" = "openvpn" ]; then
-        "$SCRIPTS/vpn-down.sh"
-        restore_dns
-        return
-    fi
+    # Без аргументу — меню з усього, що зараз живе.
+    local items=() labels=() name iface map
+    map=$(wg_active_map)
+    while read -r name iface; do
+        [ -n "$name" ] || continue
+        items+=("wg:$name"); labels+=("WireGuard  $name ${D}($iface)${N}")
+    done <<< "$map"
+    local opid oid
+    while IFS=$'\t' read -r opid oid; do
+        [ -n "$opid" ] || continue
+        local ost; ost=$(ovpn_state "$opid" | cut -f1)
+        case "$ost" in up) ost="підключено" ;; connecting) ost="НЕ підключено" ;; *) ost="стан ?" ;; esac
+        items+=("ovpn:$opid"); labels+=("OpenVPN    $oid ${D}($(ovpn_remote "$oid"), $ost, PID $opid)${N}")
+    done <<< "$(ovpn_instances)"
+    local chost; chost=$(cisco_connected_host)
+    [ -n "$chost" ] && { items+=(cisco); labels+=("Cisco      ${D}($chost)${N}"); }
 
-    echo "Опускаю WireGuard '$tunnel'..."
-    sudo wg-quick down "$(wg_target "$tunnel")"
-    restore_dns
+    [ "${#items[@]}" -gt 0 ] || { echo "Активних тунелів немає."; return 0; }
+
+    echo "${B}Що опустити?${N}"
+    local i
+    for i in "${!items[@]}"; do
+        printf "  %2d) %s\n" "$((i + 1))" "${labels[$i]}"
+    done
+    read -rp "Номери через кому / all / Enter=скасувати: " pick
+
+    local targets=() idx idxs
+    case "$pick" in
+        "")             echo "Скасовано."; return 0 ;;
+        all|ALL|y|Y)    targets=("${items[@]}") ;;
+        *)
+            IFS=',' read -ra idxs <<< "$pick"
+            for idx in "${idxs[@]}"; do
+                idx="${idx// /}"
+                if [[ "$idx" =~ ^[0-9]+$ ]] && [ "$idx" -ge 1 ] && [ "$idx" -le "${#items[@]}" ]; then
+                    targets+=("${items[$((idx - 1))]}")
+                else
+                    echo "Пропускаю невірний номер: $idx"
+                fi
+            done
+            ;;
+    esac
+    [ "${#targets[@]}" -gt 0 ] || { echo "Нічого не вибрано."; return 0; }
+
+    local t ours=0
+    for t in "${targets[@]}"; do
+        down_one "$t"
+        [ "$t" = cisco ] || ours=1
+    done
+    if [ "$ours" -eq 1 ]; then restore_dns; else dns_flush; fi
+    echo "${G}Готово.${N}"
 }
 
 cmd_cert() {
@@ -655,12 +810,67 @@ cmd_dns_fix() {
     fi
 }
 
+# Split-DNS через /etc/resolver/<домен>: запити до домену йдуть на вказаний сервер,
+# хоч би що записав у глобальний резолвер інший VPN (Cisco ставить 8.8.8.8 першим,
+# а на NXDOMAIN macOS до наступного сервера не переходить). Файли в /etc/resolver
+# не чіпає ні Cisco, ні wg-quick — тому це єдиний стійкий спосіб.
+RESOLVER_DIR="/etc/resolver"
+
+cmd_dns_split() {
+    local action="${1:-}" domain="${2:-}"
+    case "$action" in
+        ""|list|ls)
+            echo "${B}=== Split-DNS ($RESOLVER_DIR) ===${N}"
+            local f any=0
+            shopt -s nullglob
+            for f in "$RESOLVER_DIR"/*; do
+                any=1
+                printf "  ${G}%-28s${N} → %s\n" "$(basename "$f")" \
+                    "$(awk '/^nameserver/ { printf "%s ", $2 }' "$f")"
+            done
+            [ "$any" -eq 1 ] || echo "  ${D}немає правил${N}"
+            echo ""
+            echo "  ${D}додати:  ./main-vpn-manager.sh dns split add <домен> [сервер ...]${N}"
+            echo "  ${D}забрати: ./main-vpn-manager.sh dns split rm <домен>${N}"
+            ;;
+        add)
+            [[ "$domain" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] \
+                || die "вкажи домен: dns split add <домен> [сервер ...]"
+            shift 2
+            local servers=("$@")
+            if [ "${#servers[@]}" -eq 0 ]; then
+                read -rp "DNS-сервер для '$domain' (напр. DNS з WG-конфігу): " srv
+                [ -n "$srv" ] || { echo "Скасовано."; return 0; }
+                read -ra servers <<< "$srv"
+            fi
+            local sv
+            for sv in "${servers[@]}"; do
+                [[ "$sv" =~ ^[0-9a-fA-F.:]+$ ]] || die "не схоже на IP: $sv"
+            done
+            sudo mkdir -p "$RESOLVER_DIR" || return 1
+            printf 'nameserver %s\n' "${servers[@]}" | sudo tee "$RESOLVER_DIR/$domain" >/dev/null || return 1
+            dns_flush
+            echo "${G}*.$domain → ${servers[*]}${N}"
+            if command -v dscacheutil >/dev/null 2>&1; then
+                echo "  ${D}перевір: dscacheutil -q host -a name <хост>.$domain${N}"
+            fi
+            ;;
+        rm|del|remove)
+            [ -n "$domain" ] || die "вкажи домен: dns split rm <домен>"
+            [ -f "$RESOLVER_DIR/$domain" ] || die "правила для '$domain' немає"
+            sudo rm -f "$RESOLVER_DIR/$domain" && dns_flush && echo "Прибрано: $domain"
+            ;;
+        *) die "dns split [list | add <домен> [сервер ...] | rm <домен>]" ;;
+    esac
+}
+
 cmd_dns() {
     command -v networksetup >/dev/null 2>&1 || die "networksetup недоступний"
     command -v scutil       >/dev/null 2>&1 || die "scutil недоступний"
 
     case "${1:-}" in
         fix|repair) cmd_dns_fix "${2:-}"; return ;;
+        split)      shift; cmd_dns_split "$@"; return ;;
     esac
 
     svc_device_load                       # прогріти кеш до циклу зі svc_is_vpn()
@@ -668,8 +878,10 @@ cmd_dns() {
     local primary_iface primary_svc
     primary_iface=$(dns_primary_iface)
     primary_svc=$(svc_for_iface "$primary_iface")
-    printf "  ${D}діючий резолвер:${N} ${G}%s${N} ${D}(первинний: %s / %s)${N}\n\n" \
+    printf "  ${D}діючий резолвер:${N} ${G}%s${N} ${D}(первинний: %s / %s)${N}\n" \
         "$(dns_global_servers)" "${primary_svc:-—}" "${primary_iface:-—}"
+    dns_owner_hint
+    echo ""
 
     local default_dns="${RESTORE_DNS:-8.8.8.8}"
     local svc dns tag svc_names=() svc_dns=() svc_tag=()
@@ -988,11 +1200,13 @@ ${B}Команди:${N}
   ${G}status${N}            показати всі активні VPN-тунелі (швидкий статус)
   ${G}list${N}              показати доступні тунелі (WG-конфіги + openvpn)
   ${G}up${N} <тунель>       підняти тунель: назва WG-тунелю або 'openvpn'
-  ${G}down${N} [тунель]     опустити тунель; без аргументу — всі
+  ${G}down${N} [тунель]     опустити тунель (WG-назва | openvpn | cisco); без
+                    аргументу — меню з номерами активних тунелів
                     (перед вимкненням завжди показує статус)
   ${G}cert${N} <wg|openvpn> додати/керувати конфігами та сертифікатами
   ${G}dns${N}               показати DNS по сервісах і встановити на вибраних
   ${G}dns fix${N} [сервери] полагодити DNS, що зник після VPN (ClearVPN тощо)
+  ${G}dns split${N} ...     split-DNS: домен → свій сервер (/etc/resolver), стійко до Cisco
   ${G}route${N}             підтвердити, хто володіє маршрутом (default + перехоплення)
   ${G}net${N}               порядок мережевих сервісів + де реально є інтернет
   ${G}net auto${N}          підняти на верх той сервіс, у якого інтернет справді є
@@ -1004,12 +1218,14 @@ ${B}Приклади:${N}
   ./main-vpn-manager.sh up wire-first      # WireGuard-тунель
   ./main-vpn-manager.sh up openvpn         # інтерактивний вибір .ovpn профілю
   ./main-vpn-manager.sh down wire-first
-  ./main-vpn-manager.sh down               # опустити все
+  ./main-vpn-manager.sh down               # меню: вибрати номер або all
+  ./main-vpn-manager.sh down cisco         # від'єднати Cisco Secure Client
   ./main-vpn-manager.sh cert wg            # додати/згенерувати WireGuard-тунель
   ./main-vpn-manager.sh cert openvpn       # керування .ovpn профілями
   ./main-vpn-manager.sh dns                # перевірити/додати DNS на інтерфейсах
   ./main-vpn-manager.sh dns fix            # DNS зник після VPN — полагодити
   ./main-vpn-manager.sh dns fix 1.1.1.1    # те саме, з явними серверами
+  ./main-vpn-manager.sh dns split add corp.lan 10.0.0.1   # *.corp.lan → 10.0.0.1
   ./main-vpn-manager.sh route              # хто тримає default / чи є перехоплення
   ./main-vpn-manager.sh net                # список сервісів за пріоритетом
   ./main-vpn-manager.sh net auto           # Ethernet без інтернету перебив Wi-Fi — полагодити
