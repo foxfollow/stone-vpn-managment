@@ -11,14 +11,14 @@ Personal macOS Bash tooling to manage VPN tunnels from one place. Three backends
   the OpenVPN Connect GUI because the brew CLI writes routes into the kernel correctly.
 - **Defguard** via `defguard-client` (ships inside `Defguard.app`; NetworkExtension, no sudo).
 
-`main-vpn-manager.sh` is the single entry point that dispatches to all three. There is no
+`main-vpn-manager.sh` is the single entry point that dispatches to all of them (plus Cisco Secure Client via its own CLI). There is no
 build, no test framework, and no package — scripts run directly. Repo-facing docs
 (`README.md`, `OPENVPN_CLI.md`) are in Ukrainian; this file is the AI-facing reference.
 
 ## Project layout & purpose of each file
 
 ```
-main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t|openvpn|defguard [loc]>
+main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t|openvpn|cisco [host]|defguard [loc]>
                       | down [t|openvpn|cisco|defguard [loc]]
                       | cert <wg|openvpn> | dns [fix [servers] | split ...] | route | net [auto |
                       top <svc>] | help. WireGuard via wg-quick; "openvpn" and "cert"
@@ -27,7 +27,7 @@ README.md             User-facing overview + usage (Ukrainian).
 OPENVPN_CLI.md        Detailed OpenVPN reference (Ukrainian).
 config.env.example    Template for config.env (committed).
 config.env            Local defaults (LAN_GATEWAY, OVPN_USERNAME, RESTORE_DNS, DNS_SERVICES,
-                      DEFGUARD_CLI). GITIGNORED.
+                      DEFGUARD_CLI, DISABLED_BACKENDS). GITIGNORED.
 state.env             Auto-written last choices (LAST_GATEWAY, LAST_USERNAME). GITIGNORED.
 auth.txt.example      Template for auth.txt (committed).
 auth.txt              Optional default OpenVPN username, one line, chmod 600. GITIGNORED.
@@ -247,6 +247,18 @@ There are no unit tests. Validate changes like this:
   `scutil --nc stop` is only the no-CLI fallback in `dg_down`. After `down`, Defguard (like
   Cisco) restores its own DNS → `dns_flush` only, not `restore_dns` (`down_is_foreign`).
   Bare names in `up`/`down` go to Defguard only when no WG config/active WG tunnel has that name.
+- **`DISABLED_BACKENDS` (config.env or env) turns backends off entirely**: wireguard | openvpn |
+  defguard | cisco (aliases wg/ovpn/dg/anyconnect, space- or comma-separated; default empty =
+  all on). A disabled backend is neither shown nor *probed* — every status/list/down-menu
+  block, `utun_owner` probe and the `net` Defguard label is gated by `backend_on`; explicit
+  `up`/`down`/`cert` for it die via `backend_need`. `status`/`list` print what is off.
+  It's a string, not an array, because `/bin/bash` is 3.2 and an empty array under `set -u`
+  is "unbound". Unknown names warn (`backends_validate`) instead of silently doing nothing.
+- **Cisco connect goes through its CLI** (`cisco_up`: `vpn connect <host>`, interactive — the
+  `vpn` binary prompts for group/user/password/banner itself; nothing is stored). Hosts come
+  from `vpn -s hosts` (`cisco_hosts`, may include `:port` — compare hosts sans port). The GUI
+  (`/Applications/Cisco/Cisco Secure Client.app`) and the CLI can't both drive the agent (known
+  AnyConnect behaviour, not yet reproduced here), so `cisco_up` offers to quit the GUI first (`osascript quit`); the tunnel lives in `vpnagentd`.
 - **A running Defguard GUI kills CLI-started MFA sessions.** Observed on 2.1.0: ~300 ms after
   the CLI's session reaches Connected, nesessionmanager logs `stop command from
   defguard-client[<GUI pid>] with reason 1`, and the GUI pops its own TOTP prompt (then

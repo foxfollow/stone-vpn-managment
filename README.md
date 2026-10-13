@@ -51,7 +51,7 @@ Brew-версія OpenVPN (на відміну від GUI OpenVPN Connect) пр�
 |---------------------|--------------------------------------------------------------|
 | `status`            | швидкий статус: усі активні тунелі (WireGuard + OpenVPN + Defguard + utun) |
 | `list`              | доступні тунелі (WG-конфіги + `openvpn` + Defguard-локації)   |
-| `up <тунель>`       | підняти тунель: назва WG-тунелю, `openvpn` або `defguard [локація]` |
+| `up <тунель>`       | підняти тунель: назва WG-тунелю, `openvpn`, `cisco [хост]` або `defguard [локація]` |
 | `down [тунель]`     | опустити тунель; без аргументу — всі (спершу показує статус)  |
 | `cert <wg\|openvpn>`| додати/керувати конфігами та сертифікатами                    |
 | `dns [fix]`         | DNS по сервісах; `dns fix` — полагодити DNS, вбитий VPN       |
@@ -89,6 +89,33 @@ Brew-версія OpenVPN (на відміну від GUI OpenVPN Connect) пр�
 Скрипт викличе `sudo` сам — буде запит пароля. Defguard — без `sudo`.
 
 ---
+
+## Вимкнути бекенди
+
+Якщо якимось VPN не користуєшся — у `config.env`:
+
+```bash
+DISABLED_BACKENDS="cisco openvpn"   # wireguard | openvpn | defguard | cisco
+```
+
+Вимкнений бекенд не показується в `status` / `list` / меню `down` і не опитується
+(жодних викликів його CLI). `up`/`down` для нього відмовлять з поясненням. За
+замовчуванням увімкнено все. Разово, без правки конфігу:
+`DISABLED_BACKENDS=cisco ./main-vpn-manager.sh status`.
+
+## Cisco Secure Client
+
+Через CLI `/opt/cisco/secureclient/bin/vpn` замість GUI:
+
+```bash
+./main-vpn-manager.sh list          # хости з профілю Cisco (+ який під'єднаний)
+./main-vpn-manager.sh up cisco      # один хост — одразу; кілька — меню; або: up cisco <адреса>
+./main-vpn-manager.sh down cisco
+```
+
+Групу, логін, пароль і банер питає сам `vpn` у терміналі — скрипт нічого не зберігає.
+Поки відкритий GUI Cisco Secure Client, CLI підключати не може — `up cisco` запропонує
+закрити GUI (тунель тримає `vpnagentd`, не GUI).
 
 ## Defguard
 

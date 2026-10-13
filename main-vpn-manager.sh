@@ -7,7 +7,7 @@
 # Використання:
 #   ./main-vpn-manager.sh status            показати всі активні тунелі (швидкий статус)
 #   ./main-vpn-manager.sh list              показати доступні тунелі
-#   ./main-vpn-manager.sh up <tunnel>       підняти тунель (назва WG-тунелю, 'openvpn' або 'defguard [локація]')
+#   ./main-vpn-manager.sh up <tunnel>       підняти тунель (назва WG-тунелю, 'openvpn', 'cisco [хост]' або 'defguard [локація]')
 #   ./main-vpn-manager.sh down [tunnel]     опустити тунель; без аргументу — меню
 #   ./main-vpn-manager.sh cert <wg|openvpn> керування конфігами/сертифікатами
 #   ./main-vpn-manager.sh dns               показати DNS по сервісах і встановити на вибраних
@@ -24,6 +24,7 @@ SCRIPTS="$SCRIPT_DIR/scripts"
 RESTORE_DNS=""
 DNS_SERVICES=("Wi-Fi")
 DEFGUARD_CLI=""
+DISABLED_BACKENDS="${DISABLED_BACKENDS:-}"   # також разово: DISABLED_BACKENDS=cisco ./main-vpn-manager.sh ...
 
 # Опціональний локальний конфіг (дефолти: RESTORE_DNS, DNS_SERVICES тощо).
 # shellcheck source=/dev/null
@@ -42,6 +43,50 @@ else
 fi
 
 die() { echo "${R}Помилка:${N} $*" >&2; exit 1; }
+
+# ─── вимкнені бекенди (config.env: DISABLED_BACKENDS) ────────────────────────
+# Вимкнений бекенд не показується в status/list/down і взагалі не опитується
+# (жодних wg / pgrep openvpn / vpn state / defguard-client). Рядок, а не масив:
+# /bin/bash 3.2 під set -u падає на порожньому масиві. Синоніми: wg, ovpn, dg.
+BACKENDS="wireguard openvpn defguard cisco"
+
+backend_canon() {
+    case "$1" in
+        wg|wireguard)     echo wireguard ;;
+        ovpn|openvpn)     echo openvpn ;;
+        dg|defguard)      echo defguard ;;
+        cisco|anyconnect) echo cisco ;;
+        *)                echo "$1" ;;
+    esac
+}
+
+backend_on() {
+    local b want; want=$(backend_canon "$1")
+    for b in ${DISABLED_BACKENDS//,/ }; do
+        [ "$(backend_canon "$b")" = "$want" ] && return 1
+    done
+    return 0
+}
+
+backend_need() { backend_on "$1" || die "бекенд '$(backend_canon "$1")' вимкнено в config.env (DISABLED_BACKENDS)"; }
+
+# Вимкнені — одним рядком, щоб status/list чесно казали, чого не показують.
+backends_off() {
+    local b out=""
+    for b in $BACKENDS; do backend_on "$b" || out+="$b "; done
+    echo "${out% }"
+}
+
+# Друкарська помилка в config.env інакше мовчки нічого б не вимкнула.
+backends_validate() {
+    local b
+    for b in ${DISABLED_BACKENDS//,/ }; do
+        case " $BACKENDS " in
+            *" $(backend_canon "$b") "*) ;;
+            *) echo "${Y}config.env: невідомий бекенд у DISABLED_BACKENDS: '$b'${N} (є: $BACKENDS)" >&2 ;;
+        esac
+    done
+}
 
 # ─── WireGuard ──────────────────────────────────────────────────────────────
 
@@ -199,6 +244,69 @@ cisco_cli() {
 cisco_connected_host() {
     local cli; cli=$(cisco_cli) || return 0
     "$cli" -s state 2>/dev/null | sed -n 's/.*Connected to \(.*\)\.$/\1/p' | head -1
+}
+
+# Хости з профілю Cisco — те, що GUI показує у випадному списку.
+cisco_hosts() {
+    local cli; cli=$(cisco_cli) || return 0
+    "$cli" -s hosts 2>/dev/null | awk '
+        /\[hosts\]:/ { h = 1; next }
+        h && /^[[:space:]]*> / { sub(/^[[:space:]]*> /, ""); sub(/[[:space:]]+$/, ""); print }'
+}
+
+# GUI Cisco Secure Client. Поки він відкритий, агентом керує він, і `vpn connect`
+# з CLI відмовляє. Тунель тримає vpnagentd, не GUI, тож закрити GUI безпечно.
+cisco_gui_pid() {
+    pgrep -f 'Cisco Secure Client\.app/Contents/MacOS/Cisco Secure Client' 2>/dev/null | head -1
+}
+
+# Підключити Cisco через CLI (`vpn connect <хост>`). Групу, логін, пароль і банер
+# питає сам vpn у терміналі — тут нічого не зберігається.
+cisco_up() {
+    local cli host="${1:-}" cur
+    cli=$(cisco_cli) || die "Cisco Secure Client CLI не знайдено (/opt/cisco/secureclient/bin/vpn)"
+    cur=$(cisco_connected_host)
+    [ -n "$cur" ] && { echo "Cisco вже під'єднано до $cur."; return 0; }
+
+    if [ -z "$host" ]; then
+        local -a hosts=()
+        local h i
+        while IFS= read -r h; do [ -n "$h" ] && hosts+=("$h"); done <<< "$(cisco_hosts)"
+        if [ "${#hosts[@]}" -eq 1 ]; then
+            host="${hosts[0]}"
+        elif [ "${#hosts[@]}" -gt 1 ]; then
+            echo "${B}Cisco — до якого хоста?${N}"
+            for i in "${!hosts[@]}"; do printf "  %2d) %s\n" "$((i + 1))" "${hosts[$i]}"; done
+            read -rp "Номер [1-${#hosts[@]}] або адреса: " i
+            if [[ "$i" =~ ^[0-9]+$ ]] && [ "$i" -ge 1 ] && [ "$i" -le "${#hosts[@]}" ]; then
+                host="${hosts[$((i - 1))]}"
+            else
+                host="$i"
+            fi
+        else
+            read -rp "Адреса Cisco-шлюзу (у профілі хостів немає): " host
+        fi
+        [ -n "$host" ] || die "хост не вказано"
+    fi
+
+    local gui; gui=$(cisco_gui_pid)
+    if [ -n "$gui" ]; then
+        echo "${Y}Відкритий GUI Cisco Secure Client (PID $gui)${N} — поки він працює, CLI не підключає."
+        local a; read -rp "Закрити GUI? Тунелю це не шкодить — його тримає vpnagentd. [Y/n]: " a
+        case "$a" in n|N) echo "Скасовано."; return 1 ;; esac
+        osascript -e 'quit app "Cisco Secure Client"' >/dev/null 2>&1
+        sleep 1
+    fi
+
+    echo "${B}Підключаю Cisco до $host...${N}"
+    "$cli" connect "$host"
+    cur=$(cisco_connected_host)
+    if [ -n "$cur" ]; then
+        echo "${G}● Cisco під'єднано до $cur${N}"
+    else
+        echo "${R}Cisco не під'єднано${N} ($("$cli" -s state 2>/dev/null | sed -n 's/.*state: //p' | tail -1))."
+        return 1
+    fi
 }
 
 # ─── Defguard (NetworkExtension net.defguard, керується власним CLI) ─────────
@@ -679,35 +787,39 @@ cmd_status() {
         printf "  ${Y}перехоплення: 0/1+128.0/1 → %s — повнотунельний VPN обходить default${N}\n" "${split% }"
     echo ""
 
-    echo "${B}WireGuard:${N}"
-    if command -v wg >/dev/null 2>&1; then
-        local map; map=$(wg_active_map)
-        if [ -n "$map" ]; then
-            local name iface
-            while read -r name iface; do
-                [ -n "$name" ] || continue
-                printf "  ${G}● %-16s${N} UP   ${D}(%s)${N}\n" "$name" "$iface"
-            done <<< "$map"
+    if backend_on wireguard; then
+        echo "${B}WireGuard:${N}"
+        if command -v wg >/dev/null 2>&1; then
+            local map; map=$(wg_active_map)
+            if [ -n "$map" ]; then
+                local name iface
+                while read -r name iface; do
+                    [ -n "$name" ] || continue
+                    printf "  ${G}● %-16s${N} UP   ${D}(%s)${N}\n" "$name" "$iface"
+                done <<< "$map"
+            else
+                echo "  ${D}немає активних тунелів${N}"
+            fi
         else
-            echo "  ${D}немає активних тунелів${N}"
+            echo "  ${D}wg не встановлено${N}"
         fi
-    else
-        echo "  ${D}wg не встановлено${N}"
+        echo ""
     fi
-    echo ""
 
-    echo "${B}OpenVPN:${N}"
-    local pid id ovpn; ovpn=$(ovpn_instances)
-    if [ -n "$ovpn" ]; then
-        while IFS=$'\t' read -r pid id; do
-            ovpn_status_line "$pid" "$id"
-        done <<< "$ovpn"
-    else
-        echo "  ${D}не запущено${N}"
+    if backend_on openvpn; then
+        echo "${B}OpenVPN:${N}"
+        local pid id ovpn; ovpn=$(ovpn_instances)
+        if [ -n "$ovpn" ]; then
+            while IFS=$'\t' read -r pid id; do
+                ovpn_status_line "$pid" "$id"
+            done <<< "$ovpn"
+        else
+            echo "  ${D}не запущено${N}"
+        fi
+        echo ""
     fi
-    echo ""
 
-    if cisco_cli >/dev/null; then
+    if backend_on cisco && cisco_cli >/dev/null; then
         echo "${B}Cisco Secure Client:${N}"
         local chost; chost=$(cisco_connected_host)
         if [ -n "$chost" ]; then
@@ -718,8 +830,8 @@ cmd_status() {
         echo ""
     fi
 
-    local dgs; dgs=$(dg_sessions)
-    if [ -n "$dgs" ] || dg_cli >/dev/null; then
+    local dgs=""; backend_on defguard && dgs=$(dg_sessions)
+    if backend_on defguard && { [ -n "$dgs" ] || dg_cli >/dev/null; }; then
         echo "${B}Defguard:${N}"
         local st uuid dname targets="" shown=0
         # endpoint бере CLI (~1с) — лише коли є що показувати.
@@ -749,24 +861,49 @@ cmd_status() {
         local idle; idle=$(ifconfig -l 2>/dev/null | tr ' ' '\n' | grep -c '^utun[0-9]')
         echo "  ${D}немає з IPv4${N}${D} (utun-інтерфейсів без IPv4: $idle)${N}"
     fi
+    local off; off=$(backends_off)
+    [ -z "$off" ] || { echo ""; echo "${D}вимкнено в config.env (не перевіряється): $off${N}"; }
 }
 
 cmd_list() {
     echo "${B}Доступні тунелі:${N}"
     echo ""
-    echo "${B}WireGuard${N} ${D}($(wg_config_dir 2>/dev/null || echo 'конфіги не знайдено'))${N}:"
-    local cfgs; cfgs=$(wg_list_configs)
-    if [ -n "$cfgs" ]; then
-        echo "$cfgs" | sed 's/^/  /'
-    else
-        echo "  ${D}немає .conf файлів${N}"
+    if backend_on wireguard; then
+        echo "${B}WireGuard${N} ${D}($(wg_config_dir 2>/dev/null || echo 'конфіги не знайдено'))${N}:"
+        local cfgs; cfgs=$(wg_list_configs)
+        if [ -n "$cfgs" ]; then
+            echo "$cfgs" | sed 's/^/  /'
+        else
+            echo "  ${D}немає .conf файлів${N}"
+        fi
+        echo ""
     fi
-    echo ""
-    echo "${B}OpenVPN${N}:"
-    echo "  openvpn   ${D}— інтерактивний вибір профілю (scripts/vpn-up.sh)${N}"
-    echo ""
+    if backend_on openvpn; then
+        echo "${B}OpenVPN${N}:"
+        echo "  openvpn   ${D}— інтерактивний вибір профілю (scripts/vpn-up.sh)${N}"
+        echo ""
+    fi
+    local ccli
+    if backend_on cisco && ccli=$(cisco_cli); then
+        echo "${B}Cisco Secure Client${N} ${D}($ccli)${N}:"
+        local chosts ch cur; chosts=$(cisco_hosts); cur=$(cisco_connected_host)
+        if [ -n "$chosts" ]; then
+            while IFS= read -r ch; do
+                [ -n "$ch" ] || continue
+                if [ -n "$cur" ] && [ "${ch%%:*}" = "${cur%%:*}" ]; then
+                    printf "  %-30s ${G}● під'єднано${N}\n" "$ch"
+                else
+                    printf "  %s\n" "$ch"
+                fi
+            done <<< "$chosts"
+        else
+            echo "  ${D}у профілі немає хостів (можна: up cisco <адреса>)${N}"
+        fi
+        echo "  ${D}підключити: up cisco [хост]   (GUI має бути закритий — спитає)${N}"
+        echo ""
+    fi
     local dcli
-    if dcli=$(dg_cli); then
+    if backend_on defguard && dcli=$(dg_cli); then
         echo "${B}Defguard${N} ${D}($dcli)${N}:"
         local targets kind name ep mfa rt st
         targets=$(dg_targets)
@@ -786,6 +923,8 @@ cmd_list() {
         fi
         echo ""
     fi
+    local off; off=$(backends_off)
+    [ -z "$off" ] || echo "${D}вимкнено в config.env: $off${N}"
     echo "${D}Додати новий тунель: ./main-vpn-manager.sh cert <wg|openvpn>${N}"
 }
 
@@ -794,15 +933,18 @@ cmd_up() {
     [ -n "$tunnel" ] || die "вкажи назву тунелю. Див. './main-vpn-manager.sh list'"
 
     case "$tunnel" in
-        openvpn)     exec "$SCRIPTS/vpn-up.sh" ;;
-        defguard|dg) shift; dg_up "$@"; return ;;
-        dg:*)        shift; dg_up "${tunnel#dg:}" "$@"; return ;;
+        openvpn)     backend_need openvpn;  exec "$SCRIPTS/vpn-up.sh" ;;
+        defguard|dg) backend_need defguard; shift; dg_up "$@"; return ;;
+        dg:*)        backend_need defguard; shift; dg_up "${tunnel#dg:}" "$@"; return ;;
+        cisco)       backend_need cisco;    shift; cisco_up "$@"; return ;;
     esac
     # Голе ім'я без WG-конфігу, але з такою локацією в Defguard → Defguard.
-    if ! wg_has "$tunnel" && dg_cli >/dev/null && [ -n "$(dg_kind "$tunnel")" ]; then
+    if backend_on defguard && { ! backend_on wireguard || ! wg_has "$tunnel"; } \
+            && dg_cli >/dev/null && [ -n "$(dg_kind "$tunnel")" ]; then
         shift; dg_up "$tunnel" "$@"; return
     fi
 
+    backend_need wireguard
     command -v wg-quick >/dev/null 2>&1 || die "wg-quick не встановлено"
     local dir; dir=$(wg_config_dir) || die "директорію конфігів WireGuard не знайдено (${WG_DIRS[*]})"
     [ -f "$dir/$tunnel.conf" ] || die "конфіг '$tunnel.conf' не знайдено в $dir"
@@ -851,15 +993,16 @@ cmd_down() {
     if [ -n "$tunnel" ]; then
         local item
         case "$tunnel" in
-            openvpn|cisco) item="$tunnel" ;;
-            defguard|dg)   item="dg:${2:-all}" ;;
-            dg:*)          item="$tunnel" ;;
+            openvpn|cisco) backend_need "$tunnel"; item="$tunnel" ;;
+            defguard|dg)   backend_need defguard;  item="dg:${2:-all}" ;;
+            dg:*)          backend_need defguard;  item="$tunnel" ;;
             *)
                 # Голе ім'я: живий WG-тунель/конфіг має пріоритет, інакше — сесія Defguard.
-                if ! wg_has "$tunnel" && ! wg_active_map | grep -q "^$tunnel " \
-                        && [ -n "$(dg_session "$tunnel")" ]; then
+                if backend_on defguard && [ -n "$(dg_session "$tunnel")" ] && { ! backend_on wireguard \
+                        || { ! wg_has "$tunnel" && ! wg_active_map | grep -q "^$tunnel "; }; }; then
                     item="dg:$tunnel"
                 else
+                    backend_need wireguard
                     item="wg:$tunnel"
                 fi ;;
         esac
@@ -869,8 +1012,8 @@ cmd_down() {
     fi
 
     # Без аргументу — меню з усього, що зараз живе.
-    local items=() labels=() name iface map
-    map=$(wg_active_map)
+    local items=() labels=() name iface map=""
+    backend_on wireguard && map=$(wg_active_map)
     while read -r name iface; do
         [ -n "$name" ] || continue
         items+=("wg:$name"); labels+=("WireGuard  $name ${D}($iface)${N}")
@@ -881,14 +1024,14 @@ cmd_down() {
         local ost; ost=$(ovpn_state "$opid" | cut -f1)
         case "$ost" in up) ost="підключено" ;; connecting) ost="НЕ підключено" ;; *) ost="стан ?" ;; esac
         items+=("ovpn:$opid"); labels+=("OpenVPN    $oid ${D}($(ovpn_remote "$oid"), $ost, PID $opid)${N}")
-    done <<< "$(ovpn_instances)"
-    local chost; chost=$(cisco_connected_host)
+    done <<< "$(backend_on openvpn && ovpn_instances)"
+    local chost=""; backend_on cisco && chost=$(cisco_connected_host)
     [ -n "$chost" ] && { items+=(cisco); labels+=("Cisco      ${D}($chost)${N}"); }
     local dst duuid dname
     while IFS=$'\t' read -r dst duuid dname; do
         [ -n "$duuid" ] && [ "$dst" != Disconnected ] || continue
         items+=("dg:$dname"); labels+=("Defguard   $dname ${D}($(dg_iface "$duuid"), $dst)${N}")
-    done <<< "$(dg_sessions)"
+    done <<< "$(backend_on defguard && dg_sessions)"
 
     [ "${#items[@]}" -gt 0 ] || { echo "Активних тунелів немає."; return 0; }
 
@@ -929,16 +1072,16 @@ cmd_down() {
 cmd_cert() {
     local backend="${1:-}"
     case "$backend" in
-        wg|wireguard)  exec "$SCRIPTS/wg-cert.sh" "${@:2}" ;;
-        openvpn|ovpn)  exec "$SCRIPTS/vpn-cert.sh" "${@:2}" ;;
+        wg|wireguard)  backend_need wireguard; exec "$SCRIPTS/wg-cert.sh" "${@:2}" ;;
+        openvpn|ovpn)  backend_need openvpn;   exec "$SCRIPTS/vpn-cert.sh" "${@:2}" ;;
         "")
             echo "${B}Керування сертифікатами — оберіть бекенд:${N}"
             echo "  1) WireGuard"
             echo "  2) OpenVPN"
             read -rp "Номер [1-2]: " b
             case "$b" in
-                1) exec "$SCRIPTS/wg-cert.sh" ;;
-                2) exec "$SCRIPTS/vpn-cert.sh" ;;
+                1) backend_need wireguard; exec "$SCRIPTS/wg-cert.sh" ;;
+                2) backend_need openvpn;   exec "$SCRIPTS/vpn-cert.sh" ;;
                 *) die "невірний вибір" ;;
             esac
             ;;
@@ -1300,7 +1443,7 @@ utun_owner() {
     local u="$1" nf names=() pid id st dev key svc name
     # WireGuard: wireguard-go тримає $WG_RUN/<utunN>.sock (видно всім), а
     # <назва>.name часто root 400 — тоді назву беремо, лише якщо тунель один.
-    if [ -e "$WG_RUN/$u.sock" ]; then
+    if backend_on wireguard && [ -e "$WG_RUN/$u.sock" ]; then
         for nf in "$WG_RUN"/*.name; do
             [ -e "$nf" ] || continue
             names+=("$(basename "$nf" .name)")
@@ -1314,11 +1457,11 @@ utun_owner() {
         [ -n "$pid" ] || continue
         IFS=$'\t' read -r st dev <<< "$(ovpn_state "$pid")"
         [ "$st" = up ] && [ "$dev" = "$u" ] && { echo "OpenVPN $id"; return; }
-    done <<< "$(ovpn_instances)"
+    done <<< "$(backend_on openvpn && ovpn_instances)"
     # Defguard: State-сервіс живого тунелю з сесією не пов'язаний — питаємо сесії.
     while IFS=$'\t' read -r st key name; do
         [ "$st" = Connected ] && [ "$(dg_iface "$key")" = "$u" ] && { echo "Defguard $name"; return; }
-    done <<< "$(dg_sessions)"
+    done <<< "$(backend_on defguard && dg_sessions)"
     # Сторонні VPN: State-сервіс, чий IPv4.InterfaceName = цей utun.
     for key in $(printf 'list State:/Network/Service/.*/IPv4\nquit\n' | scutil 2>/dev/null | awk '{print $NF}'); do
         [ "$(sc_show "$key" | awk '/InterfaceName/{print $NF}')" = "$u" ] || continue
@@ -1580,7 +1723,7 @@ cmd_net() {
         fi
         if [ -z "$dev" ]; then
             vtag="VPN-сервіс"
-            if [ "$hw" = net.defguard ]; then
+            if [ "$hw" = net.defguard ] && backend_on defguard; then
                 vtag="Defguard"
                 dst=$(dg_session "$name" | cut -f1)
                 [ "$dst" = Connected ] && vtag="Defguard ${N}${G}● підключено${N}${D}"
@@ -1624,15 +1767,15 @@ cmd_net() {
 
 cmd_help() {
     cat <<EOF
-${B}main-vpn-manager.sh${N} — керування VPN-тунелями (WireGuard + OpenVPN + Defguard)
+${B}main-vpn-manager.sh${N} — керування VPN-тунелями (WireGuard + OpenVPN + Defguard + Cisco)
 
 ${B}Використання:${N}
   ./main-vpn-manager.sh <команда> [тунель]
 
 ${B}Команди:${N}
   ${G}status${N}            показати всі активні VPN-тунелі (швидкий статус)
-  ${G}list${N}              показати доступні тунелі (WG-конфіги + openvpn + Defguard-локації)
-  ${G}up${N} <тунель>       підняти тунель: назва WG-тунелю, 'openvpn' або 'defguard [локація]'
+  ${G}list${N}              показати доступні тунелі (WG-конфіги + openvpn + Cisco-хости + Defguard-локації)
+  ${G}up${N} <тунель>       підняти тунель: назва WG-тунелю, 'openvpn', 'cisco [хост]' або 'defguard [локація]'
   ${G}down${N} [тунель]     опустити тунель (WG-назва | openvpn | cisco | defguard [локація]); без
                     аргументу — меню з номерами активних тунелів
                     (перед вимкненням завжди показує статус)
@@ -1652,6 +1795,7 @@ ${B}Приклади:${N}
   ./main-vpn-manager.sh up openvpn         # інтерактивний вибір .ovpn профілю
   ./main-vpn-manager.sh down wire-first
   ./main-vpn-manager.sh down               # меню: вибрати номер або all
+  ./main-vpn-manager.sh up cisco           # Cisco через CLI (хост із профілю; логін/пароль спитає vpn)
   ./main-vpn-manager.sh down cisco         # від'єднати Cisco Secure Client
   ./main-vpn-manager.sh up defguard        # Defguard: меню локацій (MFA-код спитає)
   ./main-vpn-manager.sh up defguard staff --all-traffic   # решта аргументів → defguard-client connect
@@ -1697,6 +1841,11 @@ ${B}Про Defguard:${N}
   CLI запускається лише з бандла: через симлінк він не збереже тунель
   ("Failed to save tunnel configuration"), і MFA-локації не підключаться.
 
+${B}Вимкнути бекенди:${N}
+  config.env: DISABLED_BACKENDS="cisco openvpn"  (wireguard | openvpn | defguard | cisco).
+  Вимкнений не показується в status/list/down і не опитується. За замовчуванням
+  увімкнено все. Разово: DISABLED_BACKENDS=cisco ./main-vpn-manager.sh status
+
 ${B}Примітки:${N}
   • потребує sudo (створення tun-інтерфейсу, wg-quick); Defguard — ні
   • WireGuard-конфіги шукаються у: ${WG_DIRS[*]}
@@ -1705,6 +1854,8 @@ EOF
 }
 
 # ─── диспетчер ──────────────────────────────────────────────────────────────
+
+backends_validate
 
 case "${1:-help}" in
     status|st)       cmd_status ;;
