@@ -4,27 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Personal macOS Bash tooling to manage VPN tunnels from one place. Two backends:
+Personal macOS Bash tooling to manage VPN tunnels from one place. Three backends:
 
 - **WireGuard** via `wg-quick` (configs live in system paths, not the repo).
 - **OpenVPN** via the Homebrew binary `/opt/homebrew/sbin/openvpn` — used instead of
   the OpenVPN Connect GUI because the brew CLI writes routes into the kernel correctly.
+- **Defguard** via `defguard-client` (ships inside `Defguard.app`; NetworkExtension, no sudo).
 
-`main-vpn-manager.sh` is the single entry point that dispatches to both. There is no
+`main-vpn-manager.sh` is the single entry point that dispatches to all three. There is no
 build, no test framework, and no package — scripts run directly. Repo-facing docs
 (`README.md`, `OPENVPN_CLI.md`) are in Ukrainian; this file is the AI-facing reference.
 
 ## Project layout & purpose of each file
 
 ```
-main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t> | down [t|openvpn|cisco]
+main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t|openvpn|defguard [loc]>
+                      | down [t|openvpn|cisco|defguard [loc]]
                       | cert <wg|openvpn> | dns [fix [servers] | split ...] | route | net [auto |
                       top <svc>] | help. WireGuard via wg-quick; "openvpn" and "cert"
                       delegate to scripts/*.sh.
 README.md             User-facing overview + usage (Ukrainian).
 OPENVPN_CLI.md        Detailed OpenVPN reference (Ukrainian).
 config.env.example    Template for config.env (committed).
-config.env            Local defaults (LAN_GATEWAY, OVPN_USERNAME, RESTORE_DNS, DNS_SERVICES). GITIGNORED.
+config.env            Local defaults (LAN_GATEWAY, OVPN_USERNAME, RESTORE_DNS, DNS_SERVICES,
+                      DEFGUARD_CLI). GITIGNORED.
 state.env             Auto-written last choices (LAST_GATEWAY, LAST_USERNAME). GITIGNORED.
 auth.txt.example      Template for auth.txt (committed).
 auth.txt              Optional default OpenVPN username, one line, chmod 600. GITIGNORED.
@@ -162,6 +165,14 @@ There are no unit tests. Validate changes like this:
   "Конфлікту немає" while nothing resolved. It ends with `net_first_online` and points at
   `net auto`.
 
+- **`route` also lists every VPN route** (`route_vpn_table`): per live utun (has IPv4) all
+  `netstat -rn` entries through it, labelled by `utun_owner` — WireGuard via
+  `/var/run/wireguard/<utunN>.sock` (world-visible; the `<name>.name` file is often root 400,
+  so the name is shown only when readable or when exactly one tunnel exists), OpenVPN via
+  `ovpn_state`, third-party (Cisco/ClearVPN) via the `State:/Network/Service/*/IPv4` entry whose
+  `InterfaceName` matches. Plus static `/32` gateway routes on physical ifaces = route-fix
+  host routes to VPN servers.
+
 - **`status` prints a "Мережа:" block first** (primary service + effective resolver) — that,
   not the utun list, is what shows a foreign VPN owning the network.
 
@@ -211,6 +222,44 @@ There are no unit tests. Validate changes like this:
 - **State files:** per profile — PID `/tmp/openvpn-<id>.pid`, log `/tmp/openvpn-<id>.log`
   (`<id>` = profile basename). `vpn-up.sh` polls the log
   for `Initialization Sequence Completed` (success) vs `AUTH_FAILED`/`fatal error`.
+- **Defguard on macOS is a NetworkExtension, not wg-quick.** System extension
+  `net.defguard.VPNExtension` runs 24/7 (process presence means nothing). Each location is a
+  VPN network service (`Hardware Port: net.defguard`, Setup `Interface/SubType net.defguard`).
+  Live state: `scutil --nc list` lines tagged `[VPN:net.defguard]` (`dg_sessions`, real
+  Connected/Connecting/Disconnecting — unlike ClearVPN's `(Invalid)`). utun/address/DNS:
+  `scutil --nc status <uuid>` (`dg_info`), sudo-free. **Not** the State store: the live tunnel
+  writes `State:/Network/Service/<different uuid>` with no Setup entry and no link to the
+  session UUID; and `defguard-client status --json` reports `"interface": ""` on macOS.
+  `utun_owner` therefore matches utun → session via `dg_info`. Never print raw
+  `scutil --nc show <uuid>` — it contains the tunnel's `privateKey`.
+- **Defguard DNS is Supplemental with MatchDomains `[""]`** → it is resolver #1 for all domains
+  while up (like Cisco). `__CONFIGURATION_ID__` names the runtime UUID, so `dns_owner_hint`
+  resolves UUID owners whose State DNS `InterfaceName` is a utun via `utun_owner`.
+- **`defguard-client` must be exec'd by its real in-bundle path.** NetworkExtension derives the
+  app bundle from the exec path; via a symlink (`/opt/homebrew/bin`) it can't find the provider
+  → `Failed to save tunnel configuration … to system settings` (log: `NEVPNErrorDomain Code=1
+  "Missing plugin type"`). Non-MFA locations still connect (the previously saved profile stays valid); MFA
+  locations then fail with `WireGuardError error 8` (observed; presumably the post-MFA session
+  key never reaches the profile).
+  `dg_cli` prefers the bundle path and `realpath`s symlinks. The CLI prints `Connected to …`
+  even when the tunnel then dies, so `dg_up` waits on the session state (`dg_wait`).
+  Connect/disconnect only via the CLI (shares the GUI's DB, handles MFA prompts itself);
+  `scutil --nc stop` is only the no-CLI fallback in `dg_down`. After `down`, Defguard (like
+  Cisco) restores its own DNS → `dns_flush` only, not `restore_dns` (`down_is_foreign`).
+  Bare names in `up`/`down` go to Defguard only when no WG config/active WG tunnel has that name.
+- **A running Defguard GUI kills CLI-started MFA sessions.** Observed on 2.1.0: ~300 ms after
+  the CLI's session reaches Connected, nesessionmanager logs `stop command from
+  defguard-client[<GUI pid>] with reason 1`, and the GUI pops its own TOTP prompt (then
+  reconnects itself if you enter it). Non-MFA locations are left alone. `dg_gui_pid` finds the
+  GUI as the bundle binary with *no* args (`pgrep -fx`); `dg_up` warns before spending a code
+  and re-checks the session 2 s after Connected. An empty MFA code in the CLI is simply sent and
+  rejected (`MFA rejected: unauthorized`) — there is no hand-off to the GUI. Diagnose with
+  `/usr/bin/log show … 'eventMessage CONTAINS "<location>"'` (zsh's builtin `log` shadows it).
+  In `dns fix` case 3, a Defguard-owned primary utun is disconnected via the CLI instead of
+  killing processes (`fix_kill_tunnel_procs` is the generic NE path).
+- **`iface_routes` hides scoped defaults' meaning unless labelled**: NE tunnels always add a
+  scoped `default` (flag `I`) — shown as `default (scoped)`; cloned host entries (`W`),
+  multicast and broadcast are dropped.
 - **The ovpnagent watchdog is a separate concern** from the brew-CLI connection path: the
   plist + `fix-ovpnagent.sh` keep the *GUI* agent's socket alive and are independent.
 

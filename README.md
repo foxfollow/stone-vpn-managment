@@ -1,7 +1,8 @@
 # own-wg-openvpn-managment
 
 Особистий набір bash-скриптів для керування VPN-тунелями на macOS — **WireGuard**
-(через `wg-quick`) та **OpenVPN** (через Homebrew-версію `/opt/homebrew/sbin/openvpn`).
+(через `wg-quick`), **OpenVPN** (через Homebrew-версію `/opt/homebrew/sbin/openvpn`)
+та **Defguard** (через `defguard-client` з десктоп-клієнта).
 
 Призначення — мати **одну централізовану точку керування** (`main-vpn-manager.sh`)
 для запуску/зупинки тунелів і перегляду статусу, незалежно від технології.
@@ -48,9 +49,9 @@ Brew-версія OpenVPN (на відміну від GUI OpenVPN Connect) пр�
 
 | Команда             | Опис                                                          |
 |---------------------|--------------------------------------------------------------|
-| `status`            | швидкий статус: усі активні тунелі (WireGuard + OpenVPN + utun) |
-| `list`              | доступні тунелі (WG-конфіги + `openvpn`)                      |
-| `up <тунель>`       | підняти тунель: назва WG-тунелю або `openvpn`                 |
+| `status`            | швидкий статус: усі активні тунелі (WireGuard + OpenVPN + Defguard + utun) |
+| `list`              | доступні тунелі (WG-конфіги + `openvpn` + Defguard-локації)   |
+| `up <тунель>`       | підняти тунель: назва WG-тунелю, `openvpn` або `defguard [локація]` |
 | `down [тунель]`     | опустити тунель; без аргументу — всі (спершу показує статус)  |
 | `cert <wg\|openvpn>`| додати/керувати конфігами та сертифікатами                    |
 | `dns [fix]`         | DNS по сервісах; `dns fix` — полагодити DNS, вбитий VPN       |
@@ -85,7 +86,42 @@ Brew-версія OpenVPN (на відміну від GUI OpenVPN Connect) пр�
 ```
 
 `up`/`down` потребують `sudo` (створення tun-інтерфейсу та `wg-quick`).
-Скрипт викличе `sudo` сам — буде запит пароля.
+Скрипт викличе `sudo` сам — буде запит пароля. Defguard — без `sudo`.
+
+---
+
+## Defguard
+
+Потрібен встановлений [Defguard desktop client](https://docs.defguard.net/using-defguard-for-end-users/desktop-client/command-line-defguard-cli)
+з уже доданим інстансом. На macOS це NetworkExtension (`net.defguard`): кожна локація —
+окремий VPN-сервіс у системі, підключення йде через `defguard-client` (входить у
+`Defguard.app`, ділить БД із GUI).
+
+```bash
+./main-vpn-manager.sh list                       # локації: endpoint, MFA, routing
+./main-vpn-manager.sh up defguard                # меню локацій; MFA-код спитає CLI
+./main-vpn-manager.sh up staff                   # голе ім'я, якщо немає WG-конфігу з такою назвою
+./main-vpn-manager.sh up defguard staff --all-traffic   # решта аргументів → defguard-client connect
+./main-vpn-manager.sh down defguard              # усі Defguard-сесії (або: down defguard staff)
+./main-vpn-manager.sh net top staff              # Defguard-сервіс на верх порядку сервісів
+```
+
+`status` показує utun, маршрути й DNS кожної сесії; `route` підписує її utun як
+«Defguard <локація>». DNS локації Defguard ставить для **всіх** доменів і першим у
+резолвері (як Cisco) — поки тунель піднятий, усі запити спершу йдуть на нього.
+
+> **Не робіть симлінк** на `defguard-client` у `PATH`. NetworkExtension шукає бандл
+> застосунку від шляху запуску, і через симлінк не знаходить розширення:
+> `Failed to save tunnel configuration … to system settings`. Локація без MFA при
+> цьому ще працює (старий профіль валідний), а MFA-локація падає. Якщо потрібна
+> команда в `PATH` — обгортка:
+>
+> ```sh
+> printf '#!/bin/sh\nexec /Applications/Defguard.app/Contents/MacOS/defguard-client "$@"\n' \
+>   > /opt/homebrew/bin/defguard-client && chmod +x /opt/homebrew/bin/defguard-client
+> ```
+>
+> `main-vpn-manager.sh` сам завжди запускає справжній бінарник із бандла.
 
 ---
 
