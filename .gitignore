@@ -34,3 +34,17 @@ __pycache__/
 
 # ── macOS ──
 .DS_Store
+
+# ── Xcode / SwiftPM (app/) ──
+app/**/build/
+DerivedData/
+.build/
+.swiftpm/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM

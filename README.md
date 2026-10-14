@@ -9,6 +9,9 @@
 Brew-версія OpenVPN (на відміну від GUI OpenVPN Connect) правильно прописує
 маршрути в ядро, тому використовується саме вона.
 
+Поверх скриптів є нативний menubar-застосунок **StoneVPN Manager** (SwiftUI, macOS 26+,
+тека `app/`) — див. [розділ нижче](#stonevpn-manager-menubar-застосунок).
+
 ---
 
 ## Структура
@@ -32,12 +35,58 @@ Brew-версія OpenVPN (на відміну від GUI OpenVPN Connect) пр�
     ├── fix-ovpnagent.sh                # перезапуск агента OpenVPN Connect
     ├── nuclear-clean-dns.sh            # примусове очищення DNS
     └── com.local.ovpnagent-watchdog.plist  # LaunchDaemon-вотчдог агента
+
+app/                            # StoneVPN Manager — menubar-застосунок
+├── Makefile                    # make build | install | test | status
+├── Packages/StoneVPNKit/       # ядро без UI (локальний Swift-пакет)
+│   ├── Sources/StoneVPNCore/   #   Model · Parsing · System · Actions · Config · Backends
+│   ├── Sources/StoneVPNShared/ #   протокол застосунок ↔ helper
+│   └── Tests/StoneVPNCoreTests/
+└── StoneVPNManager/
+    ├── StoneVPNManager.xcodeproj
+    ├── StoneVPNManager/        # застосунок: App · Services · Views · Resources (AppIcon.icon)
+    ├── StoneVPNManagerHelper/  # privileged helper (root-демон)
+    └── Config/                 # Info.plist-доповнення, plist launchd-демона
 ```
 
 > WireGuard-конфіги (`.conf`) живуть у системних шляхах wg-quick
 > (`/etc/wireguard`, `/usr/local/etc/wireguard`, `/opt/homebrew/etc/wireguard`),
 > **не** в цьому репозиторії. OpenVPN-профілі (`.ovpn`) — у
 > `~/Library/Application Support/OpenVPN Connect/profiles/`.
+
+---
+
+## StoneVPN Manager (menubar-застосунок)
+
+Іконка в menubar показує стан кольором (сірий контур — тунелів немає, зелений + число —
+скільки підключено, помаранчевий — підключається, червоний «!» — проблема з DNS/мережею,
+фіолетовий — мережу тримає сторонній VPN). Без іконки в Dock.
+
+- **Поповер:** мережа і DNS (з перевіркою, чи резолвер відповідає), список провайдерів —
+  зліва перемикач останнього профілю, під ним обрані ★, `›` відкриває всі профілі;
+  «Змінити» — порядок і приховування. Розгортні DNS (Fix / Flush / split), Routes, Network (Auto).
+- **Підключення:** OpenVPN (логін + OTP, route-fix), Defguard (MFA-код), Cisco прямо в
+  застосунку (групи підтягуються з сервера, логін/хост з порту — з налаштувань Cisco;
+  пароль не зберігається), WireGuard.
+- **Профілі:** псевдоніми (зручно для `.ovpn` з ms-timestamp-назвами), обрані, route-fix
+  для кожного профілю (питати / LAN-шлюз / фіксований / ніколи), власні Cisco-хости `host:port`.
+- **Налаштування:** ті самі ключі, що в `config.env` (спільні з CLI), сповіщення,
+  Auto DNS fix (вимкнено за замовчуванням), helper.
+- **Без репо:** якщо `main-vpn-manager.sh` не знайдено або «Спільно з CLI» вимкнено,
+  налаштування живуть у `~/Library/Application Support/StoneVPNManager/`.
+
+```bash
+make -C app install   # зібрати Release і встановити в /Applications
+make -C app test      # unit-тести ядра
+make -C app status    # стан без UI — порівняти з ./main-vpn-manager.sh status
+```
+
+Root-дії (wg-quick, openvpn, DNS, маршрути) виконує **privileged helper**:
+Settings → Helper → «Встановити», далі схвалити в System Settings → Login Items.
+Helper приймає лише сам застосунок (той самий підпис) і виконує фіксований набір
+перевірених дій. Без нього кожна така дія разово питає пароль адміністратора.
+macOS також один раз спитає дозвіл **Local Network** — це для перевірки DNS-резолвера
+в LAN і доступності інтернету через інтерфейси.
 
 ---
 

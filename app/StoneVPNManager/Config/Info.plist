@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Доповнює згенерований Info.plist (GENERATE_INFOPLIST_FILE). LSUIElement — у build settings. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>StoneVPN перевіряє, чи відповідає DNS-резолвер і чи є інтернет через кожен мережевий інтерфейс (часто це сервер у твоїй LAN). Без дозволу індикатори DNS і мережі можуть показувати хибну проблему.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>StoneVPN закриває GUI Cisco/Defguard перед підключенням з CLI і за потреби відкриває Terminal.</string>
+	<!-- Репозиторій з config.env/state.env, спільними з main-vpn-manager.sh (build setting STONEVPN_REPO_PATH). -->
+	<key>StoneVPNRepoPath</key>
+	<string>$(STONEVPN_REPO_PATH)</string>
+</dict>
+</plist>

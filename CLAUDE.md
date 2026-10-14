@@ -11,8 +11,9 @@ Personal macOS Bash tooling to manage VPN tunnels from one place. Three backends
   the OpenVPN Connect GUI because the brew CLI writes routes into the kernel correctly.
 - **Defguard** via `defguard-client` (ships inside `Defguard.app`; NetworkExtension, no sudo).
 
-`main-vpn-manager.sh` is the single entry point that dispatches to all of them (plus Cisco Secure Client via its own CLI). There is no
-build, no test framework, and no package — scripts run directly. Repo-facing docs
+`main-vpn-manager.sh` is the single entry point that dispatches to all of them (plus Cisco Secure Client via its own CLI). The
+scripts have no build, no test framework, and no package — they run directly. `app/` holds the
+native menubar app (StoneVPN Manager), which has its own build and tests (see its section). Repo-facing docs
 (`README.md`, `OPENVPN_CLI.md`) are in Ukrainian; this file is the AI-facing reference.
 
 ## Project layout & purpose of each file
@@ -41,7 +42,71 @@ scripts/
   fix-ovpnagent.sh    Restart the OpenVPN Connect agent daemon if its socket vanished.
   nuclear-clean-dns.sh   Force-clear DNS from Wi-Fi / iPhone USB + flush resolver.
   com.local.ovpnagent-watchdog.plist   LaunchDaemon watchdog for the agent socket.
+app/
+  Makefile            build | install | test | status (xcodebuild / swift test).
+  Packages/StoneVPNKit/  Local Swift package, no UI.
+    Sources/StoneVPNCore/   Model/ Parsing/ System/ (Shell, SystemStore, StatusReader)
+                            Actions/ Config/ (config.env, standalone dir) Backends/ (Cisco)
+    Sources/StoneVPNShared/ PrivOp + HelperConst (XPC protocol, bundle ids).
+    Tests/StoneVPNCoreTests/
+  StoneVPNManager/
+    StoneVPNManager.xcodeproj   synced groups; shared scheme StoneVPNManager.
+    StoneVPNManager/   App/ (entry, AppModel, Prefs) Services/ (HelperClient)
+                       Views/{Popover,Windows,Settings,Shared}/ Resources/ (Assets, AppIcon.icon)
+    StoneVPNManagerHelper/   root daemon (Executor validates every PrivOp).
+    Config/            Info.plist additions, launchd plist of the helper.
 ```
+
+## app/ — StoneVPNManager (SwiftUI menubar app, macOS 26+)
+
+Xcode project `app/StoneVPNManager/StoneVPNManager.xcodeproj` (file-system synchronized groups:
+files dropped into a target folder are compiled automatically) + local package
+`app/Packages/StoneVPNKit`. `make -C app build|install|test|status` (install → /Applications,
+which SMAppService needs for the helper; test = `swift test` in the package).
+- Targets: `StoneVPNManager` (app, LSUIElement, no sandbox, hardened runtime) embeds
+  `StoneVPNManagerHelper` (tool, root daemon) into Contents/MacOS and
+  `Config/com.foxfollow.stonevpnmanager.helper.plist` into Contents/Library/LaunchDaemons via
+  Copy Files phases. Modules: `StoneVPNShared` (PrivOp XPC protocol, HelperConst ids),
+  `StoneVPNCore` (Parse = 1:1 ports of the bash awk/sed, SystemStore = SCDynamicStore/getifaddrs
+  instead of scutil/ifconfig, StatusReader, Actions, ConfigStore, Cisco). New app files go into
+  the matching folder under `StoneVPNManager/StoneVPNManager/` — synced groups pick them up, no
+  pbxproj edits. App icon: `Resources/AppIcon.icon` (Icon Composer; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon).
+- Bundle ids `com.foxfollow.stonevpnmanager` / `.helper`; changing them means changing
+  HelperConst, the launchd plist and PRODUCT_BUNDLE_IDENTIFIER together. Repo path for
+  config.env is baked into Info.plist (`StoneVPNRepoPath`) from build setting `STONEVPN_REPO_PATH = $(SRCROOT)/../..`.
+- **Helper never execs arbitrary commands**: the app sends a Codable `PrivOp`, the helper
+  validates every argument (WG paths inside WG dirs, IPs via inet_pton, service names against
+  networksetup, kill only tunnel-proc PIDs) and accepts XPC only from the same Team ID. Without
+  the daemon, the same binary runs once as root via `osascript … with administrator privileges`
+  (`--run-file`, request in a 600 temp file — passwords never in argv; always exits 0 so
+  `do shell script` returns the JSON).
+- **Status never prompts**: root-only reads go through `PrivilegedReader.readIfAvailable`,
+  which returns nil unless the daemon is installed.
+- **Interop with the CLI is deliberate**: OpenVPN is launched with exactly vpn-up.sh's flags and
+  `/tmp/openvpn-<id>.{pid,log}` (log root:staff 640), config.env/state.env are shared.
+- **Cisco connects in-app** through `CiscoDriver` (expect-style driver over `vpn -s`: answers
+  Group/Username/Password/Second password/banner prompts as they appear). Defaults come from
+  Cisco's own prefs (`~/.vpn/.anyconnect`, `/opt/cisco/secureclient/vpn/.anyconnect_global`:
+  DefaultUser/DefaultGroup/DefaultHostName + port from DefaultHostAddress).
+  `defaultClientProfile.xml` is useless for custom ports — the head-end rewrites it on every
+  connect — so custom hosts (`host:port`) and any seen live Cisco host are kept in the app
+  (UserDefaults `ciscoHosts`). Writes to child stdin must ignore SIGPIPE (`vpn` exits on
+  "Login failed"; an unguarded write killed the process).
+- **Works without the repo**: `RepoConfig.load(explicitRepo:standalone:)` uses the CLI repo
+  (sharedWithCLI) when found and not disabled, else `~/Library/Application Support/StoneVPNManager/`
+  with the same config.env/state.env format. Switching to standalone copies the repo files once.
+  Only "manage certs" (runs `main-vpn-manager.sh cert` in Terminal) needs the repo.
+- **Auto DNS fix** (pref `autoDNSFix`, default off): DNS dead + no sessions, no foreign tunnels,
+  no live utun → `runDNSFix()` by itself; helper-only (no password prompts), 2-minute cooldown.
+- The "find devices on local networks" prompt is Local Network privacy, triggered by `dig` to a
+  LAN resolver and `ping -b <iface>` / `curl --interface` probes (children are attributed to the
+  app). `NSLocalNetworkUsageDescription` explains it; the grant is per signing identity + path,
+  so Debug builds from DerivedData and the /Applications copy are asked separately.
+- Per-profile settings (alias, favourite, route-fix policy ask/LAN/fixed/off) live in UserDefaults;
+  route-fix defaults: OpenVPN = ask, WireGuard = off.
+- Debug parity check without UI: `make -C app status` (= `--dump-status`) vs
+  `./main-vpn-manager.sh status`.
+- `NetService` clashes with Foundation's — the model type is `NetworkService`.
 
 ## How to test the scripts
 
