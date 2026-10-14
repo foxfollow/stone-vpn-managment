@@ -25,6 +25,26 @@ struct DNSTab: View {
                     }
                 }
             }
+            Section("Повернення DNS після WireGuard") {
+                Toggle("Повертати DNS сервісів, щойно WireGuard відключено", isOn: $model.prefs.dnsGuard)
+                Text("wg-quick ставить DNS тунелю на всі сервіси і не завжди повертає старий. Поки WG немає і резолвер відповідає, застосунок запам'ятовує DNS кожного сервісу (еталон). Після down — до хвилини стежить і повертає еталон тим сервісам, де лишився DNS тунелю; якщо резолвер усе одно мовчить — запускає Fix. Перед кожним підключенням те саме робиться одразу, щоб адреса нового VPN резолвилась. У фоні — лише з helper.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                if model.prefs.dnsBaseline.isEmpty {
+                    Text("Еталон ще не знято — з'явиться за хвилину без WG і з живим DNS.").foregroundStyle(.secondary)
+                }
+                ForEach(model.prefs.dnsBaseline.keys.sorted(), id: \.self) { svc in
+                    LabeledContent(svc) {
+                        Mono(model.prefs.dnsBaseline[svc]!.isEmpty ? "DHCP" : model.prefs.dnsBaseline[svc]!.joined(separator: " "), size: 12)
+                    }
+                }
+                if !model.prefs.wgDNSSeen.isEmpty {
+                    LabeledContent("DNS тунелів (не беруться в еталон)") { Mono(model.prefs.wgDNSSeen.joined(separator: " "), size: 12) }
+                }
+                HStack {
+                    Button("Повернути зараз") { Task { await model.restoreServiceDNS(background: false) } }
+                    Button("Скинути еталон", role: .destructive) { model.prefs.dnsBaseline = [:] }
+                }
+            }
             Section("Doctor") {
                 Toggle("Перевіряти резолвер у фоні", isOn: $model.prefs.dnsWatch)
                 Toggle("Auto DNS fix, коли жодного VPN немає", isOn: $model.prefs.autoDNSFix)

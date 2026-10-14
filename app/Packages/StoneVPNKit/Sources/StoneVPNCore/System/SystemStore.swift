@@ -71,6 +71,17 @@ public final class SystemStore: @unchecked Sendable {
         value("State:/Network/Service/\(id)/DNS")?["ServerAddresses"] as? [String] ?? []
     }
 
+    /// Setup-шар DNS кожного сервісу за іменем (те, що пише `networksetup -setdnsservers`
+    /// і що wg-quick перезаписує на всіх сервісах). [] = DNS не задано (DHCP).
+    public func setupDNS() -> [String: [String]] {
+        var out: [String: [String]] = [:]
+        for key in keys("Setup:/Network/Service/[^/]+") where !key.dropFirst("Setup:/Network/Service/".count).contains("/") {
+            guard let name = value(key)?["UserDefinedName"] as? String else { continue }
+            out[name] = value(key + "/DNS")?["ServerAddresses"] as? [String] ?? []
+        }
+        return out
+    }
+
     public var ciscoInterface: String? {
         value("State:/Network/Service/com.cisco.anyconnect/IPv4")?["InterfaceName"] as? String
     }

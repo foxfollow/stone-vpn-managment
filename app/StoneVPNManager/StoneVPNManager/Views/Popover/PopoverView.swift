@@ -6,22 +6,52 @@ struct PopoverView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
+    /// MenuBarExtra не обмежує вікно екраном: розгорнуті панелі (Network з десятком сервісів)
+    /// виводили низ поповера за край. Середина скролиться, заголовок і футер лишаються на місці.
+    @State private var bodyHeight: CGFloat = 0
+    @State private var headerHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
+    @State private var screenHeight: CGFloat = NSScreen.main?.visibleFrame.height ?? 800
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-            banner
-            ProviderList(model: model)
-            tools
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    banner
+                    ProviderList(model: model)
+                    tools
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bodyHeight = $0 }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.automatic)
+            .frame(height: min(bodyHeight, maxBodyHeight))
             footer
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
         }
         .padding(14)
         .frame(width: 380)
         .onAppear {
             model.openWindowAction = openWindow
             model.popoverOpen = true
+            screenHeight = Self.currentScreenHeight()
             Task { await model.refresh() }
         }
         .onDisappear { model.popoverOpen = false }
+    }
+
+    /// Висота екрана мінус заголовок/футер/відступи і запас під menu bar та тінь вікна.
+    private var maxBodyHeight: CGFloat {
+        max(160, screenHeight - headerHeight - footerHeight - 14 * 2 - 12 * 2 - 24)
+    }
+
+    /// Поповер відкривається на екрані, де клікнули по іконці.
+    private static func currentScreenHeight() -> CGFloat {
+        let p = NSEvent.mouseLocation
+        let s = NSScreen.screens.first { $0.frame.contains(p) } ?? NSScreen.main
+        return s?.visibleFrame.height ?? 800
     }
 
     // MARK: header
@@ -108,7 +138,10 @@ struct PopoverView: View {
             Banner(color: .purple,
                    text: "\(f.name) (\(f.iface ?? "")) тримає default route і DNS" + (model.dnsHealthy == false ? ", але не пропускає трафік. Правки DNS не допоможуть." : "."),
                    action: "Розірвати…") { model.openTool = "dns"; Task { await model.runDNSFix() } }
-        } else if model.dnsHealthy == false {
+        } else if model.dnsGuardActive, model.busy.isEmpty {
+            Banner(color: .orange, text: "VPN відключено — стежу за DNS і повертаю еталонні сервери сервісів, поки резолвер не запрацює.",
+                   action: "Fix зараз") { model.openTool = "dns"; Task { await model.runDNSFix() } }
+        } else if model.dnsHealthy == false, model.busy.isEmpty {
             Banner(color: .red,
                    text: "Резолвер \(n.dnsServers.first ?? "") не відповідає — ping «висить». Fix перевірить осиротілі DNS і переб'є сервіс.",
                    action: "Fix DNS") { model.openTool = "dns"; Task { await model.runDNSFix() } }

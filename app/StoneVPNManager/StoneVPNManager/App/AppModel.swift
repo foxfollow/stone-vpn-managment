@@ -116,6 +116,8 @@ final class AppModel {
     var helperStatus: SMAppService.Status = .notRegistered
     var helperVersion: Int?
     var launchAtLogin = SMAppService.mainApp.status == .enabled
+    /// Після down WireGuard: вікно, в якому застосунок стежить за DNS і повертає еталон.
+    var dnsGuardActive = false
 
     @ObservationIgnored var openWindowAction: OpenWindowAction?
     @ObservationIgnored private var stopping: Set<String> = []
@@ -127,6 +129,10 @@ final class AppModel {
     @ObservationIgnored private var started = false
     @ObservationIgnored private var lastAutoFix = Date.distantPast
     @ObservationIgnored private var wgDNSCache: [String: [String]] = [:]
+    @ObservationIgnored private var guardTask: Task<Void, Never>?
+    @ObservationIgnored private var lastLearn = Date.distantPast
+    @ObservationIgnored private var lastGuardCheck = Date.distantPast
+    @ObservationIgnored private var guardNoHelperNotified = false
 
     // MARK: життєвий цикл
 
@@ -181,6 +187,9 @@ final class AppModel {
         if loaded { notifyDiff(old: old, new: new) }
         await loadDNSCandidates()
         await dropStalePrimaryDNS()
+        // WG-тунель зник (з app, CLI, сну, падіння) — стежимо за DNS, поки не стане здоровим.
+        let hadWG = old.sessions.contains { $0.backend == .wireguard }
+        if loaded, hadWG, !wgActive, guardTask == nil { armDNSGuard() }
         loaded = true
         if prefs.dnsWatch, Date().timeIntervalSince(lastProbe) > 30 || new.network.dnsServers != old.network.dnsServers {
             lastProbe = Date()
@@ -190,6 +199,7 @@ final class AppModel {
             lastOnlineProbe = Date()
             await checkPrimaryOnline()
         }
+        await maintainDNSBaseline()
         refreshing = false
         if pendingRefresh { pendingRefresh = false; await refresh() }
     }
@@ -200,7 +210,7 @@ final class AppModel {
         let wasHealthy = dnsHealthy
         dnsProbes = await actions.probeAll(servers)
         dnsHealthy = dnsProbes.values.contains(true)
-        if wasHealthy == true, dnsHealthy == false, prefs.notifyDNS, !prefs.autoDNSFix {
+        if wasHealthy == true, dnsHealthy == false, prefs.notifyDNS, !prefs.autoDNSFix, guardTask == nil, busy.isEmpty {
             notify("DNS не відповідає", "Резолвер \(servers.joined(separator: ", ")) мовчить. Відкрий StoneVPN → DNS → Fix.")
         }
         if dnsHealthy == false { await autoFixDNSIfIdle() }
@@ -210,7 +220,7 @@ final class AppModel {
     /// тоді мертвий DNS це залишок тунелю, і doctor лагодить його без питань.
     /// Тільки з helper (без нього кожна спроба питала б пароль) і не частіше раз на 2 хв.
     func autoFixDNSIfIdle() async {
-        guard prefs.autoDNSFix, !doctorRunning, busy.isEmpty,
+        guard prefs.autoDNSFix, !doctorRunning, busy.isEmpty, guardTask == nil,
               snap.sessions.isEmpty, snap.foreign.isEmpty, snap.routeGroups.isEmpty,
               Date().timeIntervalSince(lastAutoFix) > 120 else { return }
         lastAutoFix = Date()
@@ -238,15 +248,18 @@ final class AppModel {
     var tone: IconTone {
         let n = snap.network
         if n.primaryIsTunnel, snap.foreign.contains(where: { $0.iface == n.primaryIface }) { return .foreign }
+        // Під час підключення/повернення DNS мертвий резолвер — очікуваний проміжний стан.
+        if !busy.isEmpty || dnsGuardActive { return .busy }
         if snap.erroredCount > 0 || dnsHealthy == false || primaryOnline == false { return .problem }
-        if !busy.isEmpty || snap.connectingCount > 0 { return .busy }
+        if snap.connectingCount > 0 { return .busy }
         return snap.upCount > 0 ? .ok : .idle
     }
 
     var headline: String {
         let up = snap.upCount, conn = snap.connectingCount + busy.count
         if tone == .foreign { return "Мережу тримає сторонній VPN" }
-        if dnsHealthy == false { return "Проблема з DNS" }
+        if dnsGuardActive, busy.isEmpty { return "Повертаю DNS після VPN…" }
+        if dnsHealthy == false, busy.isEmpty { return "Проблема з DNS" }
         if primaryOnline == false { return "Немає інтернету" }
         if up == 0 && conn == 0 { return "Немає активних тунелів" }
         let tunnels = up == 1 ? "1 тунель активний" : "\(up) тунелі активні"
@@ -310,6 +323,10 @@ final class AppModel {
 
     func connect(_ p: Profile) async {
         errors[p.key] = nil
+        busy[p.key] = "перевірка DNS…"
+        await prepareDNS(for: p)
+        await checkEndpointResolves(p)
+        busy[p.key] = nil
         var r = ConnectRequest(profile: p)
         let s = prefs.settings(for: p)
         switch p.backend {
@@ -512,6 +529,11 @@ final class AppModel {
             // DNS після down: Defguard/Cisco відновлюють свій самі → лише flush.
             if p.backend.restoresOwnDNS {
                 if helper.isEnabled { try? await actions.dnsFlush() }
+            } else if p.backend == .wireguard, prefs.dnsGuard {
+                // wg-quick відновлює DNS сам, але не завжди — guard перевіряє й повертає еталон.
+                busy[p.key] = nil
+                await refresh()
+                if !wgActive { armDNSGuard() }
             } else if prefs.autoRestoreDNS, !config.restoreDNS.isEmpty {
                 try? await actions.restoreDNS(config, orphans: reader.store.network().orphanDNS)
             }
@@ -606,8 +628,12 @@ final class AppModel {
         var svc = svcs.first { !$0.device.isEmpty && $0.device == net.primaryIface }?.name
         if svc == nil { svc = config.dnsServices.first { n in svcs.contains { $0.name == n } } }
         guard let svc else { doctorLog.append("Не знайшов реального сервісу для ремонту (DNS_SERVICES у config.env)."); return }
-        var servers = want ?? config.restoreServers
-        if servers.isEmpty { servers = await actions.serviceDNS(svc) }
+        // Еталон > RESTORE_DNS > поточний (якщо це не DNS тунелю) > 1.1.1.1.
+        let tun = await tunnelDNS()
+        var servers = want ?? []
+        if servers.isEmpty, let b = prefs.dnsBaseline[svc], !b.isEmpty, tun.isDisjoint(with: b) { servers = b }
+        if servers.isEmpty { servers = config.restoreServers }
+        if servers.isEmpty { servers = await actions.serviceDNS(svc).filter { !tun.contains($0) } }
         if servers.isEmpty { servers = ["1.1.1.1"] }
         doctorLog.append("ремонтую через «\(svc)»: \(servers.joined(separator: " "))")
         do {
@@ -638,6 +664,168 @@ final class AppModel {
     }
 
     func loadSplit() { splitRules = actions.splitRules() }
+
+    // MARK: повернення DNS після WireGuard (DNSGuard)
+
+    /// WG-тунель живий або саме піднімається/опускається — Setup-DNS тоді належить wg-quick.
+    var wgActive: Bool {
+        snap.sessions.contains { $0.backend == .wireguard } || busy.keys.contains { $0.hasPrefix("wireguard:") }
+    }
+
+    /// Жодного тунелю: ні наших сесій, ні сторонніх, ні живих utun.
+    private var noTunnels: Bool { snap.sessions.isEmpty && snap.foreign.isEmpty && snap.routeGroups.isEmpty }
+
+    /// Публічні резолвери не вважаються «DNS тунелю», навіть якщо стоять у WG-конфігу:
+    /// вони працюють і без VPN, а користувач часто тримає їх на Wi-Fi.
+    private static let publicResolvers: Set<String> = [
+        "1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9", "149.112.112.112", "208.67.222.222", "208.67.220.220",
+    ]
+
+    /// DNS, які wg-quick міг розкидати по сервісах: `DNS =` усіх WG-конфігів (+ колись бачені).
+    /// Cisco/Defguard пишуть State-шар, а не сервіси, — їх тут немає навмисно.
+    func tunnelDNS() async -> Set<String> {
+        var s = Set(prefs.wgDNSSeen)
+        for p in snap.profiles[.wireguard] ?? [] { s.formUnion(await wgDNS(p.name)) }
+        s = s.filter { Parse.ipv4($0) != nil || $0.contains(":") }.subtracting(Self.publicResolvers)
+        if !s.isSubset(of: prefs.wgDNSSeen) { prefs.wgDNSSeen = s.sorted() }
+        return s
+    }
+
+    /// Раз на хвилину, поки WG немає і резолвер живий, — оновити еталон; і перевірити, чи не
+    /// лишився DNS тунелю на сервісах (застосунок запустили після збою, down з іншого місця).
+    private func maintainDNSBaseline() async {
+        guard prefs.dnsGuard, !wgActive, busy.isEmpty, guardTask == nil else { return }
+        if dnsHealthy == true, Date().timeIntervalSince(lastLearn) > 60 {
+            lastLearn = Date()
+            let b = DNSGuard.learn(baseline: prefs.dnsBaseline, current: reader.store.setupDNS(), tunnelDNS: await tunnelDNS())
+            if b != prefs.dnsBaseline { prefs.dnsBaseline = b }
+        }
+        if Date().timeIntervalSince(lastGuardCheck) > 60 {
+            lastGuardCheck = Date()
+            if await restoreServiceDNS(background: true) { armDNSGuard() }
+        }
+    }
+
+    /// Переписати сервіси, що тримають DNS тунелю, на еталон. true = щось змінено.
+    /// background: лише через helper (не питати пароль без дії користувача).
+    @discardableResult
+    func restoreServiceDNS(background: Bool) async -> Bool {
+        guard prefs.dnsGuard, !wgActive else { return false }
+        var plan = DNSGuard.plan(current: reader.store.setupDNS(), baseline: prefs.dnsBaseline,
+                                 tunnelDNS: await tunnelDNS(), fallback: config.restoreServers)
+        guard !plan.isEmpty else { return false }
+        // У Setup бувають сервіси, яких networksetup не знає (старі адаптери) — helper їх відхилить.
+        let known = Set(await actions.services().map(\.name))
+        plan = plan.filter { known.contains($0.key) }
+        guard !plan.isEmpty else { return false }
+        if background, !helper.isEnabled {
+            if !guardNoHelperNotified {
+                guardNoHelperNotified = true
+                notify("На сервісах лишився DNS тунелю", "\(plan.keys.sorted().joined(separator: ", ")). Повернути без пароля може лише helper (Settings → Helper); або відкрий DNS → Fix.")
+            }
+            return false
+        }
+        let orphans = noTunnels ? reader.store.network().orphanDNS : []
+        do {
+            try await actions.restoreServiceDNS(plan, orphans: orphans)
+        } catch {
+            toast = "Повернення DNS: \(error.localizedDescription)"
+            return false
+        }
+        let what = plan.keys.sorted().map { "\($0) → \(plan[$0]!.isEmpty ? "DHCP" : plan[$0]!.joined(separator: " "))" }
+        toast = "DNS повернуто після VPN: " + what.joined(separator: ", ")
+        loadServicesDNSIfShown()
+        return true
+    }
+
+    /// Вікно спостереження після down WG: wg-quick відновлює DNS асинхронно (і інколи — старим
+    /// забрудненим значенням), тож перевіряємо кілька разів, а не один.
+    func armDNSGuard() {
+        guard prefs.dnsGuard, guardTask == nil else { return }
+        dnsGuardActive = true
+        guardTask = Task { [weak self] in
+            await self?.runDNSGuard()
+            guard !Task.isCancelled else { return }     // скасовано prepareDNS — він уже скинув стан
+            self?.dnsGuardActive = false
+            self?.guardTask = nil
+            await self?.refresh()
+        }
+    }
+
+    private func runDNSGuard() async {
+        try? await Task.sleep(for: .seconds(2))          // дати wg-quick шанс відновити самому
+        var deadTicks = 0
+        var cleanTicks = 0
+        for _ in 0..<30 {                                  // ~60 с
+            if Task.isCancelled || wgActive { return }      // уже піднімається інший WG — далі prepareDNS
+            if await restoreServiceDNS(background: true) {
+                cleanTicks = 0
+                try? await Task.sleep(for: .seconds(1))
+            }
+            let net = reader.store.network()
+            dnsProbes = await actions.probeAll(net.dnsServers)
+            dnsHealthy = net.dnsServers.isEmpty ? nil : dnsProbes.values.contains(true)
+            if dnsHealthy == false {
+                deadTicks += 1
+                cleanTicks = 0
+                // Сервіси вже чисті, а резолвер мовчить — осиротілий State-запис: doctor.
+                if deadTicks == 3, noTunnels, busy.isEmpty, helper.isEnabled {
+                    await runDNSFix()
+                    if dnsHealthy == true { return }
+                }
+            } else {
+                deadTicks = 0
+                cleanTicks += 1
+                if cleanTicks >= 3 { return }               // ~6 с стабільно здоровий
+            }
+            try? await Task.sleep(for: .seconds(2))
+        }
+        if dnsHealthy == false, prefs.notifyDNS {
+            notify("DNS не відновився після VPN", "Резолвер \(snap.network.dnsServers.joined(separator: ", ")) мовчить. Відкрий StoneVPN → DNS → Fix.")
+        }
+    }
+
+    /// Перед підключенням: залишок попереднього VPN не має заважати резолвити адресу нового.
+    /// Це дія користувача, тож без helper один запит пароля тут доречний.
+    private func prepareDNS(for p: Profile) async {
+        guardTask?.cancel()
+        guardTask = nil
+        dnsGuardActive = false
+        if await restoreServiceDNS(background: false) {
+            try? await Task.sleep(for: .seconds(1))
+        }
+        // Cisco/Defguard/OpenVPN, що вже тримають DNS, — не наша справа: лише коли тунелів немає.
+        guard noTunnels else { return }
+        let net = reader.store.network()
+        let probes = await actions.probeAll(net.dnsServers)
+        dnsProbes = probes
+        guard !net.dnsServers.isEmpty, !probes.values.contains(true) else { dnsHealthy = net.dnsServers.isEmpty ? nil : true; return }
+        busy[p.key] = "ремонт DNS перед підключенням…"
+        openTool = "dns"
+        await runDNSFix()
+    }
+
+    /// Адреса сервера резолвиться? Інакше підключення впаде по таймауту без пояснень.
+    private func checkEndpointResolves(_ p: Profile) async {
+        var hosts: [String]
+        switch p.backend {
+        case .wireguard: hosts = await actions.wgEndpointHost(p).map { [$0] } ?? []
+        case .openvpn: hosts = p.remotes
+        case .cisco: hosts = [String(p.name.split(separator: ":").first ?? "")]
+        case .defguard: hosts = []
+        }
+        hosts = hosts.filter { !$0.isEmpty && Parse.ipv4($0) == nil }
+        guard !hosts.isEmpty else { return }
+        let ok = await Task.detached { hosts.contains { Interfaces.resolve($0) != nil } }.value
+        if !ok {
+            toast = "\(hosts.joined(separator: ", ")) не резолвиться (DNS: \(snap.network.dnsServers.joined(separator: " "))) — підключення, найімовірніше, не вдасться. DNS → Fix або split-правило."
+        }
+    }
+
+    private func loadServicesDNSIfShown() {
+        guard openTool == "net" else { return }
+        Task { await loadServices() }
+    }
 
     // MARK: DNS тунелів, основний DNS, перевірка split
 

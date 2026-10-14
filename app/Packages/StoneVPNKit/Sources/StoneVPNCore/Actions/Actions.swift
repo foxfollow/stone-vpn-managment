@@ -286,6 +286,14 @@ public final class Actions: @unchecked Sendable {
 
     public func dnsFlush() async throws { _ = try await priv(.dnsFlush) }
 
+    /// DNSGuard.plan → один запит: bounce кожного сервісу на еталон + purge + flush.
+    public func restoreServiceDNS(_ plan: [String: [String]], orphans: [String]) async throws {
+        var ops: [PrivOp] = plan.keys.sorted().map { .dnsSet(service: $0, servers: plan[$0]!) }
+        if !orphans.isEmpty { ops.append(.dnsPurge(uuids: orphans)) }
+        ops.append(.dnsFlush)
+        _ = try await priv(.batch(ops))
+    }
+
     /// Хвіст cmd_dns_fix: purge осиротілих + bounce реального сервісу + flush — одним запитом.
     public func repairDNS(service: String, servers: [String], orphans: [String]) async throws -> String {
         var ops: [PrivOp] = []

@@ -34,6 +34,12 @@ final class Prefs {
     var standalone: Bool { didSet { d.set(standalone, forKey: "standalone") } }
     /// Без жодного VPN і з мертвим DNS — запускати DNS Fix самостійно.
     var autoDNSFix: Bool { didSet { d.set(autoDNSFix, forKey: "autoDNSFix") } }
+    /// Повертати DNS сервісів з еталону, щойно WireGuard-тунелів не лишилось.
+    var dnsGuard: Bool { didSet { d.set(dnsGuard, forKey: "dnsGuard") } }
+    /// Еталон: сервіс → DNS ([] = DHCP), знятий без WG-тунелів і з живим резолвером.
+    var dnsBaseline: [String: [String]] { didSet { d.set(dnsBaseline, forKey: "dnsBaseline") } }
+    /// DNS із WG-конфігів, які колись бачили (конфіг може стати недоступним, а залишок — ні).
+    var wgDNSSeen: [String] { didSet { d.set(wgDNSSeen, forKey: "wgDNSSeen") } }
     // Cisco: власні хости (з портом) — профіль head-end перезаписує, тож тримаємо свої
     var ciscoHosts: [String] { didSet { d.set(ciscoHosts, forKey: "ciscoHosts") } }
     var ciscoLastUser: String { didSet { d.set(ciscoLastUser, forKey: "ciscoLastUser") } }
@@ -52,7 +58,7 @@ final class Prefs {
             "autoRestoreDNS": true, "dnsWatch": true, "netAutoFix": false,
             "rememberUser": true, "rememberGateway": true, "ovpnTimeout": 45,
             "notifyConnected": true, "notifyDisconnected": false, "notifyDropped": true,
-            "notifyDNS": true, "notifyForeign": true,
+            "notifyDNS": true, "notifyForeign": true, "dnsGuard": true,
         ])
         iconColored = d.bool(forKey: "iconColored")
         iconShowCount = d.bool(forKey: "iconShowCount")
@@ -73,6 +79,9 @@ final class Prefs {
         repoPath = d.string(forKey: "repoPath") ?? ""
         standalone = d.bool(forKey: "standalone")
         autoDNSFix = d.bool(forKey: "autoDNSFix")
+        dnsGuard = d.bool(forKey: "dnsGuard")
+        dnsBaseline = d.dictionary(forKey: "dnsBaseline") as? [String: [String]] ?? [:]
+        wgDNSSeen = d.stringArray(forKey: "wgDNSSeen") ?? []
         ciscoHosts = d.stringArray(forKey: "ciscoHosts") ?? []
         ciscoLastUser = d.string(forKey: "ciscoLastUser") ?? ""
         ciscoLastGroup = d.string(forKey: "ciscoLastGroup") ?? ""

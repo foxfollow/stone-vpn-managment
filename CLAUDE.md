@@ -122,6 +122,18 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   it is excluded from `orphanDNS` in the app, but the CLI `dns fix` still treats it as an orphan
   (fine as a fallback). If the head-end client rewrites DNS, the app reports that the owner did
   not change instead of claiming success.
+- **DNS guard after WireGuard** (`DNSGuard` in StoneVPNCore, pref `dnsGuard`, default on): wg-quick
+  writes the tunnel DNS into the *Setup* DNS of every service and does not always restore it
+  (Wi-Fi left on a dead `10.x` resolver → next VPN's hostname doesn't resolve). The app keeps a
+  baseline (UserDefaults `dnsBaseline`, service → servers, [] = DHCP), learned once a minute
+  while no WG tunnel is up and the resolver answers; values containing a WG-conf `DNS =` address
+  (`wgDNSSeen`, public resolvers excluded) are never learned. A WG session disappearing (any
+  cause) arms a ~60 s watcher: services still holding tunnel DNS are bounced back to the baseline
+  (fallback RESTORE_DNS, else DHCP) + orphans purged + flush; still dead after that → DNS Fix.
+  `connect()` runs the same restore first (password prompt allowed — user action), then the doctor
+  if no tunnel is up and DNS is dead, then warns if the endpoint host doesn't resolve. Background
+  restores are helper-only. Only Setup is touched, so NE VPNs (Cisco/Defguard, State layer) are
+  unaffected. While busy/guarding, a dead resolver shows as "busy", not "problem".
 - **Split rules are editable** (`splitReplace`: write new + remove old in one batch) and checked:
   a server that equals a local interface address (the tunnel's own IP instead of its DNS) or a
   "domain" without a dot that looks like an interface name (`utun3`) gets a warning.
