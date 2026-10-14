@@ -10,37 +10,54 @@ final class CiscoDriverTests: XCTestCase {
         return url.path
     }
 
+    /// Як справжній vpn: без tty пароль не прочитати → «Login failed» (саме так падав `vpn -s` через pipe).
     let happy = """
-    echo "  >> state: Disconnected"
-    printf 'VPN> '
-    read cmd; [ "$cmd" = "connect vpn.example.com:8448" ] || { echo "  >> error: bad cmd $cmd"; exit 1; }
+    [ -t 0 ] || { echo "  >> Login failed."; exit 1; }
+    [ "$1 $2" = "connect vpn.example.com:8448" ] || { echo "  >> error: bad args $*"; exit 1; }
     echo "  >> contacting host (vpn.example.com:8448) for login information..."
+    echo "    0) Employees"
+    echo "    1) Staff"
     printf 'Group: [Employees] '; read g; echo "$g" > "$OUT.group"
     printf 'Username: [j.doe] '; read u; echo "$u" > "$OUT.user"
-    printf 'Password: '; read p; [ "$p" = "s3cret" ] || { echo "  >> Login failed."; exit 1; }
+    printf 'Password: '
+    # Як справжній клієнт: спершу підказка, потім вимкнення відлуння з TCSAFLUSH — усе, що
+    # надіслали надто рано, стирається; порожній пароль → сервер каже Login failed.
+    sleep 0.2; python3 -c 'import termios; a=termios.tcgetattr(0); a[3] &= ~termios.ECHO; termios.tcsetattr(0, termios.TCSAFLUSH, a)'
+    IFS= read -r -t 3 p; echo; [ "$p" = "s3cret" ] || { echo "  >> Login failed."; exit 1; }
+    printf 'Second Password: '; read -s d; echo; echo "$d" > "$OUT.duo"
+    sleep 1   # «підтвердження на телефоні»
     echo "Authorized use only."
     printf 'accept? [y/n]: '; read a; [ "$a" = y ] || exit 1
     echo "  >> state: Connected"
     """
 
-    func testHappyPathAnswersPromptsInOrder() async throws {
+    func testHappyPathWithDuoPush() async throws {
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("cisco-\(UUID())").path
         let cli = try fakeCLI("OUT=\(out)\n" + happy)
         let steps = StepLog()
-        try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com:8448", group: "Staff", user: "j.doe", password: "s3cret", secondPassword: ""), timeout: 10) { ev in
+        try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com:8448", group: "Staff", user: "j.doe", password: "s3cret", secondPassword: ""), timeout: 15) { ev in
             if case .step(let s) = ev { steps.add(s) }
             if case .banner(let b) = ev { steps.add("banner:" + b) }
         }
-        XCTAssertEqual(try String(contentsOfFile: out + ".group", encoding: .utf8), "Staff\n")
+        XCTAssertEqual(try String(contentsOfFile: out + ".group", encoding: .utf8), "1\n")   // номер, як у CLI
         XCTAssertEqual(try String(contentsOfFile: out + ".user", encoding: .utf8), "j.doe\n")
+        XCTAssertEqual(try String(contentsOfFile: out + ".duo", encoding: .utf8), "push\n")   // порожній OTP = push
         XCTAssertTrue(steps.all.contains("Connected"))
+        XCTAssertTrue(steps.all.contains { $0.contains("Duo") })
         XCTAssertTrue(steps.all.contains { $0.contains("Authorized use only.") })
     }
 
-    func testWrongPasswordFails() async throws {
+    func testExplicitPasscodeIsSent() async throws {
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("cisco-\(UUID())").path
+        let cli = try fakeCLI("OUT=\(out)\n" + happy)
+        try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com:8448", group: "", user: "j.doe", password: "s3cret", secondPassword: "123456"), timeout: 15) { _ in }
+        XCTAssertEqual(try String(contentsOfFile: out + ".duo", encoding: .utf8), "123456\n")
+    }
+
+    func testWrongPasswordFailsWithServerText() async throws {
         let cli = try fakeCLI("OUT=/dev/null\n" + happy)
         do {
-            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com:8448", group: "", user: "j.doe", password: "nope", secondPassword: ""), timeout: 10) { _ in }
+            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com:8448", group: "", user: "j.doe", password: "nope", secondPassword: ""), timeout: 15) { _ in }
             XCTFail("мало впасти")
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("Login failed"), error.localizedDescription)

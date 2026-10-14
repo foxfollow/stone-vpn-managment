@@ -143,11 +143,16 @@ struct ConnectView: View {
                 TextField("", text: bind(\.username)).textFieldStyle(.roundedBorder).focused($focus, equals: .user)
             }
         }
-        field("Пароль", hint: "Не зберігається; передається у vpn -s через stdin.") {
+        field("Пароль", hint: "Не зберігається; передається клієнту Cisco лише на запит Password.") {
             SecureField("", text: bind(\.password)).textFieldStyle(.roundedBorder).focused($focus, equals: .pass)
         }
-        DisclosureGroup("Другий пароль / OTP") {
-            SecureField("", text: bind(\.secondPassword)).textFieldStyle(.roundedBorder).padding(.top, 4)
+        DisclosureGroup("Другий фактор (Duo / OTP)") {
+            VStack(alignment: .leading, spacing: 4) {
+                SecureField("порожньо = Duo push", text: bind(\.secondPassword)).textFieldStyle(.roundedBorder)
+                Text("Якщо сервер питає другий фактор, порожнє поле надсилає «push» — підтверди вхід у Duo на телефоні. Або введи passcode.")
+                    .font(.system(size: 10.5)).foregroundStyle(.secondary)
+            }
+            .padding(.top, 4)
         }
         .font(.system(size: 12))
         if let b = r.banner {

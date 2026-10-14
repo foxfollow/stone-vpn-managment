@@ -60,7 +60,7 @@ public struct CiscoCredentials: Sendable {
 public enum CiscoDriver {
     public enum Event: Sendable { case step(String), banner(String) }
 
-    public static func connect(cli: String, _ c: CiscoCredentials, timeout: TimeInterval = 90,
+    public static func connect(cli: String, _ c: CiscoCredentials, timeout: TimeInterval = 60,
                                onEvent: @escaping @Sendable (Event) -> Void) async throws {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -72,10 +72,13 @@ public enum CiscoDriver {
         }
     }
 
+    /// `vpn connect <host>` під псевдотерміналом (`/usr/bin/script`) — так само, як у Terminal.
+    /// Через голі pipe (`vpn -s`) пароль/другий фактор читаються з tty, якого немає, і сервер
+    /// одразу відповідає «Login failed» — Duo-push навіть не стартує.
     static func run(cli: String, _ c: CiscoCredentials, timeout: TimeInterval, onEvent: @escaping @Sendable (Event) -> Void) throws {
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: cli)
-        p.arguments = ["-s"]
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/script")
+        p.arguments = ["-q", "/dev/null", cli, "connect", c.host]
         let inp = Pipe(), out = Pipe()
         p.standardInput = inp
         p.standardOutput = out
@@ -84,13 +87,16 @@ public enum CiscoDriver {
 
         let lock = NSLock()
         var buf = ""          // ще не оброблений хвіст
-        var all = ""
+        var all = ""          // увесь вивід (паролі tty не відлунює)
+        var lastData = Date()
         let reader = out.fileHandleForReading
         reader.readabilityHandler = { h in
             let d = h.availableData
             guard !d.isEmpty else { return }
-            lock.lock(); let s = String(decoding: d, as: UTF8.self); buf += s; all += s; lock.unlock()
+            let s = String(decoding: d, as: UTF8.self).replacingOccurrences(of: "\r", with: "")
+            lock.lock(); buf += s; all += s; lastData = Date(); lock.unlock()
         }
+        var groupOptions: [String: String] = [:]   // назва групи → номер у меню сервера
         // vpn може вийти раніше (Login failed) — запис у закритий pipe не має вбивати процес.
         signal(SIGPIPE, SIG_IGN)
         func send(_ s: String) { try? inp.fileHandleForWriting.write(contentsOf: Data((s + "\n").utf8)) }
@@ -99,46 +105,75 @@ public enum CiscoDriver {
             try? inp.fileHandleForWriting.close()
             if p.isRunning { p.terminate() }
         }
+        func transcriptTail() -> String {
+            lock.lock(); defer { lock.unlock() }
+            return all.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty && !$0.hasPrefix("VPN>") }.suffix(6).joined(separator: "\n")
+        }
 
-        send("connect \(c.host)")
         onEvent(.step("vpn connect \(c.host)"))
-        var passwordsSent = 0
+        // Duo: порожній другий фактор = "push" (конвенція Duo для secondary password).
+        let second = c.secondPassword.isEmpty ? "push" : c.secondPassword
+        var passwordsSent = 0, secondSent = 0
         var bannerSent = false
-        let deadline = Date().addingTimeInterval(timeout)
+        var deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             Thread.sleep(forTimeInterval: 0.15)
-            lock.lock(); let chunk = buf; lock.unlock()
+            lock.lock(); let chunk = buf; let quiet = Date().timeIntervalSince(lastData); lock.unlock()
             guard !chunk.isEmpty else {
                 if !p.isRunning { break }
                 continue
+            }
+            for l in chunk.split(separator: "\n") {
+                if let m = Parse.firstMatch(#"^\s*(\d+\)\s+.+?)\s*$"#, String(l)) {
+                    let parts = m.split(separator: ")", maxSplits: 1)
+                    groupOptions[parts[1].trimmingCharacters(in: .whitespaces)] = String(parts[0])
+                }
             }
             let tail = chunk.split(separator: "\n", omittingEmptySubsequences: false).last.map(String.init) ?? ""
             let lower = chunk.lowercased()
 
             if lower.contains("state: connected") || lower.contains("connected to ") {
                 onEvent(.step("Connected"))
-                send("exit")
                 return
             }
-            if let err = failure(chunk) { throw ActionError(err) }
+            if failure(chunk) != nil {
+                Thread.sleep(forTimeInterval: 0.3)       // дочитати причину, якщо сервер її надсилає
+                throw ActionError(transcriptTail())
+            }
 
-            // Запити (рядок без \n у кінці або з двокрапкою наприкінці).
             let t = tail.trimmingCharacters(in: .whitespaces).lowercased()
+            // Відповідаємо, лише коли вивід затих: клієнт друкує підказку *до* того, як вимкне
+            // відлуння з TCSAFLUSH (рання відповідь стирається), а після зміни групи
+            // перезавантажує форму. Людина в Terminal ніколи не буває такою швидкою.
+            if !t.isEmpty, quiet < 0.6 { continue }
             var consumed = true
             if t.hasSuffix("group:") || t.contains("group: [") || (t.hasPrefix("group") && t.hasSuffix(":")) {
+                // Меню груп приймає номер (як у CLI: «Group: [VPN1] 1»); назву — лише як запасний варіант.
+                let answer = c.group.isEmpty ? "" : (groupOptions[c.group] ?? c.group)
                 onEvent(.step("Група: \(c.group.isEmpty ? "(за замовчуванням)" : c.group)"))
-                send(c.group)
+                send(answer)
             } else if t.hasPrefix("username:") || t.contains("username: [") {
                 onEvent(.step("Логін: \(c.user)"))
                 send(c.user)
-            } else if t.contains("second password:") || t.contains("secondary password:") {
-                onEvent(.step("Другий пароль / OTP"))
-                send(c.secondPassword)
+            } else if t.contains("second password") || t.contains("secondary password") || t.contains("passcode")
+                        || t.contains("duo") || t.hasPrefix("answer:") || t.hasPrefix("response:") {
+                secondSent += 1
+                if secondSent > 2 { throw ActionError("сервер повторно питає другий фактор:\n" + transcriptTail()) }
+                // Меню Duo «Passcode or option (1-3)»: 1 = Duo Push.
+                let answer = t.contains("option") && c.secondPassword.isEmpty ? "1" : second
+                onEvent(.step(answer == "push" || answer == "1" ? "Duo: надіслано push на телефон" : "Другий фактор / OTP"))
+                send(answer)
+                onEvent(.step("Підтверди вхід у Duo на телефоні…"))
+                deadline = max(deadline, Date().addingTimeInterval(120))
             } else if t.hasSuffix("password:") || t.contains("password: ") {
                 passwordsSent += 1
-                if passwordsSent > 2 { throw ActionError("сервер повторно питає пароль — невірний логін/пароль?") }
+                if passwordsSent > 1 { throw ActionError("сервер повторно питає пароль — невірний логін або пароль:\n" + transcriptTail()) }
                 onEvent(.step("Пароль"))
-                send(passwordsSent == 1 ? c.password : c.secondPassword)
+                send(c.password)
+                // Сервер може тримати відповідь, поки ти підтверджуєш Duo-push (auto-push без запиту).
+                onEvent(.step("Чекаю відповіді сервера (Duo/MFA — підтверди на телефоні)…"))
+                deadline = max(deadline, Date().addingTimeInterval(120))
             } else if t.contains("accept?") || t.contains("[y/n]") {
                 if !bannerSent {
                     let banner = chunk.components(separatedBy: "\n").dropLast()
@@ -158,8 +193,11 @@ public enum CiscoDriver {
             lock.unlock()
             if !p.isRunning { break }
         }
-        if let err = failure(all) { throw ActionError(err) }
-        throw ActionError(p.isRunning ? "Cisco не підключився за \(Int(timeout)) с" : "vpn завершився без підключення")
+        lock.lock(); let text = all; lock.unlock()
+        if text.lowercased().contains("state: connected") { onEvent(.step("Connected")); return }
+        let tailText = transcriptTail()
+        if failure(text) != nil { throw ActionError(tailText) }
+        throw ActionError((p.isRunning ? "Cisco не підключився вчасно" : "vpn завершився без підключення") + (tailText.isEmpty ? "" : ":\n" + tailText))
     }
 
     public struct GroupProbe: Sendable, Equatable {

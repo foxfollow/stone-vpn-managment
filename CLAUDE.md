@@ -84,8 +84,18 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   which returns nil unless the daemon is installed.
 - **Interop with the CLI is deliberate**: OpenVPN is launched with exactly vpn-up.sh's flags and
   `/tmp/openvpn-<id>.{pid,log}` (log root:staff 640), config.env/state.env are shared.
-- **Cisco connects in-app** through `CiscoDriver` (expect-style driver over `vpn -s`: answers
-  Group/Username/Password/Second password/banner prompts as they appear). Defaults come from
+- **Cisco connects in-app** through `CiscoDriver`: `vpn connect <host>` under a pty
+  (`/usr/bin/script -q /dev/null …`), answering Group/Username/Password/banner prompts as they
+  appear. A pty is required: over plain pipes (`vpn -s`) the password/second factor never reach
+  the server → instant "Login failed", Duo push never starts. Duo prompts (Second Password,
+  passcode, "Passcode or option") get the user's OTP or `push` / option `1`; after the password
+  the driver waits up to 2 min for the phone approval (this head-end auto-pushes: Password →
+  Connecting). **Pacing matters**: answer a prompt only after ~0.6 s of output silence — the
+  client prints `Password:` before switching echo off with TCSAFLUSH (an instant answer is
+  wiped → empty password → "Login failed" in <1 s), and a group change reloads the login form.
+  Groups are answered by their menu number (`Group: [VPN1] 1`, as typed in the CLI); the name
+  made the head-end fall back to another group. The group probe still uses `vpn -s`
+  (no secrets involved) and stops at the first prompt. Defaults come from
   Cisco's own prefs (`~/.vpn/.anyconnect`, `/opt/cisco/secureclient/vpn/.anyconnect_global`:
   DefaultUser/DefaultGroup/DefaultHostName + port from DefaultHostAddress).
   `defaultClientProfile.xml` is useless for custom ports — the head-end rewrites it on every
