@@ -23,6 +23,10 @@ public enum PrivOp: Codable, Sendable, Equatable {
     case dnsFlush
     case resolverSet(domain: String, servers: [String])
     case resolverRemove(domain: String)
+    /// Основний DNS: власний Supplemental-резолвер для всіх доменів із SearchOrder 0 —
+    /// випереджає Cisco/Defguard (вони ставлять 1). Clear прибирає запис.
+    case dnsOverride(servers: [String])
+    case dnsOverrideClear
     // Мережа / процеси
     case orderServices(names: [String])
     case killPid(pid: Int32)
@@ -48,7 +52,10 @@ public enum HelperConst {
     public static let appBundleID = "com.foxfollow.stonevpnmanager"
     public static let helperExecutable = "StoneVPNManagerHelper"
     /// Підняти при зміні PrivOp — застосунок запропонує перевстановити helper.
-    public static let version = 1
+    public static let version = 2
+    /// State-ключ основного DNS, який публікує helper (service id не має Setup-запису, як і Cisco).
+    public static let dnsOverrideService = "com.foxfollow.stonevpnmanager.dns"
+    public static var dnsOverrideKey: String { "State:/Network/Service/\(dnsOverrideService)/DNS" }
 }
 
 @objc public protocol HelperXPC {

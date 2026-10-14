@@ -6,8 +6,9 @@ import StoneVPNCore
 struct DNSPanel: View {
     @Bindable var model: AppModel
     @State private var setValue = ""
-    @State private var splitDomain = ""
-    @State private var splitServers = ""
+    @State private var editing: String?          // домен правила, що редагується; "" = нове
+    @State private var editDomain = ""
+    @State private var editServers = ""
 
     var body: some View {
         let n = model.snap.network
@@ -34,24 +35,9 @@ struct DNSPanel: View {
                         Text("\(n.orphanDNS.count) резолвер(и) мертвих тунелів").foregroundStyle(.orange)
                     }
                 }
-                if !model.splitRules.isEmpty {
-                    GridRow {
-                        Text("Split").foregroundStyle(.secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(model.splitRules, id: \.domain) { r in
-                                HStack(spacing: 4) {
-                                    Mono("\(r.domain) → \(r.servers.joined(separator: " "))")
-                                    Button { model.runAction("Split") { try await model.actions.splitRemove(r.domain); model.loadSplit(); return nil } } label: {
-                                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help("Прибрати правило")
-                                }
-                            }
-                        }
-                    }
-                }
             }
+
+            primaryPicker
 
             HStack(spacing: 6) {
                 Button("Fix DNS") { Task { await model.runDNSFix() } }
@@ -73,33 +59,21 @@ struct DNSPanel: View {
             }
             if let p = model.doctorPrompt { takeDown(p) }
 
-            DisclosureGroup("Встановити DNS / split") {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        TextField("1.1.1.1 8.8.8.8", text: $setValue).textFieldStyle(.roundedBorder)
-                        Button("На первинний") {
-                            let servers = setValue.split(separator: " ").map(String.init)
-                            model.runAction("DNS") {
-                                let svcs = await model.actions.services()
-                                guard let svc = svcs.first(where: { !$0.device.isEmpty && $0.device == n.primaryIface })?.name
-                                        ?? model.config.dnsServices.first else { throw ActionError("немає сервісу") }
-                                try await model.actions.setDNS(services: [svc], servers: servers)
-                                return "DNS «\(svc)» → \(servers.isEmpty ? "empty" : servers.joined(separator: " "))"
-                            }
+            splitSection
+
+            DisclosureGroup("Встановити DNS на сервіс") {
+                HStack(spacing: 6) {
+                    TextField("1.1.1.1 8.8.8.8", text: $setValue).textFieldStyle(.roundedBorder)
+                    Button("На первинний") {
+                        let servers = setValue.split(separator: " ").map(String.init)
+                        model.runAction("DNS") {
+                            let svcs = await model.actions.services()
+                            guard let svc = svcs.first(where: { !$0.device.isEmpty && $0.device == n.primaryIface })?.name
+                                    ?? model.config.dnsServices.first else { throw ActionError("немає сервісу") }
+                            try await model.actions.setDNS(services: [svc], servers: servers)
+                            return "DNS «\(svc)» → \(servers.isEmpty ? "empty" : servers.joined(separator: " "))"
                         }
                     }
-                    HStack(spacing: 6) {
-                        TextField("corp.internal", text: $splitDomain).textFieldStyle(.roundedBorder)
-                        TextField("10.8.0.1", text: $splitServers).textFieldStyle(.roundedBorder).frame(width: 100)
-                        Button("Додати") {
-                            let d = splitDomain, s = splitServers.split(separator: " ").map(String.init)
-                            model.runAction("Split") { try await model.actions.splitAdd(d, s); model.loadSplit(); return "*.\(d) → \(s.joined(separator: " "))" }
-                            splitDomain = ""; splitServers = ""
-                        }
-                        .disabled(splitDomain.isEmpty || splitServers.isEmpty)
-                    }
-                    Text("Split-DNS (/etc/resolver) не чіпають ні Cisco, ні wg-quick — стійкий спосіб резолвити внутрішні домени тунелю.")
-                        .font(.system(size: 10.5)).foregroundStyle(.secondary)
                 }
                 .controlSize(.small)
                 .padding(.top, 4)
@@ -110,6 +84,124 @@ struct DNSPanel: View {
             model.loadSplit()
             if setValue.isEmpty { setValue = model.config.restoreDNS.isEmpty ? "1.1.1.1" : model.config.restoreDNS }
         }
+    }
+
+    // MARK: основний DNS
+
+    /// Supplemental-резолвер для всіх доменів із пріоритетом вище за Cisco/Defguard.
+    private var primaryPicker: some View {
+        HStack(spacing: 8) {
+            Text("Основний").foregroundStyle(.secondary)
+            Menu {
+                Button { model.setPrimaryDNS(nil) } label: {
+                    checked("Як вирішила система", model.primaryDNSChoice == nil)
+                }
+                if !model.dnsCandidates.isEmpty { Divider() }
+                ForEach(model.dnsCandidates) { c in
+                    Button { model.setPrimaryDNS(c) } label: {
+                        checked("\(c.label) — \(c.servers.joined(separator: ", "))", model.primaryDNSChoice == c.id)
+                    }
+                }
+            } label: {
+                Text(primaryLabel).lineLimit(1)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(model.dnsCandidates.isEmpty && model.snap.network.dnsOverride == nil)
+            .help("Чий DNS питати першим для всіх доменів. Скидається сам, коли обраний тунель падає.")
+        }
+    }
+
+    @ViewBuilder private func checked(_ t: String, _ on: Bool) -> some View {
+        if on { Label(t, systemImage: "checkmark") } else { Text(t) }
+    }
+
+    private var primaryLabel: String {
+        switch model.primaryDNSChoice {
+        case nil: return model.dnsCandidates.isEmpty ? "система (немає DNS тунелів)" : "система"
+        case "custom"?: return (model.snap.network.dnsOverride ?? []).joined(separator: ", ")
+        case let id?: return model.dnsCandidates.first { $0.id == id }?.label ?? id
+        }
+    }
+
+    // MARK: split
+
+    private var splitSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Split DNS").font(.system(size: 11.5, weight: .semibold))
+                Spacer()
+                if editing == nil {
+                    Button { startEdit(nil) } label: { Label("Додати", systemImage: "plus") }
+                        .buttonStyle(.borderless).font(.system(size: 11.5))
+                }
+            }
+            if model.splitRules.isEmpty, editing == nil {
+                Text("Правил немає — внутрішні домени тунелю можна направити на його DNS.").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            ForEach(model.splitRules, id: \.domain) { r in
+                if editing == r.domain {
+                    editor(old: r.domain)
+                } else {
+                    let warn = model.splitWarnings(domain: r.domain, servers: r.servers)
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) {
+                            if !warn.isEmpty { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.system(size: 10)) }
+                            Mono("\(r.domain) → \(r.servers.joined(separator: " "))")
+                            Spacer(minLength: 4)
+                            Button { startEdit(r) } label: { Image(systemName: "pencil") }
+                                .buttonStyle(.borderless).help("Редагувати правило")
+                            Button { model.removeSplit(r.domain) } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                                .buttonStyle(.borderless).help("Прибрати правило")
+                        }
+                        ForEach(warn, id: \.self) { Text($0).font(.system(size: 10.5)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true) }
+                    }
+                }
+            }
+            if editing == "" { editor(old: nil) }
+            Text("Файли в /etc/resolver не чіпають ні Cisco, ні wg-quick — стійкий спосіб резолвити внутрішні домени тунелю.")
+                .font(.system(size: 10.5)).foregroundStyle(.secondary)
+        }
+    }
+
+    private func editor(old: String?) -> some View {
+        let servers = editServers.split(whereSeparator: { $0 == " " || $0 == "," }).map(String.init)
+        let warn = editDomain.isEmpty ? [] : model.splitWarnings(domain: editDomain, servers: servers)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                TextField("corp.internal", text: $editDomain).textFieldStyle(.roundedBorder)
+                TextField("10.8.0.1", text: $editServers).textFieldStyle(.roundedBorder).frame(width: 120)
+                if !model.dnsCandidates.isEmpty {
+                    Menu {
+                        ForEach(model.dnsCandidates) { c in
+                            Button("\(c.label) — \(c.servers.joined(separator: ", "))") { editServers = c.servers.first ?? "" }
+                        }
+                    } label: { Image(systemName: "network") }
+                    .menuStyle(.borderlessButton).fixedSize()
+                    .help("DNS активного тунелю")
+                }
+            }
+            ForEach(warn, id: \.self) { Text($0).font(.system(size: 10.5)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true) }
+            HStack {
+                Spacer()
+                Button("Скасувати") { editing = nil }
+                Button(old == nil ? "Додати" : "Зберегти") {
+                    model.saveSplit(old: old, domain: editDomain.trimmingCharacters(in: .whitespaces).lowercased(), servers: servers)
+                    editing = nil
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(editDomain.isEmpty || servers.isEmpty)
+            }
+            .controlSize(.small)
+        }
+        .padding(8)
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func startEdit(_ r: (domain: String, servers: [String])?) {
+        editDomain = r?.domain ?? ""
+        editServers = r?.servers.joined(separator: " ") ?? ""
+        editing = r?.domain ?? ""
     }
 
     @ViewBuilder private func takeDown(_ p: DoctorPrompt) -> some View {

@@ -1,4 +1,5 @@
 import Foundation
+import StoneVPNShared
 import SystemConfiguration
 
 /// Прямий доступ до SystemConfiguration (замість парсингу `scutil`).
@@ -43,7 +44,9 @@ public final class SystemStore: @unchecked Sendable {
         n.dnsOwner = Parse.configOwner(dns?["__CONFIGURATION_ID__"] as? String)
         // dns_orphan_uuids: State-DNS без State-IPv4, крім первинного.
         let live = Set(serviceUUIDs("IPv4"))
-        n.orphanDNS = serviceUUIDs("DNS").filter { $0 != n.primaryUUID && !live.contains($0) }
+        // Наш основний DNS теж «DNS без IPv4», але він живий навмисно — не осиротілий.
+        n.orphanDNS = serviceUUIDs("DNS").filter { $0 != n.primaryUUID && !live.contains($0) && $0 != HelperConst.dnsOverrideService }
+        n.dnsOverride = value(HelperConst.dnsOverrideKey)?["ServerAddresses"] as? [String]
         return n
     }
 
@@ -61,6 +64,11 @@ public final class SystemStore: @unchecked Sendable {
             return serviceName(svc) ?? "VPN-сервіс \(svc)"
         }
         return nil
+    }
+
+    /// ServerAddresses State-DNS сервісу (напр. com.cisco.anyconnect) — DNS тунелю.
+    public func serviceDNS(_ id: String) -> [String] {
+        value("State:/Network/Service/\(id)/DNS")?["ServerAddresses"] as? [String] ?? []
     }
 
     public var ciscoInterface: String? {

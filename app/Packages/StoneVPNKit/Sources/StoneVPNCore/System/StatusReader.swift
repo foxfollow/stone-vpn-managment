@@ -168,6 +168,7 @@ public final class StatusReader: @unchecked Sendable {
         // Власник глобального резолвера людською мовою (dns_owner_hint).
         if let o = s.network.dnsOwner {
             if o == "com.cisco.anyconnect" { s.network.dnsOwnerLabel = "Cisco Secure Client" }
+            else if o == HelperConst.dnsOverrideService { s.network.dnsOwnerLabel = "StoneVPN (обраний основний DNS)" }
             else if Parse.isUUID(o) {
                 if let i = store.dnsInterface(uuid: o), i.hasPrefix("utun") { s.network.dnsOwnerLabel = owners[i] ?? "тунель \(i)" }
                 else { s.network.dnsOwnerLabel = store.serviceName(o) }

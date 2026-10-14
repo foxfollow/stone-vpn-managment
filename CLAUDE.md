@@ -112,6 +112,19 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   LAN resolver and `ping -b <iface>` / `curl --interface` probes (children are attributed to the
   app). `NSLocalNetworkUsageDescription` explains it; the grant is per signing identity + path,
   so Debug builds from DerivedData and the /Applications copy are asked separately.
+- **Primary DNS switch** (`PrivOp.dnsOverride`, helper protocol v2): the helper publishes
+  `State:/Network/Service/com.foxfollow.stonevpnmanager.dns/DNS` with
+  `SupplementalMatchDomains [""]` + `SearchOrder 0` — the same mechanism Cisco/Defguard use
+  (they set SearchOrder 1), so it becomes resolver #1 for all domains. Written with
+  SCDynamicStoreSetValue (survives the one-shot osascript helper process). Candidates = DNS of up
+  tunnels: WG `DNS =` from the conf, Cisco `State:/…/com.cisco.anyconnect/DNS`, Defguard session
+  DNS (brew openvpn applies no pushed DNS). The app drops the override when its tunnel goes down;
+  it is excluded from `orphanDNS` in the app, but the CLI `dns fix` still treats it as an orphan
+  (fine as a fallback). If the head-end client rewrites DNS, the app reports that the owner did
+  not change instead of claiming success.
+- **Split rules are editable** (`splitReplace`: write new + remove old in one batch) and checked:
+  a server that equals a local interface address (the tunnel's own IP instead of its DNS) or a
+  "domain" without a dot that looks like an interface name (`utun3`) gets a warning.
 - Per-profile settings (alias, favourite, route-fix policy ask/LAN/fixed/off) live in UserDefaults;
   route-fix defaults: OpenVPN = ask, WireGuard = off.
 - Debug parity check without UI: `make -C app status` (= `--dump-status`) vs

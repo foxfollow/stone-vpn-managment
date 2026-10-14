@@ -4,6 +4,7 @@ import ServiceManagement
 import SwiftUI
 import UserNotifications
 import StoneVPNCore
+import StoneVPNShared
 
 enum ProfileStatus: Equatable {
     case off
@@ -72,6 +73,14 @@ enum DoctorPrompt {
 
 enum IconTone { case idle, ok, busy, problem, foreign }
 
+/// DNS активного тунелю — кандидат на основний DNS і підказка для split-правил.
+struct DNSCandidate: Identifiable, Hashable {
+    var id: String          // session id
+    var label: String
+    var servers: [String]
+    var iface: String?
+}
+
 @Observable @MainActor
 final class AppModel {
     static let shared = AppModel()
@@ -103,6 +112,7 @@ final class AppModel {
     var serviceOnline: [String: Bool] = [:]
     var serviceDNS: [String: [String]] = [:]
     var splitRules: [(domain: String, servers: [String])] = []
+    var dnsCandidates: [DNSCandidate] = []
     var helperStatus: SMAppService.Status = .notRegistered
     var helperVersion: Int?
     var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -116,6 +126,7 @@ final class AppModel {
     @ObservationIgnored private var debounce: Task<Void, Never>?
     @ObservationIgnored private var started = false
     @ObservationIgnored private var lastAutoFix = Date.distantPast
+    @ObservationIgnored private var wgDNSCache: [String: [String]] = [:]
 
     // MARK: життєвий цикл
 
@@ -168,6 +179,8 @@ final class AppModel {
             if !known { prefs.ciscoHosts.append(s.name) }
         }
         if loaded { notifyDiff(old: old, new: new) }
+        await loadDNSCandidates()
+        await dropStalePrimaryDNS()
         loaded = true
         if prefs.dnsWatch, Date().timeIntervalSince(lastProbe) > 30 || new.network.dnsServers != old.network.dnsServers {
             lastProbe = Date()
@@ -625,6 +638,100 @@ final class AppModel {
     }
 
     func loadSplit() { splitRules = actions.splitRules() }
+
+    // MARK: DNS тунелів, основний DNS, перевірка split
+
+    func loadDNSCandidates() async {
+        var out: [DNSCandidate] = []
+        for s in snap.sessions where s.state == .up {
+            guard let b = s.backend else { continue }
+            var servers: [String]
+            switch b {
+            case .wireguard: servers = await wgDNS(s.name)
+            case .cisco: servers = reader.store.serviceDNS("com.cisco.anyconnect")
+            case .defguard: servers = s.dnsServers
+            case .openvpn: servers = []      // brew openvpn не застосовує pushed DNS
+            }
+            servers = servers.filter { Parse.ipv4($0) != nil || $0.contains(":") }
+            guard !servers.isEmpty else { continue }
+            let prof = snap.profiles[b]?.first { $0.key == s.profileKey }
+            out.append(DNSCandidate(id: s.id, label: "\(b.title) · \(prof.map(prefs.display) ?? s.name)", servers: servers, iface: s.iface))
+        }
+        dnsCandidates = out
+    }
+
+    /// `DNS =` з WG-конфігу (там можуть бути й search-домени — лишаємо лише адреси).
+    private func wgDNS(_ name: String) async -> [String] {
+        if let c = wgDNSCache[name] { return c }
+        guard let path = (snap.profiles[.wireguard]?.first { $0.name == name })?.path ?? snap.wgDir.map({ "\($0)/\(name).conf" }) else { return [] }
+        var text = try? String(contentsOfFile: path, encoding: .utf8)
+        if text == nil { text = await helper.readIfAvailable(.readWGConf(path: path))?.output }
+        guard let text else { return [] }
+        let dns = (Parse.wgConf(text).dns ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        wgDNSCache[name] = dns
+        return dns
+    }
+
+    /// Який кандидат зараз основний (nil = як вирішила система).
+    var primaryDNSChoice: String? {
+        guard let ov = snap.network.dnsOverride else { return nil }
+        return dnsCandidates.first { $0.servers == ov }?.id ?? "custom"
+    }
+
+    func setPrimaryDNS(_ c: DNSCandidate?) {
+        runAction("Основний DNS") {
+            try await self.actions.setPrimaryDNS(c?.servers)
+            try? await Task.sleep(for: .milliseconds(700))
+            await self.refresh()
+            await self.probeDNS()
+            guard let c else { return "Основний DNS: як вирішила система (\(self.snap.network.dnsOwnerLabel ?? "—"))" }
+            if self.snap.network.dnsOwner != HelperConst.dnsOverrideService {
+                return "Записано, але першим лишився \(self.snap.network.dnsOwnerLabel ?? "інший резолвер") — схоже, клієнт VPN перезаписує DNS"
+            }
+            return "Основний DNS: \(c.label) (\(c.servers.joined(separator: " ")))"
+        }
+    }
+
+    /// Обраний тунель упав — не лишати мертвий основний DNS.
+    private func dropStalePrimaryDNS() async {
+        guard let ov = snap.network.dnsOverride, busy.isEmpty,
+              !dnsCandidates.contains(where: { !Set($0.servers).isDisjoint(with: ov) }) else { return }
+        guard helper.isEnabled else { return }          // без helper не питати пароль у фоні
+        try? await actions.setPrimaryDNS(nil)
+        notify("Основний DNS скинуто", "Тунель із DNS \(ov.joined(separator: " ")) більше не активний — DNS знову обирає система.")
+    }
+
+    /// Типові помилки split-правила (адреса інтерфейсу замість DNS, «домен» = назва інтерфейсу).
+    func splitWarnings(domain: String, servers: [String]) -> [String] {
+        var w: [String] = []
+        let ifs = Interfaces.ipv4()
+        for s in servers {
+            if Parse.ipv4(s) == nil && !s.contains(":") { w.append("«\(s)» — не IP-адреса"); continue }
+            if let i = ifs.first(where: { $0.value == s })?.key {
+                let hint = dnsCandidates.first { $0.iface == i }.map { " DNS цього тунелю: \($0.servers.joined(separator: ", "))." } ?? ""
+                w.append("\(s) — адреса інтерфейсу \(i), а не DNS-сервер.\(hint)")
+            }
+        }
+        if !domain.contains(".") {
+            w.append(domain.range(of: #"^(utun|en|bridge|lo|awdl|llw|anpi|gif|stf)\d+$"#, options: .regularExpression) != nil
+                     ? "«\(domain)» — назва інтерфейсу, а не домен: правило ловить лише імена *.\(domain)"
+                     : "домен без крапки — правило ловить лише імена *.\(domain)")
+        }
+        return w
+    }
+
+    func saveSplit(old: String?, domain: String, servers: [String]) {
+        runAction("Split") {
+            if let old { try await self.actions.splitReplace(old: old, domain: domain, servers: servers) }
+            else { try await self.actions.splitAdd(domain, servers) }
+            self.loadSplit()
+            return "*.\(domain) → \(servers.joined(separator: " "))"
+        }
+    }
+
+    func removeSplit(_ domain: String) {
+        runAction("Split") { try await self.actions.splitRemove(domain); self.loadSplit(); return "Прибрано \(domain)" }
+    }
 
     // MARK: мережа
 

@@ -132,6 +132,7 @@ public struct NetworkInfo: Sendable, Equatable {
     public var dnsOwner: String?            // __CONFIGURATION_ID__ (UUID або reverse-DNS)
     public var dnsOwnerLabel: String?       // людська назва власника, якщо відома
     public var orphanDNS: [String] = []
+    public var dnsOverride: [String]?        // наш основний DNS, якщо встановлено
     public var defaultRouteIface: String?
     public var defaultRouteGateway: String?
     public var splitDefault: [String] = []  // 0/1 + 128.0/1 → utunN

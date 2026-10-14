@@ -1,5 +1,6 @@
 import Foundation
 import StoneVPNShared
+import SystemConfiguration
 
 /// Виконує PrivOp від root. Кожен аргумент перевіряється тут, а не в застосунку:
 /// helper довіряє лише підпису клієнта, не його даним.
@@ -137,6 +138,22 @@ enum Executor {
             }
             _ = execute(.dnsFlush, waitAuthCleanup: false)
             return PrivResult(ok: true, output: "*.\(domain) → \(servers.joined(separator: " "))")
+        case .dnsOverride(let servers):
+            guard !servers.isEmpty, servers.allSatisfy(isIP) else { return .fail("невірний DNS: \(servers.joined(separator: " "))") }
+            guard let store = SCDynamicStoreCreate(nil, "StoneVPNHelper" as CFString, nil, nil) else { return .fail("SCDynamicStore недоступний") }
+            let dict: [String: Any] = ["ServerAddresses": servers, "SupplementalMatchDomains": [""], "SearchOrder": 0]
+            // SetValue (не Temporary): запис живе й після виходу одноразового процесу (osascript-режим).
+            guard SCDynamicStoreSetValue(store, HelperConst.dnsOverrideKey as CFString, dict as CFDictionary) else {
+                return .fail("не вдалося записати основний DNS")
+            }
+            _ = execute(.dnsFlush, waitAuthCleanup: false)
+            return PrivResult(ok: true, output: "основний DNS → \(servers.joined(separator: " "))")
+        case .dnsOverrideClear:
+            if let store = SCDynamicStoreCreate(nil, "StoneVPNHelper" as CFString, nil, nil) {
+                SCDynamicStoreRemoveValue(store, HelperConst.dnsOverrideKey as CFString)
+            }
+            _ = execute(.dnsFlush, waitAuthCleanup: false)
+            return PrivResult(ok: true, output: "основний DNS — як вирішила система")
         case .resolverRemove(let domain):
             guard isDomain(domain) else { return .fail("невірний домен") }
             do { try FileManager.default.removeItem(atPath: "/etc/resolver/\(domain)") } catch {

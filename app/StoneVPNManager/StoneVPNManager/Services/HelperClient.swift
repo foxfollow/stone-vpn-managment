@@ -90,6 +90,7 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
         case .routeHostSet, .routeHostDelete: "змінити маршрут до VPN-сервера"
         case .dnsSet, .dnsPurge, .dnsFlush: "відремонтувати DNS"
         case .resolverSet, .resolverRemove: "змінити split-DNS"
+        case .dnsOverride, .dnsOverrideClear: "перемкнути основний DNS"
         case .orderServices: "змінити порядок мережевих сервісів"
         case .killPid: "зупинити процес VPN-тунелю"
         case .batch(let ops): ops.first.map(describe) ?? "дія"

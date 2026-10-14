@@ -356,6 +356,17 @@ public final class Actions: @unchecked Sendable {
     }
 
     public func splitAdd(_ domain: String, _ servers: [String]) async throws { _ = try await priv(.resolverSet(domain: domain, servers: servers)) }
+
+    /// Редагування правила: новий домен/сервери одним запитом (старий файл прибирається, якщо домен змінено).
+    public func splitReplace(old: String, domain: String, servers: [String]) async throws {
+        var ops: [PrivOp] = [.resolverSet(domain: domain, servers: servers)]
+        if old != domain { ops.append(.resolverRemove(domain: old)) }
+        _ = try await priv(.batch(ops))
+    }
+
+    public func setPrimaryDNS(_ servers: [String]?) async throws {
+        _ = try await priv(servers.map { .dnsOverride(servers: $0) } ?? .dnsOverrideClear)
+    }
     public func splitRemove(_ domain: String) async throws { _ = try await priv(.resolverRemove(domain: domain)) }
 
     // MARK: Мережа
