@@ -142,6 +142,11 @@ which SMAppService needs for the helper; test = `swift test` in the package).
 - **Split rules are editable** (`splitReplace`: write new + remove old in one batch) and checked:
   a server that equals a local interface address (the tunnel's own IP instead of its DNS) or a
   "domain" without a dot that looks like an interface name (`utun3`) gets a warning.
+- **Cmd+Tab while a window is open** (`AppSwitcherPolicy`, pref `showInAppSwitcher`, default on):
+  the app switcher only lists `.regular` apps, which always also get a Dock icon — there is no
+  public API for one without the other. So the policy flips to `.regular` while a titled non-panel
+  window (Profiles/Settings/Connect) is visible and back to `.accessory` after the last one closes
+  (checked on the next runloop turn — `willClose` fires while the window is still visible).
 - Per-profile settings (alias, favourite, route-fix policy ask/LAN/fixed/off) live in UserDefaults;
   route-fix defaults: OpenVPN = ask, WireGuard = off.
 - Debug parity check without UI: `make -C app status` (= `--dump-status`) vs

@@ -142,6 +142,7 @@ final class AppModel {
         guard !started else { return }
         started = true
         reloadConfig()
+        AppSwitcherPolicy.shared.start(enabled: prefs.showInAppSwitcher)
         reader.store.watch { Task { @MainActor in AppModel.shared.scheduleRefresh() } }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         Task { await checkHelper() }

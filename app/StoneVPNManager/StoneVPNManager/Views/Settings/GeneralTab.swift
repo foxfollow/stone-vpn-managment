@@ -7,6 +7,9 @@ struct GeneralTab: View {
         Form {
             Section("Запуск") {
                 Toggle("Запускати при вході", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                Toggle("Показувати в Cmd+Tab, поки відкрите вікно", isOn: $model.prefs.showInAppSwitcher)
+                Text("Профілі, Налаштування, Підключення. macOS пускає в Cmd+Tab лише застосунки з іконкою в Dock, тож на цей час вона з'являється і зникає, коли закриваєш останнє вікно.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Section("Іконка в menubar") {
                 Toggle("Кольорова іконка", isOn: $model.prefs.iconColored)

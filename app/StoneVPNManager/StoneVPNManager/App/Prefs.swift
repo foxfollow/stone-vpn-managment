@@ -34,6 +34,10 @@ final class Prefs {
     var standalone: Bool { didSet { d.set(standalone, forKey: "standalone") } }
     /// Без жодного VPN і з мертвим DNS — запускати DNS Fix самостійно.
     var autoDNSFix: Bool { didSet { d.set(autoDNSFix, forKey: "autoDNSFix") } }
+    /// Поки відкрите вікно — бути в Cmd+Tab (і тимчасово в Dock).
+    var showInAppSwitcher: Bool {
+        didSet { d.set(showInAppSwitcher, forKey: "showInAppSwitcher"); AppSwitcherPolicy.shared.enabled = showInAppSwitcher }
+    }
     /// Повертати DNS сервісів з еталону, щойно WireGuard-тунелів не лишилось.
     var dnsGuard: Bool { didSet { d.set(dnsGuard, forKey: "dnsGuard") } }
     /// Еталон: сервіс → DNS ([] = DHCP), знятий без WG-тунелів і з живим резолвером.
@@ -60,7 +64,7 @@ final class Prefs {
             "autoRestoreDNS": true, "dnsWatch": true, "netAutoFix": false,
             "rememberUser": true, "rememberGateway": true, "ovpnTimeout": 45,
             "notifyConnected": true, "notifyDisconnected": false, "notifyDropped": true,
-            "notifyDNS": true, "notifyForeign": true, "dnsGuard": true,
+            "notifyDNS": true, "notifyForeign": true, "dnsGuard": true, "showInAppSwitcher": true,
         ])
         iconColored = d.bool(forKey: "iconColored")
         iconShowCount = d.bool(forKey: "iconShowCount")
@@ -82,6 +86,7 @@ final class Prefs {
         standalone = d.bool(forKey: "standalone")
         autoDNSFix = d.bool(forKey: "autoDNSFix")
         dnsGuard = d.bool(forKey: "dnsGuard")
+        showInAppSwitcher = d.bool(forKey: "showInAppSwitcher")
         dnsBaseline = d.dictionary(forKey: "dnsBaseline") as? [String: [String]] ?? [:]
         wgDNSSeen = d.stringArray(forKey: "wgDNSSeen") ?? []
         primaryDNSChoice = d.string(forKey: "primaryDNSChoice")
