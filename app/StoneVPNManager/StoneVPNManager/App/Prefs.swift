@@ -105,7 +105,7 @@ final class Prefs {
         if let i = favorites.firstIndex(of: key) { favorites.remove(at: i) } else { favorites.append(key) }
     }
 
-    func display(_ p: Profile) -> String { aliases[p.key].flatMap { $0.isEmpty ? nil : $0 } ?? p.name }
+    func display(_ p: Profile) -> String { aliases[p.key].flatMap { $0.isEmpty ? nil : $0 } ?? p.title ?? p.name }
 
     /// Route-fix за замовчуванням: OpenVPN — питати (як vpn-up.sh); WireGuard — ні
     /// (wg-quick сам веде маршрут до endpoint); NE-бекенди route-fix не мають.

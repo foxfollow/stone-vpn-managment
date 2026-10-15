@@ -142,7 +142,7 @@ struct ProfileDetail: View {
                     BackendBadge(backend: p.backend, size: 44)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(model.prefs.display(p)).font(.system(size: 19, weight: .bold))
-                        Text("\(p.backend.title) · \(p.name)").font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text("\(p.backend.title) · " + (p.title != nil ? "ID \(p.name)" : p.name)).font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                     Spacer()
                     HStack(spacing: 6) { StatusDot(color: item.status.color); Text(statusText) }
@@ -197,7 +197,7 @@ struct ProfileDetail: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel(text: "Налаштування профілю")
             Form {
-                TextField("Псевдонім", text: $alias, prompt: Text(p.name))
+                TextField("Псевдонім", text: $alias, prompt: Text(p.title ?? p.name))
                     .onSubmit { saveAlias(p) }
                     .onChange(of: alias) { saveAlias(p) }
                 if p.backend == .cisco {

@@ -238,6 +238,9 @@ public final class StatusReader: @unchecked Sendable {
 
     func ovpnProfiles(_ dir: String) -> [Profile] {
         let items = (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []
+        // Файли названі ms-мітками часу; людські назви — у config.json GUI поруч із profiles/.
+        let config = URL(fileURLWithPath: dir).deletingLastPathComponent().appendingPathComponent("config.json")
+        let titles = (try? Data(contentsOf: config)).map(Parse.ovpnConnectTitles) ?? [:]
         return items.filter { $0.hasSuffix(".ovpn") }.sorted().map { f in
             let path = "\(dir)/\(f)"
             var p = Profile(backend: .openvpn, name: String(f.dropLast(5)), path: path)
@@ -246,7 +249,9 @@ public final class StatusReader: @unchecked Sendable {
                 p.needsAuth = info.needsAuth
                 p.remotes = Array(Set(info.remotes.map(\.host))).sorted()
                 if let r = info.remotes.first { p.endpoint = "\(r.host):\(r.port)" + (r.proto.map { " \($0)" } ?? "") }
+                if p.title == nil, p.name.allSatisfy(\.isNumber), let r = info.remotes.first { p.title = "\(r.host):\(r.port)" }
             }
+            p.title = titles[p.name] ?? p.title
             return p
         }
     }

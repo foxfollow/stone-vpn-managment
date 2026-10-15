@@ -228,3 +228,15 @@ final class ParserTests: XCTestCase {
         try? FileManager.default.removeItem(at: url)
     }
 }
+
+final class OvpnConnectTitleTests: XCTestCase {
+    func testTitles() throws {
+        let status = #"{"profiles":{"1781177684954":{"id":"1781177684954","name":"vpn.example.com [office-tcp4]","profileDisplayName":"vpn.example.com [office-tcp4]","savedPassword":"x"},"1781012519334":{"name":"vpn.example.com [a]","profileDisplayName":"10023-renamed"}}}"#
+        let persist = try JSONSerialization.data(withJSONObject: ["status": status])
+        let root = try JSONSerialization.data(withJSONObject: ["persist:root": String(data: persist, encoding: .utf8)!])
+        let t = Parse.ovpnConnectTitles(root)
+        XCTAssertEqual(t["1781177684954"], "office-tcp4")
+        XCTAssertEqual(t["1781012519334"], "10023-renamed")
+        XCTAssertEqual(Parse.ovpnConnectTitle("host [cfg (global-dns)]"), "cfg (global-dns)")
+    }
+}

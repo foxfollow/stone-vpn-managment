@@ -43,6 +43,7 @@ public enum Backend: String, CaseIterable, Codable, Identifiable, Sendable {
 public struct Profile: Identifiable, Hashable, Sendable {
     public var backend: Backend
     public var name: String                 // сирий ідентифікатор (ім'я конфігу/локації/хост)
+    public var title: String?               // людська назва, якщо name — технічний ID (OpenVPN: ms-мітка)
     public var endpoint: String?
     public var path: String?
     public var needsAuth = false            // OpenVPN: голий auth-user-pass

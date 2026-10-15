@@ -193,6 +193,35 @@ public enum Parse {
         return OvpnProfileInfo(remotes: remotes, needsAuth: needsAuth, hasDev: hasDev)
     }
 
+    /// Назви профілів з config.json OpenVPN Connect (redux-persist: `persist:root` → `status` —
+    /// JSON-рядки всередині JSON). Повертає id → назва. Секретні поля не читаються.
+    public static func ovpnConnectTitles(_ json: Data) -> [String: String] {
+        func obj(_ v: Any?) -> [String: Any]? {
+            if let d = v as? [String: Any] { return d }
+            guard let s = v as? String, let data = s.data(using: .utf8) else { return nil }
+            return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        }
+        guard let root = obj(try? JSONSerialization.jsonObject(with: json)),
+              let persist = obj(root["persist:root"]),
+              let status = obj(persist["status"]),
+              let profiles = obj(status["profiles"]) else { return [:] }
+        var out: [String: String] = [:]
+        for (id, v) in profiles {
+            guard let p = v as? [String: Any] else { continue }
+            let raw = [p["profileDisplayName"], p["name"], p["profileName"]].compactMap { $0 as? String }.first { !$0.isEmpty }
+            if let raw, let t = ovpnConnectTitle(raw) { out[id] = t }
+        }
+        return out
+    }
+
+    /// GUI іменує імпорт як «host [ім'я-файлу]» — host і так видно в remote, тож назва = ім'я файлу.
+    /// Перейменований у GUI профіль (без дужок) лишається як є.
+    public static func ovpnConnectTitle(_ raw: String) -> String? {
+        let s = raw.trimmingCharacters(in: .whitespaces)
+        if let inner = firstMatch(#"^.*? \[(.+)\]$"#, s) { return inner }
+        return s.isEmpty ? nil : s
+    }
+
     // MARK: Defguard (scutil --nc)
 
     public struct NCSession: Sendable, Equatable {

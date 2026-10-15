@@ -22,7 +22,7 @@ struct StoneVPNManagerApp: App {
             out.append("primary: \(n.primaryService ?? "—") \(n.primaryIface ?? "—") router \(n.router ?? "—")")
             out.append("dns: \(n.dnsServers.joined(separator: " ")) owner: \(n.dnsOwnerLabel ?? n.dnsOwner ?? "—") orphans: \(n.orphanDNS.count)")
             out.append("default route: \(n.defaultRouteIface ?? "—") via \(n.defaultRouteGateway ?? "—") split: \(n.splitDefault)")
-            for b in Backend.allCases { out.append("\(b.badge) profiles: \((s.profiles[b] ?? []).map(\.name))") }
+            for b in Backend.allCases { out.append("\(b.badge) profiles: \((s.profiles[b] ?? []).map { p in p.title.map { "\(p.name) = \($0)" } ?? p.name })") }
             for x in s.sessions + s.foreign {
                 out.append("session \(x.backend?.badge ?? "NE") \(x.name) \(x.state) \(x.iface ?? "-") \(x.address ?? "-") \(x.elapsed ?? "") routes=\(x.routes)")
             }
