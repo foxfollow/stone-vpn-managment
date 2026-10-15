@@ -23,17 +23,19 @@ final class AppSwitcherPolicy {
         }
     }
 
-    private var hasAppWindow: Bool {
-        NSApp.windows.contains { w in
+    private func hasAppWindow(_ app: NSApplication) -> Bool {
+        app.windows.contains { w in
             w.isVisible && w.styleMask.contains(.titled) && !(w is NSPanel) && w.level.rawValue < NSWindow.Level.statusBar.rawValue
         }
     }
 
     func update() {
-        let want: NSApplication.ActivationPolicy = enabled && hasAppWindow ? .regular : .accessory
-        guard NSApp.activationPolicy() != want else { return }
-        NSApp.setActivationPolicy(want)
+        // start() викликається з App.init — NSApplication ще не створено (NSApp == nil).
+        guard let app = NSApp else { return }
+        let want: NSApplication.ActivationPolicy = enabled && hasAppWindow(app) ? .regular : .accessory
+        guard app.activationPolicy() != want else { return }
+        app.setActivationPolicy(want)
         // Зміна політики може зняти фокус — повернути його відкритому вікну.
-        if want == .regular { NSApp.activate() }
+        if want == .regular { app.activate() }
     }
 }
