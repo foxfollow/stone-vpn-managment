@@ -38,6 +38,12 @@ struct DNSPanel: View {
             }
 
             primaryPicker
+            if model.snap.network.dnsOverride != nil, !model.snap.network.displacedDNS.isEmpty {
+                let n = model.snap.network
+                Text("Відсунуто на час вибору: " + n.displacedDNS.map { n.dnsServiceLabels[$0] ?? $0 }.joined(separator: ", ") +
+                     ". Їхні внутрішні домени — через split DNS.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
 
             HStack(spacing: 6) {
                 Button("Fix DNS") { Task { await model.runDNSFix() } }
@@ -88,7 +94,7 @@ struct DNSPanel: View {
 
     // MARK: основний DNS
 
-    /// Supplemental-резолвер для всіх доменів із пріоритетом вище за Cisco/Defguard.
+    /// Єдиний catch-all резолвер: чужі (Cisco/Defguard) на час вибору відсуваються (CatchAllDNS).
     private var primaryPicker: some View {
         HStack(spacing: 8) {
             Text("Основний").foregroundStyle(.secondary)
@@ -108,7 +114,7 @@ struct DNSPanel: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             .disabled(model.dnsCandidates.isEmpty && model.snap.network.dnsOverride == nil)
-            .help("Чий DNS питати першим для всіх доменів. Скидається сам, коли обраний тунель падає.")
+            .help("Чий DNS питати першим для всіх доменів. Catch-all записи інших VPN на цей час відсуваються і повертаються при скиданні. Скидається сам, коли обраний тунель падає.")
         }
     }
 

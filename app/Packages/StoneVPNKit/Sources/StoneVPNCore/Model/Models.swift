@@ -133,6 +133,12 @@ public struct NetworkInfo: Sendable, Equatable {
     public var dnsOwnerLabel: String?       // людська назва власника, якщо відома
     public var orphanDNS: [String] = []
     public var dnsOverride: [String]?        // наш основний DNS, якщо встановлено
+    /// Чужі catch-all DNS-записи (ID сервісу), що конкурують із нашим основним DNS.
+    public var catchAllOthers: [String] = []
+    /// Записи, з яких helper прибрав "" на час вибору основного DNS (ID сервісу).
+    public var displacedDNS: [String] = []
+    /// Людські назви для catchAllOthers / displacedDNS.
+    public var dnsServiceLabels: [String: String] = [:]
     public var defaultRouteIface: String?
     public var defaultRouteGateway: String?
     public var splitDefault: [String] = []  // 0/1 + 128.0/1 → utunN

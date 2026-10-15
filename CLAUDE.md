@@ -112,16 +112,21 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   LAN resolver and `ping -b <iface>` / `curl --interface` probes (children are attributed to the
   app). `NSLocalNetworkUsageDescription` explains it; the grant is per signing identity + path,
   so Debug builds from DerivedData and the /Applications copy are asked separately.
-- **Primary DNS switch** (`PrivOp.dnsOverride`, helper protocol v2): the helper publishes
-  `State:/Network/Service/com.foxfollow.stonevpnmanager.dns/DNS` with
-  `SupplementalMatchDomains [""]` + `SearchOrder 0` — the same mechanism Cisco/Defguard use
-  (they set SearchOrder 1), so it becomes resolver #1 for all domains. Written with
-  SCDynamicStoreSetValue (survives the one-shot osascript helper process). Candidates = DNS of up
-  tunnels: WG `DNS =` from the conf, Cisco `State:/…/com.cisco.anyconnect/DNS`, Defguard session
-  DNS (brew openvpn applies no pushed DNS). The app drops the override when its tunnel goes down;
-  it is excluded from `orphanDNS` in the app, but the CLI `dns fix` still treats it as an orphan
-  (fine as a fallback). If the head-end client rewrites DNS, the app reports that the owner did
-  not change instead of claiming success.
+- **Primary DNS switch** (`PrivOp.dnsOverride`, helper protocol v3): the helper publishes
+  `State:/Network/Service/com.foxfollow.stonevpnmanager.dns/DNS` (`SupplementalMatchDomains [""]`)
+  **and strips `""` from every other catch-all State DNS entry** (Cisco, Defguard…), keeping the
+  originals in `State:/Network/StoneVPNManager/DisplacedDNS` (`CatchAllDNS` in StoneVPNShared).
+  Why: configd sorts resolvers with `compareDomain` (Plugins/IPMonitor/dns-configuration.c), which
+  returns "less" for *any* entry without a domain — so among several catch-all entries SearchOrder
+  is ignored and insertion (hash) order of service IDs wins (observed: ours got order 104200 and
+  sat behind Defguard; Cisco's "order 1" only ever won by luck). Being the *only* catch-all is the
+  one deterministic way to be resolver #1. `dnsOverrideClear` puts `""` back (or removes the entry
+  if its service lost IPv4/IPv6). If a VPN client re-asserts its entry (reconnect, new Defguard
+  UUID), the app re-applies via the helper (≤6×/min, then one notification). Candidates = DNS of
+  up tunnels: WG `DNS =` from the conf, Cisco `State:/…/com.cisco.anyconnect/DNS`, Defguard
+  session DNS (brew openvpn applies no pushed DNS). The chosen candidate id is kept in
+  UserDefaults `primaryDNSChoice`. The override is dropped when its tunnel goes down; it is
+  excluded from `orphanDNS` in the app, but the CLI `dns fix` still treats it as an orphan.
 - **DNS guard after WireGuard** (`DNSGuard` in StoneVPNCore, pref `dnsGuard`, default on): wg-quick
   writes the tunnel DNS into the *Setup* DNS of every service and does not always restore it
   (Wi-Fi left on a dead `10.x` resolver → next VPN's hostname doesn't resolve). The app keeps a

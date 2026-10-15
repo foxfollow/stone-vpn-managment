@@ -40,6 +40,8 @@ final class Prefs {
     var dnsBaseline: [String: [String]] { didSet { d.set(dnsBaseline, forKey: "dnsBaseline") } }
     /// DNS із WG-конфігів, які колись бачили (конфіг може стати недоступним, а залишок — ні).
     var wgDNSSeen: [String] { didSet { d.set(wgDNSSeen, forKey: "wgDNSSeen") } }
+    /// Який кандидат обрано основним DNS (кілька тунелів можуть мати однакові сервери).
+    var primaryDNSChoice: String? { didSet { d.set(primaryDNSChoice, forKey: "primaryDNSChoice") } }
     // Cisco: власні хости (з портом) — профіль head-end перезаписує, тож тримаємо свої
     var ciscoHosts: [String] { didSet { d.set(ciscoHosts, forKey: "ciscoHosts") } }
     var ciscoLastUser: String { didSet { d.set(ciscoLastUser, forKey: "ciscoLastUser") } }
@@ -82,6 +84,7 @@ final class Prefs {
         dnsGuard = d.bool(forKey: "dnsGuard")
         dnsBaseline = d.dictionary(forKey: "dnsBaseline") as? [String: [String]] ?? [:]
         wgDNSSeen = d.stringArray(forKey: "wgDNSSeen") ?? []
+        primaryDNSChoice = d.string(forKey: "primaryDNSChoice")
         ciscoHosts = d.stringArray(forKey: "ciscoHosts") ?? []
         ciscoLastUser = d.string(forKey: "ciscoLastUser") ?? ""
         ciscoLastGroup = d.string(forKey: "ciscoLastGroup") ?? ""

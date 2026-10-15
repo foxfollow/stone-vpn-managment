@@ -133,6 +133,8 @@ final class AppModel {
     @ObservationIgnored private var lastLearn = Date.distantPast
     @ObservationIgnored private var lastGuardCheck = Date.distantPast
     @ObservationIgnored private var guardNoHelperNotified = false
+    @ObservationIgnored private var reassertTimes: [Date] = []
+    @ObservationIgnored private var reassertNotified = false
 
     // MARK: життєвий цикл
 
@@ -187,6 +189,7 @@ final class AppModel {
         if loaded { notifyDiff(old: old, new: new) }
         await loadDNSCandidates()
         await dropStalePrimaryDNS()
+        await reassertPrimaryDNS()
         // WG-тунель зник (з app, CLI, сну, падіння) — стежимо за DNS, поки не стане здоровим.
         let hadWG = old.sessions.contains { $0.backend == .wireguard }
         if loaded, hadWG, !wgActive, guardTask == nil { armDNSGuard() }
@@ -863,21 +866,59 @@ final class AppModel {
     /// Який кандидат зараз основний (nil = як вирішила система).
     var primaryDNSChoice: String? {
         guard let ov = snap.network.dnsOverride else { return nil }
+        if let id = prefs.primaryDNSChoice, dnsCandidates.contains(where: { $0.id == id && $0.servers == ov }) { return id }
         return dnsCandidates.first { $0.servers == ov }?.id ?? "custom"
     }
 
     func setPrimaryDNS(_ c: DNSCandidate?) {
+        prefs.primaryDNSChoice = c?.id
+        reassertTimes = []
+        reassertNotified = false
         runAction("Основний DNS") {
             try await self.actions.setPrimaryDNS(c?.servers)
             try? await Task.sleep(for: .milliseconds(700))
             await self.refresh()
             await self.probeDNS()
-            guard let c else { return "Основний DNS: як вирішила система (\(self.snap.network.dnsOwnerLabel ?? "—"))" }
-            if self.snap.network.dnsOwner != HelperConst.dnsOverrideService {
-                return "Записано, але першим лишився \(self.snap.network.dnsOwnerLabel ?? "інший резолвер") — схоже, клієнт VPN перезаписує DNS"
+            let n = self.snap.network
+            guard let c else { return "Основний DNS: як вирішила система (\(n.dnsOwnerLabel ?? "—"))" }
+            if n.dnsOwner != HelperConst.dnsOverrideService {
+                if self.helperVersion.map({ $0 < HelperConst.version }) ?? false {
+                    return "Helper застарий (v\(self.helperVersion ?? 0), треба v\(HelperConst.version)) — Settings → Helper → Перевстановити"
+                }
+                return "Записано, але першим лишився \(n.dnsOwnerLabel ?? "інший резолвер")" +
+                    (n.catchAllOthers.isEmpty ? "" : " — його клієнт одразу повернув свій запис")
             }
-            return "Основний DNS: \(c.label) (\(c.servers.joined(separator: " ")))"
+            let moved = n.displacedDNS.map { n.dnsServiceLabels[$0] ?? $0 }
+            return "Основний DNS: \(c.label) (\(c.servers.joined(separator: " ")))" +
+                (moved.isEmpty ? "" : ". Тимчасово відсунуто: \(moved.joined(separator: ", "))")
         }
+    }
+
+    /// Клієнт VPN повернув свій catch-all запис (перепідключення, зміна мережі, Defguard з новим
+    /// UUID) — наш основний DNS знову не єдиний, тож витісняємо ще раз. Захист від пінг-понгу:
+    /// не більше 6 разів за хвилину, далі — одне сповіщення.
+    private func reassertPrimaryDNS() async {
+        let n = snap.network
+        guard let ov = n.dnsOverride, !n.catchAllOthers.isEmpty, busy.isEmpty else { return }
+        guard helper.isEnabled, (helperVersion ?? 0) >= HelperConst.version else {
+            if !reassertNotified {
+                reassertNotified = true
+                notify("Основний DNS перебито", "\(n.catchAllOthers.map { n.dnsServiceLabels[$0] ?? $0 }.joined(separator: ", ")) повернув свій DNS. Тримати вибір без пароля може лише актуальний helper (Settings → Helper).")
+            }
+            return
+        }
+        let now = Date()
+        reassertTimes = reassertTimes.filter { now.timeIntervalSince($0) < 60 }
+        guard reassertTimes.count < 6 else {
+            if !reassertNotified {
+                reassertNotified = true
+                notify("Основний DNS не втримати", "Клієнт VPN постійно повертає свій DNS. Для його внутрішніх доменів — split DNS.")
+            }
+            return
+        }
+        reassertTimes.append(now)
+        try? await actions.setPrimaryDNS(ov)
+        scheduleRefresh()
     }
 
     /// Обраний тунель упав — не лишати мертвий основний DNS.
@@ -886,6 +927,7 @@ final class AppModel {
               !dnsCandidates.contains(where: { !Set($0.servers).isDisjoint(with: ov) }) else { return }
         guard helper.isEnabled else { return }          // без helper не питати пароль у фоні
         try? await actions.setPrimaryDNS(nil)
+        prefs.primaryDNSChoice = nil
         notify("Основний DNS скинуто", "Тунель із DNS \(ov.joined(separator: " ")) більше не активний — DNS знову обирає система.")
     }
 

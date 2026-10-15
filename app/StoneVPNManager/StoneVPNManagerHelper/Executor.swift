@@ -146,11 +146,14 @@ enum Executor {
             guard SCDynamicStoreSetValue(store, HelperConst.dnsOverrideKey as CFString, dict as CFDictionary) else {
                 return .fail("не вдалося записати основний DNS")
             }
+            let moved = displaceCatchAll(store)
             _ = execute(.dnsFlush, waitAuthCleanup: false)
-            return PrivResult(ok: true, output: "основний DNS → \(servers.joined(separator: " "))")
+            return PrivResult(ok: true, output: "основний DNS → \(servers.joined(separator: " "))" +
+                              (moved.isEmpty ? "" : "; витіснено catch-all: \(moved.joined(separator: ", "))"))
         case .dnsOverrideClear:
             if let store = SCDynamicStoreCreate(nil, "StoneVPNHelper" as CFString, nil, nil) {
                 SCDynamicStoreRemoveValue(store, HelperConst.dnsOverrideKey as CFString)
+                restoreCatchAll(store)
             }
             _ = execute(.dnsFlush, waitAuthCleanup: false)
             return PrivResult(ok: true, output: "основний DNS — як вирішила система")
@@ -257,6 +260,41 @@ enum Executor {
 
     static func isSymlink(_ p: String) -> Bool {
         (try? FileManager.default.destinationOfSymbolicLink(atPath: p)) != nil
+    }
+
+    /// Прибрати "" з усіх чужих catch-all DNS-записів (State:/Network/Service/*/DNS), запам'ятавши
+    /// оригінали. Повторний виклик не перезаписує вже збережений оригінал.
+    static func displaceCatchAll(_ store: SCDynamicStore) -> [String] {
+        let backupKey = HelperConst.dnsDisplacedKey as CFString
+        var backup = SCDynamicStoreCopyValue(store, backupKey) as? [String: [String: Any]] ?? [:]
+        var moved: [String] = []
+        let keys = SCDynamicStoreCopyKeyList(store, "State:/Network/Service/.*/DNS" as CFString) as? [String] ?? []
+        for key in keys where key != HelperConst.dnsOverrideKey {
+            guard let dns = SCDynamicStoreCopyValue(store, key as CFString) as? [String: Any],
+                  let without = CatchAllDNS.displaced(dns) else { continue }
+            if backup[key] == nil { backup[key] = CatchAllDNS.backup(dns) }
+            if SCDynamicStoreSetValue(store, key as CFString, without as CFDictionary) { moved.append(key) }
+        }
+        if !backup.isEmpty { SCDynamicStoreSetValue(store, backupKey, backup as CFDictionary) }
+        return moved
+    }
+
+    /// Повернути "" витісненим записам. Тунель, якого вже немає (State IPv4 зник), — запис
+    /// прибирається зовсім, щоб не лишити осиротілий DNS.
+    static func restoreCatchAll(_ store: SCDynamicStore) {
+        let backupKey = HelperConst.dnsDisplacedKey as CFString
+        let backup = SCDynamicStoreCopyValue(store, backupKey) as? [String: [String: Any]] ?? [:]
+        for (key, orig) in backup {
+            guard let cur = SCDynamicStoreCopyValue(store, key as CFString) as? [String: Any] else { continue }
+            let ipv4 = key.replacingOccurrences(of: "/DNS", with: "/IPv4")
+            let ipv6 = key.replacingOccurrences(of: "/DNS", with: "/IPv6")
+            if SCDynamicStoreCopyValue(store, ipv4 as CFString) == nil, SCDynamicStoreCopyValue(store, ipv6 as CFString) == nil {
+                SCDynamicStoreRemoveValue(store, key as CFString)
+            } else if let r = CatchAllDNS.restored(current: cur, backup: orig) {
+                SCDynamicStoreSetValue(store, key as CFString, r as CFDictionary)
+            }
+        }
+        SCDynamicStoreRemoveValue(store, backupKey)
     }
 
     static func networkServices() -> [String] {

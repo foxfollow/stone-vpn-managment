@@ -166,14 +166,17 @@ public final class StatusReader: @unchecked Sendable {
         s.routeFixRoutes = Parse.routeFixRows(rows)
 
         // Власник глобального резолвера людською мовою (dns_owner_hint).
-        if let o = s.network.dnsOwner {
-            if o == "com.cisco.anyconnect" { s.network.dnsOwnerLabel = "Cisco Secure Client" }
-            else if o == HelperConst.dnsOverrideService { s.network.dnsOwnerLabel = "StoneVPN (обраний основний DNS)" }
-            else if Parse.isUUID(o) {
-                if let i = store.dnsInterface(uuid: o), i.hasPrefix("utun") { s.network.dnsOwnerLabel = owners[i] ?? "тунель \(i)" }
-                else { s.network.dnsOwnerLabel = store.serviceName(o) }
-            } else { s.network.dnsOwnerLabel = o }
+        func label(_ o: String) -> String? {
+            if o == "com.cisco.anyconnect" { return "Cisco Secure Client" }
+            if o == HelperConst.dnsOverrideService { return "StoneVPN (обраний основний DNS)" }
+            if Parse.isUUID(o) {
+                if let i = store.dnsInterface(uuid: o), i.hasPrefix("utun") { return owners[i] ?? "тунель \(i)" }
+                return store.serviceName(o)
+            }
+            return o
         }
+        if let o = s.network.dnsOwner { s.network.dnsOwnerLabel = label(o) }
+        for o in s.network.catchAllOthers + s.network.displacedDNS { s.network.dnsServiceLabels[o] = label(o) ?? o }
         s.updated = Date()
         return s
     }

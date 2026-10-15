@@ -47,6 +47,11 @@ public final class SystemStore: @unchecked Sendable {
         // Наш основний DNS теж «DNS без IPv4», але він живий навмисно — не осиротілий.
         n.orphanDNS = serviceUUIDs("DNS").filter { $0 != n.primaryUUID && !live.contains($0) && $0 != HelperConst.dnsOverrideService }
         n.dnsOverride = value(HelperConst.dnsOverrideKey)?["ServerAddresses"] as? [String]
+        n.catchAllOthers = serviceUUIDs("DNS").filter {
+            $0 != HelperConst.dnsOverrideService && CatchAllDNS.isCatchAll(value("State:/Network/Service/\($0)/DNS") ?? [:])
+        }
+        n.displacedDNS = (value(HelperConst.dnsDisplacedKey)?.keys).map { Array($0) }?
+            .compactMap { Parse.firstMatch("^State:/Network/Service/(.*)/DNS$", $0) }.sorted() ?? []
         return n
     }
 
