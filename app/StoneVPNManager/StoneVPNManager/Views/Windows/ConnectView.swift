@@ -41,7 +41,7 @@ struct ConnectView: View {
                 field("Логін") {
                     TextField("", text: bind(\.username)).textFieldStyle(.roundedBorder).focused($focus, equals: .user)
                 }
-                field("Пароль / OTP", hint: "Не зберігається. Тимчасовий auth-файл видаляється після підключення.") {
+                field("Пароль / OTP", hint: "Не зберігається (логін — запам'ятовується для профілю). Тимчасовий auth-файл видаляється після підключення.") {
                     SecureField("", text: bind(\.password)).textFieldStyle(.roundedBorder).focused($focus, equals: .pass)
                 }
             }
@@ -189,8 +189,11 @@ struct ConnectView: View {
                 Text("Сервер за іншим VPN, але маршруту до нього немає? Обери шлюз тунелю.")
                     .font(.system(size: 10.5)).foregroundStyle(.secondary)
             }
-            Text("Політику route-fix можна задати для профілю (Профілі → профіль), щоб не питало щоразу.")
-                .font(.system(size: 10.5)).foregroundStyle(.secondary)
+            Toggle("Запам'ятати для профілю й більше не питати", isOn: Binding(
+                get: { model.connect?.rememberGateway ?? false }, set: { model.connect?.rememberGateway = $0 }))
+                .font(.system(size: 12))
+            Text("Без галочки останній вибір просто буде обраний наступного разу. Змінити політику — Профілі → профіль.")
+                .font(.system(size: 10.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 

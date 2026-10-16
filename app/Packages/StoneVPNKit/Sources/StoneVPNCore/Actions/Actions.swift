@@ -22,7 +22,10 @@ public enum RouteFixMode: Codable, Hashable, Sendable {
 
 public struct ProfileSettings: Codable, Hashable, Sendable {
     public var routeFix: RouteFixMode = .ask
+    /// Останній вибір у вікні підключення; "" = route-fix пропущено. nil = ще не обирали.
     public var lastGateway: String?
+    /// Останній логін цього профілю (OpenVPN). Пароль/OTP не зберігаються.
+    public var lastUsername: String?
     public init() {}
 }
 

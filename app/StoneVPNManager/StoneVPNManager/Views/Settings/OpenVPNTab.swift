@@ -12,13 +12,13 @@ struct OpenVPNTab: View {
             }
             Section("Логін") {
                 ConfigField(model: model, label: "OVPN_USERNAME", key: "OVPN_USERNAME", value: model.config.ovpnUsername,
-                            hint: "Пріоритет: state.env (останній) → config.env → auth.txt. OTP не зберігається ніколи.")
-                Toggle("Запам'ятовувати останній логін (state.env)", isOn: $model.prefs.rememberUser)
+                            hint: "Пріоритет: логін профілю → state.env (останній) → config.env → auth.txt. OTP не зберігається ніколи.")
+                Toggle("Запам'ятовувати логін для кожного профілю (+ state.env)", isOn: $model.prefs.rememberUser)
             }
             Section("Route-fix") {
                 ConfigField(model: model, label: "LAN_GATEWAY", key: "LAN_GATEWAY", value: model.config.lanGateway, prompt: "192.168.0.1",
                             hint: "Типовий шлюз для host-маршрутів до VPN-сервера.")
-                Toggle("Запам'ятовувати останній шлюз (state.env)", isOn: $model.prefs.rememberGateway)
+                Toggle("Запам'ятовувати вибір шлюзу для кожного профілю (+ state.env)", isOn: $model.prefs.rememberGateway)
                 RouteFixList(model: model)
             }
             Section("Підключення") {

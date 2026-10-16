@@ -226,7 +226,20 @@ struct ProfileDetail: View {
                             .onChange(of: fixedGW) { if Parse.ipv4(fixedGW) != nil { setMode(p, .gateway(fixedGW)) } }
                     }
                     if let last = model.prefs.settings(for: p).lastGateway {
-                        LabeledContent("Останній шлюз") { Mono(last, size: 12) }
+                        LabeledContent("Останній вибір шлюзу") { Mono(last.isEmpty ? "пропущено" : last, size: 12) }
+                    }
+                    if p.backend == .openvpn, let u = model.prefs.settings(for: p).lastUsername, !u.isEmpty {
+                        LabeledContent("Останній логін") {
+                            HStack {
+                                Mono(u, size: 12)
+                                Button("Забути") {
+                                    var s = model.prefs.settings(for: p)
+                                    s.lastUsername = nil
+                                    model.prefs.setSettings(s, for: p)
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
                     }
                     Text(routeFixHint(p)).font(.system(size: 11)).foregroundStyle(.secondary)
                 }

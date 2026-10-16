@@ -48,6 +48,7 @@ struct ConnectRequest: Identifiable {
     var plan: RouteFixPlan?
     var askGateway = false
     var gateway = ""              // "" = пропустити route-fix
+    var rememberGateway = false   // зберегти вибір як політику профілю й більше не питати
     var mfa = false
     var code = ""
     var guiRunning = false        // Defguard.app / Cisco GUI
@@ -339,16 +340,18 @@ final class AppModel {
             var hosts = p.remotes
             if p.backend == .wireguard, s.routeFix != .off, let h = await actions.wgEndpointHost(p) { hosts = [h] }
             if s.routeFix != .off, !hosts.isEmpty {
-                let plan = await actions.routeFixPlan(hosts: hosts, lastGateway: s.lastGateway ?? config.defaultGateway)
+                // Вибір профілю (включно з «пропустити») важливіший за глобальний LAST_GATEWAY.
+                let last = s.lastGateway ?? config.defaultGateway
+                let plan = await actions.routeFixPlan(hosts: hosts, lastGateway: last.isEmpty ? config.defaultGateway : last)
                 let g = actions.resolveGateway(s.routeFix, plan: plan)
                 r.plan = plan
                 r.askGateway = g.ask
-                r.gateway = g.gw ?? (g.ask ? (s.lastGateway ?? config.defaultGateway) : "")
+                r.gateway = g.gw ?? (g.ask ? last : "")
             }
             busy[p.key] = nil
             if p.backend == .openvpn, p.needsAuth {
                 r.needsAuth = true
-                r.username = config.defaultUsername
+                r.username = s.lastUsername.flatMap { $0.isEmpty ? nil : $0 } ?? config.defaultUsername
             }
         case .defguard:
             if p.mfa != nil {
@@ -386,11 +389,15 @@ final class AppModel {
             if let plan = r.plan, !plan.isEmpty || !plan.staleDeletes.isEmpty {
                 step("Route-fix")
                 _ = try await actions.applyRouteFix(plan, gateway: r.gateway.isEmpty ? nil : r.gateway)
-                if !r.gateway.isEmpty, !plan.isEmpty {
+                if !plan.isEmpty {
                     var s = prefs.settings(for: p)
-                    s.lastGateway = r.gateway
+                    if prefs.rememberGateway || r.rememberGateway { s.lastGateway = r.gateway }
+                    if r.askGateway, r.rememberGateway {
+                        let lan = plan.candidates.contains { $0.gw == r.gateway && $0.label.hasSuffix("LAN") }
+                        s.routeFix = r.gateway.isEmpty ? .off : (lan ? .lanDefault : .gateway(r.gateway))
+                    }
                     prefs.setSettings(s, for: p)
-                    if prefs.rememberGateway { config.setState("LAST_GATEWAY", r.gateway) }
+                    if prefs.rememberGateway, !r.gateway.isEmpty { config.setState("LAST_GATEWAY", r.gateway) }
                 }
             }
             switch p.backend {
@@ -398,7 +405,12 @@ final class AppModel {
                 step("wg-quick up")
                 try await actions.wgUp(p)
             case .openvpn:
-                if r.needsAuth, prefs.rememberUser, !r.username.isEmpty { config.setState("LAST_USERNAME", r.username) }
+                if r.needsAuth, prefs.rememberUser, !r.username.isEmpty {
+                    var s = prefs.settings(for: p)
+                    s.lastUsername = r.username
+                    prefs.setSettings(s, for: p)
+                    config.setState("LAST_USERNAME", r.username)
+                }
                 let key = p.key
                 _ = try await actions.ovpnUp(p, username: r.username, password: r.password, timeout: prefs.ovpnTimeout) { s in
                     Task { @MainActor in
