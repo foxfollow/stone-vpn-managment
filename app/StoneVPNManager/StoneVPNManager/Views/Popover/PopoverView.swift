@@ -138,6 +138,11 @@ struct PopoverView: View {
             Banner(color: .purple,
                    text: "\(f.name) (\(f.iface ?? "")) тримає default route і DNS" + (model.dnsHealthy == false ? ", але не пропускає трафік. Правки DNS не допоможуть." : "."),
                    action: "Розірвати…") { model.openTool = "dns"; Task { await model.runDNSFix() } }
+        } else if let name = model.dgStale.sorted().first, model.busy.isEmpty {
+            Banner(color: .red,
+                   text: "Defguard «\(name)» показує «підключено», але gateway більше не приймає сесію (сон довший за поріг)." +
+                         (model.dnsFailover.map { " DNS тимчасово на \($0.joined(separator: " "))." } ?? ""),
+                   action: "Оновити") { model.renewDefguard(name) }
         } else if model.dnsGuardActive, model.busy.isEmpty {
             Banner(color: .orange, text: "VPN відключено — стежу за DNS і повертаю еталонні сервери сервісів, поки резолвер не запрацює.",
                    action: "Fix зараз") { model.openTool = "dns"; Task { await model.runDNSFix() } }

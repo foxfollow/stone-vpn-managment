@@ -82,6 +82,7 @@ struct ProviderCell: View {
                         .padding(.leading, 22)
                 }
                 Spacer(minLength: 0)
+                if let main = row.main, main.status == .stale { renewButton(main) }
                 if model.editingList { editControls }
                 Button { model.openProfiles(row.backend, select: row.main?.id) } label: {
                     HStack(spacing: 4) {
@@ -106,6 +107,7 @@ struct ProviderCell: View {
                     Text(model.prefs.display(it.profile)).font(.system(size: 12.5)).lineLimit(1)
                     Text(subtitle(it, isMain: false)).font(.system(size: 11)).foregroundStyle(it.status.color).lineLimit(1).truncationMode(.tail)
                     Spacer(minLength: 0)
+                    if it.status == .stale { renewButton(it) }
                     let fav = model.prefs.isFavorite(it.id)
                     Button { model.prefs.toggleFavorite(it.id) } label: {
                         Image(systemName: fav ? "star.fill" : "star").foregroundStyle(fav ? .yellow : .secondary)
@@ -125,6 +127,12 @@ struct ProviderCell: View {
                 .padding(.leading, 58).padding(.bottom, 8)
             }
         }
+    }
+
+    private func renewButton(_ it: ProfileItem) -> some View {
+        Button("Оновити") { model.renewDefguard(it.profile.name) }
+            .buttonStyle(.borderedProminent).tint(.red).controlSize(.small)
+            .help(it.profile.mfa != nil ? "Перепідключити з новим MFA-кодом" : "Перепідключити")
     }
 
     private var editControls: some View {
@@ -159,6 +167,8 @@ struct ProviderCell: View {
         case .retry(let e): return e
         case .unknown: return "стан невідомий — лог лише для root"
         case .failed(let e): return e
+        case .stale:
+            return it.profile.mfa != nil ? "сесія протухла — потрібен новий MFA-код" : "gateway не відповідає на хендшейк"
         case .off:
             let last = isMain && model.prefs.lastProfile[it.profile.backend.rawValue] == it.id
             var bits: [String] = []

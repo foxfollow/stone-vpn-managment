@@ -291,6 +291,7 @@ struct ProfileDetail: View {
         case .retry: "повторює спроби"
         case .unknown: "стан невідомий"
         case .failed: "помилка"
+        case .stale: "сесія протухла"
         }
     }
 

@@ -31,9 +31,13 @@ struct ConnectView: View {
                 }
             }
 
+            if r.reconnect {
+                warning("Сесію скинуто на сервері — тунель «підключений», але трафік не ходить. Введи новий код: застосунок сам відключить і підключить локацію.")
+            }
+
             if r.guiRunning {
                 warning(p.backend == .defguard
-                        ? "Defguard.app запущений — він зупиняє MFA-сесію, підняту з CLI, через ~300 мс і просить код у своєму вікні. Закрий застосунок (трей → Quit) або підключайся в ньому."
+                        ? "Defguard.app запущений — він зупиняє MFA-сесію, підняту з CLI, і просить код у своєму вікні. Його буде закрито перед підключенням (тунелі тримає системне розширення)."
                         : "Відкрито GUI Cisco Secure Client — CLI і GUI не можуть керувати агентом одночасно. Його закриють перед підключенням (тунель тримає vpnagentd).")
             }
 
@@ -84,7 +88,7 @@ struct ConnectView: View {
                 .buttonStyle(.borderless).font(.system(size: 12))
                 Spacer()
                 Button("Скасувати") { close() }.keyboardShortcut(.cancelAction)
-                Button("Підключити") { submit() }
+                Button(r.reconnect ? "Оновити" : "Підключити") { submit() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .disabled(r.running || (r.needsAuth && r.username.isEmpty) || (r.mfa && r.code.isEmpty)

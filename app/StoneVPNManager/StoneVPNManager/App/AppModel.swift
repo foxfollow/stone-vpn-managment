@@ -14,6 +14,7 @@ enum ProfileStatus: Equatable {
     case retry(String)         // процес живий, але в retry-циклі з помилкою
     case unknown               // процес живий, лог недоступний
     case failed(String)        // остання спроба впала, сесії немає
+    case stale                 // Defguard «Connected», але gateway не приймає сесію (MFA протухла)
 
     var isActive: Bool {
         switch self {
@@ -52,6 +53,7 @@ struct ConnectRequest: Identifiable {
     var mfa = false
     var code = ""
     var guiRunning = false        // Defguard.app / Cisco GUI
+    var reconnect = false         // Defguard: сесія протухла — спершу down, потім up з новим кодом
     // Cisco
     var host = ""
     var hostOptions: [String] = []
@@ -119,6 +121,10 @@ final class AppModel {
     var launchAtLogin = SMAppService.mainApp.status == .enabled
     /// Після down WireGuard: вікно, в якому застосунок стежить за DNS і повертає еталон.
     var dnsGuardActive = false
+    /// Defguard-сесії (за назвою), які NE показує Connected, а gateway вже не приймає.
+    var dgStale: Set<String> = []
+    /// Основний DNS, який ми поставили, бо резолвер протухлої Defguard-сесії мертвий.
+    var dnsFailover: [String]?
 
     @ObservationIgnored var openWindowAction: OpenWindowAction?
     @ObservationIgnored private var stopping: Set<String> = []
@@ -136,6 +142,11 @@ final class AppModel {
     @ObservationIgnored private var guardNoHelperNotified = false
     @ObservationIgnored private var reassertTimes: [Date] = []
     @ObservationIgnored private var reassertNotified = false
+    @ObservationIgnored private var dgConnectedAt: [String: Date] = [:]
+    @ObservationIgnored private var lastStaleCheck = Date.distantPast
+    @ObservationIgnored private var lastStaleLog = Date.distantPast
+    @ObservationIgnored private var failoverPrev: [String]?
+    @ObservationIgnored private var failoverNoHelperNotified = false
 
     // MARK: життєвий цикл
 
@@ -189,7 +200,9 @@ final class AppModel {
             if !known { prefs.ciscoHosts.append(s.name) }
         }
         if loaded { notifyDiff(old: old, new: new) }
+        await checkDefguardStale()
         await loadDNSCandidates()
+        await applyDNSFailover()
         await dropStalePrimaryDNS()
         await reassertPrimaryDNS()
         // WG-тунель зник (з app, CLI, сну, падіння) — стежимо за DNS, поки не стане здоровим.
@@ -215,7 +228,7 @@ final class AppModel {
         let wasHealthy = dnsHealthy
         dnsProbes = await actions.probeAll(servers)
         dnsHealthy = dnsProbes.values.contains(true)
-        if wasHealthy == true, dnsHealthy == false, prefs.notifyDNS, !prefs.autoDNSFix, guardTask == nil, busy.isEmpty {
+        if wasHealthy == true, dnsHealthy == false, prefs.notifyDNS, !prefs.autoDNSFix, guardTask == nil, busy.isEmpty, dgStale.isEmpty {
             notify("DNS не відповідає", "Резолвер \(servers.joined(separator: ", ")) мовчить. Відкрий StoneVPN → DNS → Fix.")
         }
         if dnsHealthy == false { await autoFixDNSIfIdle() }
@@ -255,6 +268,7 @@ final class AppModel {
         if n.primaryIsTunnel, snap.foreign.contains(where: { $0.iface == n.primaryIface }) { return .foreign }
         // Під час підключення/повернення DNS мертвий резолвер — очікуваний проміжний стан.
         if !busy.isEmpty || dnsGuardActive { return .busy }
+        if !dgStale.isEmpty { return .problem }
         if snap.erroredCount > 0 || dnsHealthy == false || primaryOnline == false { return .problem }
         if snap.connectingCount > 0 { return .busy }
         return snap.upCount > 0 ? .ok : .idle
@@ -264,6 +278,7 @@ final class AppModel {
         let up = snap.upCount, conn = snap.connectingCount + busy.count
         if tone == .foreign { return "Мережу тримає сторонній VPN" }
         if dnsGuardActive, busy.isEmpty { return "Повертаю DNS після VPN…" }
+        if let n = dgStale.sorted().first, busy.isEmpty { return "Defguard «\(n)»: сесія протухла" }
         if dnsHealthy == false, busy.isEmpty { return "Проблема з DNS" }
         if primaryOnline == false { return "Немає інтернету" }
         if up == 0 && conn == 0 { return "Немає активних тунелів" }
@@ -292,7 +307,7 @@ final class AppModel {
         if let b = busy[p.key] { return .busy(b) }
         if let s {
             switch s.state {
-            case .up: return .up
+            case .up: return s.backend == .defguard && dgStale.contains(s.name) ? .stale : .up
             case .unknown: return .unknown
             case .connecting(let e): return (e?.isEmpty == false) ? .retry(e!) : .connecting
             }
@@ -419,8 +434,19 @@ final class AppModel {
                     }
                 }
             case .defguard:
+                if r.guiRunning, p.mfa != nil { step("Закриваю Defguard.app"); await actions.dgQuitGUI() }
+                // Повтор після невдалого коду: сесія вже відключена — лише up.
+                if r.reconnect, let st = await actions.dgSessionState(p.name), st != "Disconnected" {
+                    step("defguard-client disconnect")
+                    stopping.insert(p.key)
+                    try await actions.dgDownAndWait(p.name, kind: p.dgKind, cliPath: config.defguardCLI)
+                }
                 step("defguard-client connect")
                 try await actions.dgUp(p, code: r.code, cliPath: config.defguardCLI)
+                // Старі reasserting-и в лозі належать попередній сесії.
+                dgConnectedAt[p.name] = Date()
+                dgStale.remove(p.name)
+                stopping.remove(p.key)
             case .cisco:
                 if r.guiRunning { step("Закриваю GUI Cisco"); await actions.ciscoQuitGUI() }
                 let host = r.host.trimmingCharacters(in: .whitespaces)
@@ -450,10 +476,29 @@ final class AppModel {
             if prefs.notifyConnected { notify("Підключено", "\(p.backend.title) · \(prefs.display(p))") }
             return true
         } catch {
+            if r.reconnect { stopping.remove(p.key) }
             errors[p.key] = error.localizedDescription
             connect?.error = error.localizedDescription
             await refresh()
             return false
+        }
+    }
+
+    /// «Оновити» протухлу Defguard-сесію: MFA-локація питає лише код, решту (закрити GUI,
+    /// down, чекати, up) робить perform.
+    func renewDefguard(_ name: String) {
+        guard let p = items(for: .defguard).first(where: { $0.profile.name == name })?.profile else { return }
+        Task {
+            var r = ConnectRequest(profile: p)
+            r.reconnect = true
+            if p.mfa != nil {
+                r.mfa = true
+                r.guiRunning = await actions.dgGUIRunning()
+                connect = r
+                openWindow("connect")
+            } else {
+                _ = await perform(r)
+            }
         }
     }
 
@@ -570,6 +615,92 @@ final class AppModel {
         }
     }
 
+    // MARK: протухла Defguard-сесія
+
+    /// MFA-локація Defguard після сну, довшого за поріг gateway: пір видалено на сервері, а NE
+    /// лишається Connected — адаптер кожні 90 с пише ConnectionExpired, сесія reasserting → connected,
+    /// трафік (і DNS тунелю) у чорну діру. Ознака: DNS сесії мовчить + reasserting у лозі після
+    /// нашого підключення, що не минув за 15 с (здоровий пір відповідає на хендшейк одразу);
+    /// без DNS у сесії — ≥2 reasserting-и (два 90-секундні цикли поспіль).
+    private func checkDefguardStale() async {
+        let live = snap.sessions.filter { $0.backend == .defguard && $0.state == .up }
+        dgStale.formIntersection(live.map(\.name))
+        guard !live.isEmpty else { return }
+        let interval: TimeInterval = dgStale.isEmpty && dnsHealthy != false ? 30 : 10
+        guard Date().timeIntervalSince(lastStaleCheck) > interval else { return }
+        lastStaleCheck = Date()
+        var log: [String: [Date]]?
+        func reasserts(_ name: String) async -> [Date] {
+            if log == nil { log = await actions.dgReasserts(lastSeconds: 240) }
+            let since = dgConnectedAt[name] ?? .distantPast
+            return (log?[name] ?? []).filter { $0 > since }
+        }
+        var stale: Set<String> = []
+        for s in live {
+            if s.dnsServers.isEmpty {
+                guard Date().timeIntervalSince(lastStaleLog) > 60 else {
+                    if dgStale.contains(s.name) { stale.insert(s.name) }
+                    continue
+                }
+                if await reasserts(s.name).count >= 2 { stale.insert(s.name) }
+                continue
+            }
+            if await actions.probeAll(s.dnsServers).values.contains(true) { continue }
+            if primaryOnline == false { continue }          // немає інтернету — сесія не винна
+            if dgStale.contains(s.name) { stale.insert(s.name); continue }
+            let ev = await reasserts(s.name)
+            if ev.count >= 2 || (ev.last.map { Date().timeIntervalSince($0) > 15 } ?? false) { stale.insert(s.name) }
+        }
+        if log != nil { lastStaleLog = Date() }
+        let added = stale.subtracting(dgStale)
+        dgStale = stale
+        if prefs.notifyDropped {
+            for n in added.sorted() {
+                notify("Defguard «\(n)»: сесія протухла",
+                       "Gateway більше не приймає тунель (сон довший за поріг). DNS переключено на інший резолвер; StoneVPN → Оновити.")
+            }
+        }
+    }
+
+    /// Резолвер протухлої сесії — catch-all №1, тож без цього «не працює весь DNS». Ставимо
+    /// основним DNS живого тунелю (або системний) — той самий механізм, що й ручний вибір.
+    private func applyDNSFailover() async {
+        guard !dgStale.isEmpty else { await endDNSFailover(); return }
+        let dead = Set(snap.sessions.filter { $0.backend == .defguard && dgStale.contains($0.name) }.flatMap(\.dnsServers))
+        let n = snap.network
+        guard !dead.isEmpty, !dead.isDisjoint(with: n.dnsOverride ?? n.dnsServers), busy.isEmpty else { return }
+        guard helper.isEnabled, (helperVersion ?? 0) >= HelperConst.version else {
+            if !failoverNoHelperNotified {
+                failoverNoHelperNotified = true
+                notify("DNS протухлої сесії Defguard", "Переключити DNS на інший резолвер без пароля може лише актуальний helper (Settings → Helper). Або натисни «Оновити».")
+            }
+            return
+        }
+        var servers = (dnsCandidates.first { $0.id == prefs.primaryDNSChoice } ?? dnsCandidates.first)?.servers ?? []
+        if servers.isEmpty, let u = n.primaryUUID, !n.primaryIsTunnel { servers = reader.store.serviceDNS(u).filter { !dead.contains($0) } }
+        if servers.isEmpty { servers = config.restoreServers }
+        if servers.isEmpty { servers = ["1.1.1.1"] }
+        if dnsFailover == nil { failoverPrev = n.dnsOverride }
+        do { try await actions.setPrimaryDNS(servers) } catch { toast = "DNS failover: \(error.localizedDescription)"; return }
+        dnsFailover = servers
+        try? await actions.dnsFlush()
+        toast = "DNS тимчасово на \(servers.joined(separator: " ")) — резолвер протухлої сесії Defguard мовчить"
+        scheduleRefresh()
+    }
+
+    /// Сесію оновлено або відключено — повернути основний DNS, як був до failover.
+    private func endDNSFailover() async {
+        guard let f = dnsFailover, busy.isEmpty else { return }
+        if snap.network.dnsOverride == f {
+            let prev = failoverPrev.flatMap { pv in dnsCandidates.contains { $0.servers == pv } ? pv : nil }
+            do { try await actions.setPrimaryDNS(prev) } catch { return }
+            try? await actions.dnsFlush()
+            scheduleRefresh()
+        }
+        dnsFailover = nil
+        failoverPrev = nil
+    }
+
     // MARK: DNS doctor (cmd_dns_fix)
 
     func runDNSFix() async {
@@ -577,6 +708,14 @@ final class AppModel {
         doctorLog = []
         doctorPrompt = nil
         defer { doctorRunning = false }
+        if !dgStale.isEmpty {
+            let names = dgStale.sorted().map { "«\($0)»" }.joined(separator: ", ")
+            doctorLog.append("Defguard \(names): тунель «Connected», але gateway не відповідає на хендшейк — сесію (MFA) скинуто на сервері. Правки DNS тут не допоможуть: потрібне «Оновити» з новим кодом.")
+            await applyDNSFailover()
+            if let f = dnsFailover { doctorLog.append("DNS тимчасово переключено на \(f.joined(separator: " ")).") }
+            await probeDNS()
+            return
+        }
         let net = reader.store.network()
         let probes = await actions.probeAll(net.dnsServers)
         dnsProbes = probes
@@ -848,7 +987,7 @@ final class AppModel {
     func loadDNSCandidates() async {
         var out: [DNSCandidate] = []
         for s in snap.sessions where s.state == .up {
-            guard let b = s.backend else { continue }
+            guard let b = s.backend, !(b == .defguard && dgStale.contains(s.name)) else { continue }
             var servers: [String]
             switch b {
             case .wireguard: servers = await wgDNS(s.name)
@@ -885,6 +1024,8 @@ final class AppModel {
 
     func setPrimaryDNS(_ c: DNSCandidate?) {
         prefs.primaryDNSChoice = c?.id
+        dnsFailover = nil          // ручний вибір важливіший за автоматичний failover
+        failoverPrev = nil
         reassertTimes = []
         reassertNotified = false
         runAction("Основний DNS") {
@@ -936,7 +1077,7 @@ final class AppModel {
 
     /// Обраний тунель упав — не лишати мертвий основний DNS.
     private func dropStalePrimaryDNS() async {
-        guard let ov = snap.network.dnsOverride, busy.isEmpty,
+        guard dnsFailover == nil, let ov = snap.network.dnsOverride, busy.isEmpty,
               !dnsCandidates.contains(where: { !Set($0.servers).isDisjoint(with: ov) }) else { return }
         guard helper.isEnabled else { return }          // без helper не питати пароль у фоні
         try? await actions.setPrimaryDNS(nil)

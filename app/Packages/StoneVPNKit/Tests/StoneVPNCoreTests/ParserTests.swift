@@ -115,6 +115,20 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(rows[1].command, "/Applications/Defguard.app/Contents/MacOS/defguard-client")
     }
 
+    func testNCReasserts() {
+        let r = Parse.ncReasserts("""
+        Timestamp               Ty Process[PID:TID]
+        2026-10-16 17:33:24.780 Df nesessionmanager[390:17aad8] [com.apple.networkextension:] NESMVPNSession[Primary Tunnel:core:12C3F010-5168-4556-B808-9026C2C268D4:(null)] in state NESMVPNSessionStateRunning: plugin NEVPNTunnelPlugin(net.defguard[packet-tunnel][inactive]) status changed to reasserting
+        2026-10-16 17:33:24.780 Df nesessionmanager[390:17aad8] [com.apple.networkextension:] NESMVPNSession[Primary Tunnel:core:12C3F010-5168-4556-B808-9026C2C268D4:(null)]: status changed to reasserting
+        2026-10-16 17:34:54.788 Df nesessionmanager[390:17c345] [com.apple.networkextension:] NESMVPNSession[Primary Tunnel:core:12C3F010-5168-4556-B808-9026C2C268D4:(null)]: status changed to reasserting
+        2026-10-16 17:35:00.001 Df nesessionmanager[390:17c345] [com.apple.networkextension:] NESMVPNSession[Primary Tunnel:a:b:7A2B3C4D-1111-2222-3333-444455556666:(null)]: status changed to reasserting
+        2026-10-16 17:35:01.000 Df nesessionmanager[390:17c345] [com.apple.networkextension:] NESMVPNSession[Primary Tunnel:core:12C3F010-5168-4556-B808-9026C2C268D4:(null)]: status changed to connected
+        """)
+        XCTAssertEqual(r["core"]?.count, 2)
+        XCTAssertEqual(r["a:b"]?.count, 1)
+        XCTAssertEqual(r.count, 2)
+    }
+
     func testNCListAndStatus() {
         let list = Parse.ncList("""
         Available network connection services in the current set (*=enabled):

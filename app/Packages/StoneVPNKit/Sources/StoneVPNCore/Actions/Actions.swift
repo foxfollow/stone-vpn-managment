@@ -183,6 +183,37 @@ public final class Actions: @unchecked Sendable {
         Parse.ncList(await Shell.run("/usr/sbin/scutil", ["--nc", "list"]).out).first { $0.name == name }?.state
     }
 
+    /// Reasserting-и Defguard-сесій за останні `seconds` (системний лог, без sudo, ~1.5 с).
+    public func dgReasserts(lastSeconds seconds: Int) async -> [String: [Date]] {
+        let r = await Shell.run("/usr/bin/log", ["show", "--last", "\(seconds)s", "--style", "compact", "--predicate",
+                                                 #"process == "nesessionmanager" AND eventMessage CONTAINS "]: status changed to reasserting""#],
+                                timeout: 20)
+        return Parse.ncReasserts(r.out)
+    }
+
+    /// GUI Defguard зупиняє CLI-MFA-сесію і просить код у своєму вікні — закриваємо його
+    /// (тунелі живуть у системному розширенні, не в GUI). Трей-застосунок інколи ігнорує quit → SIGTERM.
+    public func dgQuitGUI() async {
+        _ = await Shell.run("/usr/bin/osascript", ["-e", "quit app id \"net.defguard\""], timeout: 5)
+        for _ in 0..<6 {
+            try? await Task.sleep(for: .milliseconds(500))
+            if !(await dgGUIRunning()) { return }
+        }
+        let rows = Parse.ps(await Shell.run("/bin/ps", ["-axww", "-o", "pid=,etime=,command="]).out)
+        for r in rows where r.command == Paths.defguardBundleCLI { kill(r.pid, SIGTERM) }
+        try? await Task.sleep(for: .seconds(1))
+    }
+
+    /// Перепідключення протухлої сесії: down і чекати Disconnected (інакше dgUp вважає, що вже up).
+    public func dgDownAndWait(_ name: String, kind: String?, cliPath: String) async throws {
+        try await dgDown(name, kind: kind, cliPath: cliPath)
+        for _ in 0..<15 {
+            if await dgSessionState(name) ?? "Disconnected" == "Disconnected" { return }
+            try await Task.sleep(for: .seconds(1))
+        }
+        throw ActionError("сесія '\(name)' не відключилась (стан: \(await dgSessionState(name) ?? "?"))")
+    }
+
     public func dgUp(_ p: Profile, code: String?, cliPath: String) async throws {
         guard let cli = Paths.defguardCLI(cliPath) else { throw ActionError("defguard-client не знайдено") }
         if await dgSessionState(p.name) == "Connected" { return }

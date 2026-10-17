@@ -37,7 +37,7 @@ extension ProfileStatus {
         case .off: .secondary
         case .busy, .connecting, .unknown: .orange
         case .up: .green
-        case .retry, .failed: .red
+        case .retry, .failed, .stale: .red
         }
     }
 

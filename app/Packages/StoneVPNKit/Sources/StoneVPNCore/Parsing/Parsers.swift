@@ -242,6 +242,23 @@ public enum Parse {
         }
     }
 
+    /// `log show --style compact` по nesessionmanager: моменти, коли NE-сесія пішла в reasserting
+    /// (у Defguard — WireGuard-хендшейк 90 с без відповіді, `ConnectionExpired`). Ключ — назва
+    /// сесії з `NESMVPNSession[Primary Tunnel:<name>:<UUID>:…]`; сам адаптер назви не пише.
+    public static func ncReasserts(_ s: String) -> [String: [Date]] {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        var out: [String: [Date]] = [:]
+        for l in s.split(separator: "\n") where l.contains("]: status changed to reasserting") {
+            let line = String(l)
+            guard let name = firstMatch(#"Primary Tunnel:(.+):[0-9A-F]{8}-[0-9A-F]{4}-"#, line),
+                  let d = f.date(from: String(line.prefix(23))) else { continue }
+            out[name, default: []].append(d)
+        }
+        return out
+    }
+
     /// dg_info: InterfaceName, перша адреса, DNSServers.
     public static func ncStatus(_ s: String) -> (iface: String?, address: String?, dns: [String]) {
         var ifc: String?, addr: String?, dns: [String] = []

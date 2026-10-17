@@ -139,6 +139,17 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   if no tunnel is up and DNS is dead, then warns if the endpoint host doesn't resolve. Background
   restores are helper-only. Only Setup is touched, so NE VPNs (Cisco/Defguard, State layer) are
   unaffected. While busy/guarding, a dead resolver shows as "busy", not "problem".
+- **Stale Defguard MFA session** (`checkDefguardStale` in AppModel): if the Mac sleeps longer than
+  the location's *Client disconnect threshold* (Defguard web UI), the gateway drops the MFA peer, but
+  NE keeps showing Connected. Every 90 s the adapter logs `ConnectionExpired` and the session goes
+  reasserting → connected; traffic and the tunnel DNS are black-holed, and since Defguard DNS is
+  catch-all, *all* DNS dies. Detection: the session's DNS is dead + `]: status changed to reasserting`
+  for that location name in `log show` (nesessionmanager, sudo-free, ~1.5 s; the adapter's own lines
+  don't name the location) after our last connect, older than 15 s; no DNS in the session → ≥2
+  reasserting events. Then: status `.stale`, red icon, banner + "Оновити" (MFA → asks only for the
+  TOTP; perform quits Defguard.app, `dgDownAndWait`, `dgUp`), and a DNS failover via the helper's
+  `dnsOverride` to a live candidate / the primary service DNS. It is undone once the session is
+  renewed or gone. DNS Fix does not help here and says so.
 - **Split rules are editable** (`splitReplace`: write new + remove old in one batch) and checked:
   a server that equals a local interface address (the tunnel's own IP instead of its DNS) or a
   "domain" without a dot that looks like an interface name (`utun3`) gets a warning.
