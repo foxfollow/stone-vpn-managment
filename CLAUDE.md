@@ -4,26 +4,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Personal macOS Bash tooling to manage VPN tunnels from one place. Two backends:
+Personal macOS Bash tooling to manage VPN tunnels from one place. Three backends:
 
 - **WireGuard** via `wg-quick` (configs live in system paths, not the repo).
 - **OpenVPN** via the Homebrew binary `/opt/homebrew/sbin/openvpn` — used instead of
   the OpenVPN Connect GUI because the brew CLI writes routes into the kernel correctly.
+- **Defguard** via `defguard-client` (ships inside `Defguard.app`; NetworkExtension, no sudo).
 
-`main-vpn-manager.sh` is the single entry point that dispatches to both. There is no
-build, no test framework, and no package — scripts run directly. Repo-facing docs
+`main-vpn-manager.sh` is the single entry point that dispatches to all of them (plus Cisco Secure Client via its own CLI). The
+scripts have no build, no test framework, and no package — they run directly. `app/` holds the
+native menubar app (StoneVPN Manager), which has its own build and tests (see its section). Repo-facing docs
 (`README.md`, `OPENVPN_CLI.md`) are in Ukrainian; this file is the AI-facing reference.
 
 ## Project layout & purpose of each file
 
 ```
-main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t> | down [t]
-                      | cert <wg|openvpn> | dns | help. WireGuard via wg-quick; "openvpn"
-                      and "cert" delegate to scripts/*.sh.
+main-vpn-manager.sh   Central dispatcher. Commands: status | list | up <t|openvpn|cisco [host]|defguard [loc]>
+                      | down [t|openvpn|cisco|defguard [loc]]
+                      | cert <wg|openvpn> | dns [fix [servers] | split ...] | route | net [auto |
+                      top <svc>] | help. WireGuard via wg-quick; "openvpn" and "cert"
+                      delegate to scripts/*.sh.
 README.md             User-facing overview + usage (Ukrainian).
 OPENVPN_CLI.md        Detailed OpenVPN reference (Ukrainian).
 config.env.example    Template for config.env (committed).
-config.env            Local defaults (LAN_GATEWAY, OVPN_USERNAME, RESTORE_DNS, DNS_SERVICES). GITIGNORED.
+config.env            Local defaults (LAN_GATEWAY, OVPN_USERNAME, RESTORE_DNS, DNS_SERVICES,
+                      DEFGUARD_CLI, DISABLED_BACKENDS). GITIGNORED.
 state.env             Auto-written last choices (LAST_GATEWAY, LAST_USERNAME). GITIGNORED.
 auth.txt.example      Template for auth.txt (committed).
 auth.txt              Optional default OpenVPN username, one line, chmod 600. GITIGNORED.
@@ -37,7 +42,132 @@ scripts/
   fix-ovpnagent.sh    Restart the OpenVPN Connect agent daemon if its socket vanished.
   nuclear-clean-dns.sh   Force-clear DNS from Wi-Fi / iPhone USB + flush resolver.
   com.local.ovpnagent-watchdog.plist   LaunchDaemon watchdog for the agent socket.
+app/
+  Makefile            build | install | test | status (xcodebuild / swift test).
+  Packages/StoneVPNKit/  Local Swift package, no UI.
+    Sources/StoneVPNCore/   Model/ Parsing/ System/ (Shell, SystemStore, StatusReader)
+                            Actions/ Config/ (config.env, standalone dir) Backends/ (Cisco)
+    Sources/StoneVPNShared/ PrivOp + HelperConst (XPC protocol, bundle ids).
+    Tests/StoneVPNCoreTests/
+  StoneVPNManager/
+    StoneVPNManager.xcodeproj   synced groups; shared scheme StoneVPNManager.
+    StoneVPNManager/   App/ (entry, AppModel, Prefs) Services/ (HelperClient)
+                       Views/{Popover,Windows,Settings,Shared}/ Resources/ (Assets, AppIcon.icon)
+    StoneVPNManagerHelper/   root daemon (Executor validates every PrivOp).
+    Config/            Info.plist additions, launchd plist of the helper.
 ```
+
+## app/ — StoneVPNManager (SwiftUI menubar app, macOS 26+)
+
+Xcode project `app/StoneVPNManager/StoneVPNManager.xcodeproj` (file-system synchronized groups:
+files dropped into a target folder are compiled automatically) + local package
+`app/Packages/StoneVPNKit`. `make -C app build|install|test|status` (install → /Applications,
+which SMAppService needs for the helper; test = `swift test` in the package).
+- Targets: `StoneVPNManager` (app, LSUIElement, no sandbox, hardened runtime) embeds
+  `StoneVPNManagerHelper` (tool, root daemon) into Contents/MacOS and
+  `Config/com.foxfollow.stonevpnmanager.helper.plist` into Contents/Library/LaunchDaemons via
+  Copy Files phases. Modules: `StoneVPNShared` (PrivOp XPC protocol, HelperConst ids),
+  `StoneVPNCore` (Parse = 1:1 ports of the bash awk/sed, SystemStore = SCDynamicStore/getifaddrs
+  instead of scutil/ifconfig, StatusReader, Actions, ConfigStore, Cisco). New app files go into
+  the matching folder under `StoneVPNManager/StoneVPNManager/` — synced groups pick them up, no
+  pbxproj edits. App icon: `Resources/AppIcon.icon` (Icon Composer; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon).
+- Bundle ids `com.foxfollow.stonevpnmanager` / `.helper`; changing them means changing
+  HelperConst, the launchd plist and PRODUCT_BUNDLE_IDENTIFIER together. Repo path for
+  config.env is baked into Info.plist (`StoneVPNRepoPath`) from build setting `STONEVPN_REPO_PATH = $(SRCROOT)/../..`.
+- **Helper never execs arbitrary commands**: the app sends a Codable `PrivOp`, the helper
+  validates every argument (WG paths inside WG dirs, IPs via inet_pton, service names against
+  networksetup, kill only tunnel-proc PIDs) and accepts XPC only from the same Team ID. Without
+  the daemon, the same binary runs once as root via `osascript … with administrator privileges`
+  (`--run-file`, request in a 600 temp file — passwords never in argv; always exits 0 so
+  `do shell script` returns the JSON).
+- **Status never prompts**: root-only reads go through `PrivilegedReader.readIfAvailable`,
+  which returns nil unless the daemon is installed.
+- **Interop with the CLI is deliberate**: OpenVPN is launched with exactly vpn-up.sh's flags and
+  `/tmp/openvpn-<id>.{pid,log}` (log root:staff 640), config.env/state.env are shared.
+- **Cisco connects in-app** through `CiscoDriver`: `vpn connect <host>` under a pty
+  (`/usr/bin/script -q /dev/null …`), answering Group/Username/Password/banner prompts as they
+  appear. A pty is required: over plain pipes (`vpn -s`) the password/second factor never reach
+  the server → instant "Login failed", Duo push never starts. Duo prompts (Second Password,
+  passcode, "Passcode or option") get the user's OTP or `push` / option `1`; after the password
+  the driver waits up to 2 min for the phone approval (this head-end auto-pushes: Password →
+  Connecting). **Pacing matters**: answer a prompt only after ~0.6 s of output silence — the
+  client prints `Password:` before switching echo off with TCSAFLUSH (an instant answer is
+  wiped → empty password → "Login failed" in <1 s), and a group change reloads the login form.
+  Groups are answered by their menu number (`Group: [VPN1] 1`, as typed in the CLI); the name
+  made the head-end fall back to another group. The group probe still uses `vpn -s`
+  (no secrets involved) and stops at the first prompt. Defaults come from
+  Cisco's own prefs (`~/.vpn/.anyconnect`, `/opt/cisco/secureclient/vpn/.anyconnect_global`:
+  DefaultUser/DefaultGroup/DefaultHostName + port from DefaultHostAddress).
+  `defaultClientProfile.xml` is useless for custom ports — the head-end rewrites it on every
+  connect — so custom hosts (`host:port`) and any seen live Cisco host are kept in the app
+  (UserDefaults `ciscoHosts`). Writes to child stdin must ignore SIGPIPE (`vpn` exits on
+  "Login failed"; an unguarded write killed the process).
+- **Works without the repo**: `RepoConfig.load(explicitRepo:standalone:)` uses the CLI repo
+  (sharedWithCLI) when found and not disabled, else `~/Library/Application Support/StoneVPNManager/`
+  with the same config.env/state.env format. Switching to standalone copies the repo files once.
+  Only "manage certs" (runs `main-vpn-manager.sh cert` in Terminal) needs the repo.
+- **Auto DNS fix** (pref `autoDNSFix`, default off): DNS dead + no sessions, no foreign tunnels,
+  no live utun → `runDNSFix()` by itself; helper-only (no password prompts), 2-minute cooldown.
+- The "find devices on local networks" prompt is Local Network privacy, triggered by `dig` to a
+  LAN resolver and `ping -b <iface>` / `curl --interface` probes (children are attributed to the
+  app). `NSLocalNetworkUsageDescription` explains it; the grant is per signing identity + path,
+  so Debug builds from DerivedData and the /Applications copy are asked separately.
+- **Primary DNS switch** (`PrivOp.dnsOverride`, helper protocol v3): the helper publishes
+  `State:/Network/Service/com.foxfollow.stonevpnmanager.dns/DNS` (`SupplementalMatchDomains [""]`)
+  **and strips `""` from every other catch-all State DNS entry** (Cisco, Defguard…), keeping the
+  originals in `State:/Network/StoneVPNManager/DisplacedDNS` (`CatchAllDNS` in StoneVPNShared).
+  Why: configd sorts resolvers with `compareDomain` (Plugins/IPMonitor/dns-configuration.c), which
+  returns "less" for *any* entry without a domain — so among several catch-all entries SearchOrder
+  is ignored and insertion (hash) order of service IDs wins (observed: ours got order 104200 and
+  sat behind Defguard; Cisco's "order 1" only ever won by luck). Being the *only* catch-all is the
+  one deterministic way to be resolver #1. `dnsOverrideClear` puts `""` back (or removes the entry
+  if its service lost IPv4/IPv6). If a VPN client re-asserts its entry (reconnect, new Defguard
+  UUID), the app re-applies via the helper (≤6×/min, then one notification). Candidates = DNS of
+  up tunnels: WG `DNS =` from the conf, Cisco `State:/…/com.cisco.anyconnect/DNS`, Defguard
+  session DNS (brew openvpn applies no pushed DNS). The chosen candidate id is kept in
+  UserDefaults `primaryDNSChoice`. The override is dropped when its tunnel goes down; it is
+  excluded from `orphanDNS` in the app, but the CLI `dns fix` still treats it as an orphan.
+- **DNS guard after WireGuard** (`DNSGuard` in StoneVPNCore, pref `dnsGuard`, default on): wg-quick
+  writes the tunnel DNS into the *Setup* DNS of every service and does not always restore it
+  (Wi-Fi left on a dead `10.x` resolver → next VPN's hostname doesn't resolve). The app keeps a
+  baseline (UserDefaults `dnsBaseline`, service → servers, [] = DHCP), learned once a minute
+  while no WG tunnel is up and the resolver answers; values containing a WG-conf `DNS =` address
+  (`wgDNSSeen`, public resolvers excluded) are never learned. A WG session disappearing (any
+  cause) arms a ~60 s watcher: services still holding tunnel DNS are bounced back to the baseline
+  (fallback RESTORE_DNS, else DHCP) + orphans purged + flush; still dead after that → DNS Fix.
+  `connect()` runs the same restore first (password prompt allowed — user action), then the doctor
+  if no tunnel is up and DNS is dead, then warns if the endpoint host doesn't resolve. Background
+  restores are helper-only. Only Setup is touched, so NE VPNs (Cisco/Defguard, State layer) are
+  unaffected. While busy/guarding, a dead resolver shows as "busy", not "problem".
+- **Stale Defguard MFA session** (`checkDefguardStale` in AppModel): if the Mac sleeps longer than
+  the location's *Client disconnect threshold* (Defguard web UI), the gateway drops the MFA peer, but
+  NE keeps showing Connected. Every 90 s the adapter logs `ConnectionExpired` and the session goes
+  reasserting → connected; traffic and the tunnel DNS are black-holed, and since Defguard DNS is
+  catch-all, *all* DNS dies. Detection: the session's DNS is dead + `]: status changed to reasserting`
+  for that location name in `log show` (nesessionmanager, sudo-free, ~1.5 s; the adapter's own lines
+  don't name the location) after our last connect, older than 15 s; no DNS in the session → ≥2
+  reasserting events. Then: status `.stale`, red icon, banner + "Оновити" (MFA → asks only for the
+  TOTP; perform quits Defguard.app, `dgDownAndWait`, `dgUp`), and a DNS failover via the helper's
+  `dnsOverride` to a live candidate / the primary service DNS. It is undone once the session is
+  renewed or gone. DNS Fix does not help here and says so.
+- **Split rules are editable** (`splitReplace`: write new + remove old in one batch) and checked:
+  a server that equals a local interface address (the tunnel's own IP instead of its DNS) or a
+  "domain" without a dot that looks like an interface name (`utun3`) gets a warning.
+- **Cmd+Tab while a window is open** (`AppSwitcherPolicy`, pref `showInAppSwitcher`, default on):
+  the app switcher only lists `.regular` apps, which always also get a Dock icon — there is no
+  public API for one without the other. So the policy flips to `.regular` while a titled non-panel
+  window (Profiles/Settings/Connect) is visible and back to `.accessory` after the last one closes
+  (checked on the next runloop turn — `willClose` fires while the window is still visible).
+- Per-profile settings (alias, favourite, route-fix policy ask/LAN/fixed/off) live in UserDefaults;
+  route-fix defaults: OpenVPN = ask, WireGuard = off.
+- Logins are remembered per VPN (pref `rememberUser`): OpenVPN in `ProfileSettings.lastUsername`,
+  Cisco per host in UserDefaults `ciscoUsers`/`ciscoGroups` (key = lowercased host incl. port).
+  A profile with no saved login falls back to OVPN_USERNAME/auth.txt — never to the shared
+  `LAST_USERNAME` (still written to state.env for the CLI); Cisco's own DefaultUser/Group are used
+  only when its DefaultHostName is the same host.
+- Debug parity check without UI: `make -C app status` (= `--dump-status`) vs
+  `./main-vpn-manager.sh status`.
+- `NetService` clashes with Foundation's — the model type is `NetworkService`.
 
 ## How to test the scripts
 
@@ -75,6 +205,10 @@ There are no unit tests. Validate changes like this:
   gateway is prompted each connect (default `state.env` LAST_GATEWAY → `config.env`
   LAN_GATEWAY), can be overridden/skipped, and is remembered. Target hosts are derived from the
   chosen profile's `remote` line(s) — nothing network-specific is committed.
+  Hosts reachable through *another* tunnel (VPN-in-VPN, `tunnel_iface_for`: longest-prefix
+  match over `netstat -rn`, ignoring our own stale `-host` route via the gateway and utun
+  default/def1 routes) are skipped and the stale host route is removed — forcing them via
+  the LAN gateway sends the handshake out en0 and it times out (`TLS key negotiation failed`).
 - **OpenVPN profile menu is dynamic** in `vpn-up.sh` — built by scanning the profiles dir and
   reading each `remote` line (no hardcoded filenames/hosts). Profiles live in
   `~/Library/Application Support/OpenVPN Connect/profiles/` (shared with the GUI, named by
@@ -83,19 +217,187 @@ There are no unit tests. Validate changes like this:
   (written via the inline `set_state KEY VAL` helper, which rewrites one key). Both gitignored;
   `state.env` is created on first connect. `main-vpn-manager.sh` also sources `config.env`.
 - **DNS restore after `down`.** `wg-quick` can leave a dead WG DNS after teardown, so `cmd_down`
-  calls `restore_dns()`: if `config.env` RESTORE_DNS is non-empty it runs
-  `networksetup -setdnsservers` for each service in the `DNS_SERVICES` array (default `Wi-Fi`).
-  Empty RESTORE_DNS = DNS left untouched.
+  calls `restore_dns()`: if `config.env` RESTORE_DNS is non-empty it `dns_bounce()`es each
+  service in the `DNS_SERVICES` array (default `Wi-Fi`), then purges orphaned resolvers and
+  flushes. Empty RESTORE_DNS = DNS left untouched.
 - **`dns` command (`cmd_dns`).** Interactive audit: lists every enabled network service
   (`networksetup -listallnetworkservices`, skipping `*`-disabled) with its current DNS, then
   sets a chosen DNS (default `RESTORE_DNS`) on selected services or `all`. Complements the
   automatic `restore_dns()` for interfaces not in `DNS_SERVICES` (Ethernet/USB LAN, etc.).
+  It also prints the *effective* resolver (`dns_global_servers`) and the primary service,
+  because per-service DNS in the list is often not what the resolver actually uses.
+
+- **macOS DNS has two layers, and `networksetup` only touches the weaker one.**
+  `Setup:/Network/Service/<uuid>/DNS` = preferences (what `networksetup -setdnsservers`
+  writes). `State:/Network/Service/<uuid>/DNS` = runtime, written directly by
+  NetworkExtension VPNs (ClearVPN, FortiClient). **State beats Setup.** So setting DNS on a
+  VPN service via `networksetup` is a silent no-op while the extension holds its State entry.
+  Ground truth is `State:/Network/Global/DNS` (`scutil`), never `-getdnsservers`.
+
+- **SystemConfiguration only recomputes global DNS on a *real value change*.** Writing the
+  same DNS a service already has produces no notification, so a stale global resolver left by
+  a dead tunnel survives. Hence `dns_bounce()`: `-setdnsservers <svc> empty` then the real
+  value — two genuine transitions. This is the whole reason the old `restore_dns()` and
+  `cmd_dns` appeared to "succeed" while `ping` still hung.
+
+- **`dns fix` (`cmd_dns_fix`) is a three-case doctor** for "VPN broke DNS, ping hangs with no
+  output". It probes every effective resolver (`dns_probe`: `dig +time=2 +tries=1`, `nslookup`
+  fallback, neither → assume alive). Cases: (1) healthy — resolver answers, no orphans → touch
+  nothing, no sudo; (2) dead tunnel left a stale resolver → purge orphans (State `DNS` key
+  without State `IPv4`, not primary — `dns_orphan_uuids`) and bounce a *real* service (falls
+  back to `DNS_SERVICES` when the primary maps to no networksetup service); (3) primary is a
+  *live but broken* VPN utun — see next bullet. It always re-probes at the end and reports
+  failure honestly instead of printing success.
+
+- **A live-but-broken NE VPN black-holes everything; no DNS edit can fix it.** When a
+  NetworkExtension tunnel (ClearVPN) is primary, it owns both the default route and State DNS.
+  If its in-tunnel resolvers (10.1.0.x) don't answer, *all* traffic dies — including other VPN
+  clients' control channels (observed: Cisco Secure Client "Unable to contact <head-end>"
+  purely because ClearVPN held the route; after reboot Cisco connected fine). Bouncing Wi-Fi
+  while the VPN stays primary changes nothing — `dns fix` case 3 instead lists candidate
+  tunnel-owner processes and offers to `sudo kill` them, then repairs DNS normally.
+  `vpn_tunnel_procs` uses `pgrep -fl` (`ps | grep` would match its own grep — the user's grep
+  is aliased to ugrep, whose argv contains the pattern) over `SystemExtensions/` paths matching
+  vpn|wireguard|tunnel|anyconnect plus Cisco's `vpnagentd`, excluding ClearVPN's
+  `security-monitor`; repo-managed `openvpn`/`wireguard-go` are deliberately not matched (they
+  go through `down`). `scutil --nc stop` is not an option: ClearVPN's sessions show `(Invalid)`
+  in `scutil --nc list` even while its tunnel is up.
+
+- **Liveness checks on root processes must use `ps -p`, not `kill -0`.** Without root,
+  `kill -0 <pid>` returns EPERM for a *live* root-owned process, so a "still alive → kill -9"
+  escalation silently never fires. All NE extensions run as root.
+
+- **macOS picks the primary interface by *service order*, not by reachability.** The
+  highest-ordered service that has an IPv4 address *with a router* wins — a USB-Ethernet
+  plugged into a router with no uplink therefore steals the default route from Wi-Fi
+  (gateway present, internet absent). `cmd_net` lists services in order with a real
+  per-interface reachability probe (`net_iface_online`: `ping -c1 -W 1200 -b <dev>` to
+  1.1.1.1/8.8.8.8, then `curl --interface` to captive.apple.com — ICMP is filtered on some
+  LANs), marks the primary, and can reorder. `net auto` = "primary has no internet → put
+  the highest service that does on top". Fixing this with `route change default` is
+  pointless: `configd` rewrites the route on the next network-state change; only the
+  service order is persistent. `networksetup -ordernetworkservices` needs the **full**
+  service list (partial list → "parameters were not valid"), so `net_apply_top` re-emits
+  every name, disabled ones included.
+
+- **`route -n get default` and `State:/Network/Global/IPv4` can disagree.** With two
+  default routes (scoped `UGScIg` + unscoped) `route get` may report the non-primary
+  interface. `cmd_route` uses the routing table (what packets actually do); `cmd_net`/
+  `dns_primary_iface` use the global state (what SystemConfiguration considers primary).
+  Both are needed — do not "unify" them.
+
+- **`cmd_route`'s "no conflict" verdict now includes a liveness probe.** A physical default
+  can be just as dead as a VPN one; without the probe the old code cheerfully printed
+  "Конфлікту немає" while nothing resolved. It ends with `net_first_online` and points at
+  `net auto`.
+
+- **`route` also lists every VPN route** (`route_vpn_table`): per live utun (has IPv4) all
+  `netstat -rn` entries through it, labelled by `utun_owner` — WireGuard via
+  `/var/run/wireguard/<utunN>.sock` (world-visible; the `<name>.name` file is often root 400,
+  so the name is shown only when readable or when exactly one tunnel exists), OpenVPN via
+  `ovpn_state`, third-party (Cisco/ClearVPN) via the `State:/Network/Service/*/IPv4` entry whose
+  `InterfaceName` matches. Plus static `/32` gateway routes on physical ifaces = route-fix
+  host routes to VPN servers.
+
+- **`status` prints a "Мережа:" block first** (primary service + effective resolver) — that,
+  not the utun list, is what shows a foreign VPN owning the network.
+
+- **`scutil` always exits 0** — even on `Permission denied`. A successful `remove` prints
+  nothing, so `dns_purge_orphans()` treats *any* output as failure. Never check `$?` there.
+
+- **A network service with an empty `Device:` in `networksetup -listnetworkserviceorder` is a
+  VPN service** (NE or IPSec) — that's how `svc_is_vpn()` flags rows whose DNS is controlled
+  by the tunnel itself. Real interfaces always report a BSD device (`en0`, `bridge0`, …).
+
+- **Cisco Secure Client overrides the global resolver without being primary.** It writes
+  `State:/Network/Service/com.cisco.anyconnect/DNS` as a *Supplemental* config with order 1
+  (`__CONFIGURATION_ID__` in `State:/Network/Global/DNS` names it — `dns_global_owner`),
+  listing its own servers (8.8.8.8) *before* the pre-existing WG DNS. macOS moves to the
+  next nameserver only on timeout, not NXDOMAIN, so WG-internal names stop resolving while
+  IPs still work. Not fixable via networksetup or by reordering; the durable fix is
+  `/etc/resolver/<domain>` (`dns split add`), which neither Cisco nor wg-quick touch.
+  `down` detects a live Cisco session via `vpn -s state` (its daemons run 24/7, so process
+  presence means nothing) and disconnects it via the same CLI.
+
+- **`networksetup -getdnsservers` shows the WG DNS on *every* service while a WG tunnel is
+  up** — wg-quick's darwin backend sets it on all services and restores them on `down`.
+  That's expected, not a leak.
+
+- **`scripts/nuclear-clean-dns.sh` is superseded by `dns fix`.** It only ever worked by
+  accident: setting Wi-Fi to `empty` is a real change, which forced the recompute. It still
+  hardcodes Wi-Fi / iPhone USB and leaves DNS empty.
+
+- **utun parsing in `cmd_status` must reset the interface name on every interface header.**
+  Most utuns carry only link-local IPv6; an awk that keeps the last-seen utun name until it
+  finds an `inet` line will attribute the *next* interface's IPv4 to that utun (utun0 showing
+  en0's address). A utun with no IPv4 is not a live tunnel.
 - **`wg-cert.sh` mirrors `vpn-cert.sh`'s UX** for WireGuard: list / generate keypair
   (`wg genkey|pubkey`, optional `wg genpsk`) + scaffold `.conf` from a template / import an
   existing `.conf` / delete. Writes to the wg system dirs via `sudo` (chmod 600); tunnel names
   are validated against wg-quick's `[a-zA-Z0-9_=+.-]{1,15}` interface-name rule.
-- **State files:** PID `/tmp/openvpn.pid`, log `/tmp/openvpn.log`. `vpn-up.sh` polls the log
+- **Multiple OpenVPN tunnels can run at once** (one per profile). Running instances are
+  discovered from the process table (`pgrep -x openvpn` + `--config` in `ps -o command=`),
+  not from PID files, so legacy/foreign launches are visible too; `vpn-down.sh [all|<id>|<PID>]`
+  stops one/all/menu. Same profile twice is refused.
+  A live process ≠ a live tunnel (it may loop on TLS retries). `ovpn_state` parses the
+  instance's log (path from `--log` in its argv): `Initialization Sequence Completed` after
+  the last restart → up + `Opened utun device utunN`; otherwise connecting + last error.
+  `vpn-up.sh` makes the log `root:staff 640` so `status` reads it sudo-free; legacy/foreign
+  logs (root 600) fall back to `sudo -n`, else "стан невідомий". `status` then lists the
+  utun's live routes (`iface_routes`).
+- **State files:** per profile — PID `/tmp/openvpn-<id>.pid`, log `/tmp/openvpn-<id>.log`
+  (`<id>` = profile basename). `vpn-up.sh` polls the log
   for `Initialization Sequence Completed` (success) vs `AUTH_FAILED`/`fatal error`.
+- **Defguard on macOS is a NetworkExtension, not wg-quick.** System extension
+  `net.defguard.VPNExtension` runs 24/7 (process presence means nothing). Each location is a
+  VPN network service (`Hardware Port: net.defguard`, Setup `Interface/SubType net.defguard`).
+  Live state: `scutil --nc list` lines tagged `[VPN:net.defguard]` (`dg_sessions`, real
+  Connected/Connecting/Disconnecting — unlike ClearVPN's `(Invalid)`). utun/address/DNS:
+  `scutil --nc status <uuid>` (`dg_info`), sudo-free. **Not** the State store: the live tunnel
+  writes `State:/Network/Service/<different uuid>` with no Setup entry and no link to the
+  session UUID; and `defguard-client status --json` reports `"interface": ""` on macOS.
+  `utun_owner` therefore matches utun → session via `dg_info`. Never print raw
+  `scutil --nc show <uuid>` — it contains the tunnel's `privateKey`.
+- **Defguard DNS is Supplemental with MatchDomains `[""]`** → it is resolver #1 for all domains
+  while up (like Cisco). `__CONFIGURATION_ID__` names the runtime UUID, so `dns_owner_hint`
+  resolves UUID owners whose State DNS `InterfaceName` is a utun via `utun_owner`.
+- **`defguard-client` must be exec'd by its real in-bundle path.** NetworkExtension derives the
+  app bundle from the exec path; via a symlink (`/opt/homebrew/bin`) it can't find the provider
+  → `Failed to save tunnel configuration … to system settings` (log: `NEVPNErrorDomain Code=1
+  "Missing plugin type"`). Non-MFA locations still connect (the previously saved profile stays valid); MFA
+  locations then fail with `WireGuardError error 8` (observed; presumably the post-MFA session
+  key never reaches the profile).
+  `dg_cli` prefers the bundle path and `realpath`s symlinks. The CLI prints `Connected to …`
+  even when the tunnel then dies, so `dg_up` waits on the session state (`dg_wait`).
+  Connect/disconnect only via the CLI (shares the GUI's DB, handles MFA prompts itself);
+  `scutil --nc stop` is only the no-CLI fallback in `dg_down`. After `down`, Defguard (like
+  Cisco) restores its own DNS → `dns_flush` only, not `restore_dns` (`down_is_foreign`).
+  Bare names in `up`/`down` go to Defguard only when no WG config/active WG tunnel has that name.
+- **`DISABLED_BACKENDS` (config.env or env) turns backends off entirely**: wireguard | openvpn |
+  defguard | cisco (aliases wg/ovpn/dg/anyconnect, space- or comma-separated; default empty =
+  all on). A disabled backend is neither shown nor *probed* — every status/list/down-menu
+  block, `utun_owner` probe and the `net` Defguard label is gated by `backend_on`; explicit
+  `up`/`down`/`cert` for it die via `backend_need`. `status`/`list` print what is off.
+  It's a string, not an array, because `/bin/bash` is 3.2 and an empty array under `set -u`
+  is "unbound". Unknown names warn (`backends_validate`) instead of silently doing nothing.
+- **Cisco connect goes through its CLI** (`cisco_up`: `vpn connect <host>`, interactive — the
+  `vpn` binary prompts for group/user/password/banner itself; nothing is stored). Hosts come
+  from `vpn -s hosts` (`cisco_hosts`, may include `:port` — compare hosts sans port). The GUI
+  (`/Applications/Cisco/Cisco Secure Client.app`) and the CLI can't both drive the agent (known
+  AnyConnect behaviour, not yet reproduced here), so `cisco_up` offers to quit the GUI first (`osascript quit`); the tunnel lives in `vpnagentd`.
+- **A running Defguard GUI kills CLI-started MFA sessions.** Observed on 2.1.0: ~300 ms after
+  the CLI's session reaches Connected, nesessionmanager logs `stop command from
+  defguard-client[<GUI pid>] with reason 1`, and the GUI pops its own TOTP prompt (then
+  reconnects itself if you enter it). Non-MFA locations are left alone. `dg_gui_pid` finds the
+  GUI as the bundle binary with *no* args (`pgrep -fx`); `dg_up` warns before spending a code
+  and re-checks the session 2 s after Connected. An empty MFA code in the CLI is simply sent and
+  rejected (`MFA rejected: unauthorized`) — there is no hand-off to the GUI. Diagnose with
+  `/usr/bin/log show … 'eventMessage CONTAINS "<location>"'` (zsh's builtin `log` shadows it).
+  In `dns fix` case 3, a Defguard-owned primary utun is disconnected via the CLI instead of
+  killing processes (`fix_kill_tunnel_procs` is the generic NE path).
+- **`iface_routes` hides scoped defaults' meaning unless labelled**: NE tunnels always add a
+  scoped `default` (flag `I`) — shown as `default (scoped)`; cloned host entries (`W`),
+  multicast and broadcast are dropped.
 - **The ovpnagent watchdog is a separate concern** from the brew-CLI connection path: the
   plist + `fix-ovpnagent.sh` keep the *GUI* agent's socket alive and are independent.
 

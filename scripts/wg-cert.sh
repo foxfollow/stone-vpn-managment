@@ -12,6 +12,21 @@
 
 WG_DIRS=(/etc/wireguard /usr/local/etc/wireguard /opt/homebrew/etc/wireguard)
 
+# Шлях, введений руками/перетягнутий у Terminal: прибрати пробіли по краях, обгорткові
+# лапки ('...' / "...") або екранування (\ , \( ), розгорнути ~.
+clean_path() {
+    local p="$1"
+    p="${p#"${p%%[![:space:]]*}"}"
+    p="${p%"${p##*[![:space:]]}"}"
+    if [[ ${#p} -ge 2 && ( "$p" == \'*\' || "$p" == \"*\" ) ]]; then
+        p="${p:1:${#p}-2}"
+    else
+        p=$(printf '%s' "$p" | sed 's/\\\(.\)/\1/g')
+    fi
+    [[ "$p" == "~" || "$p" == "~/"* ]] && p="$HOME${p:1}"
+    printf '%s' "$p"
+}
+
 valid_name() { [[ "$1" =~ ^[a-zA-Z0-9_=+.-]{1,15}$ ]]; }
 
 # Тека для нових конфігів: перша з наявними .conf, інакше перша наявна, інакше /etc/wireguard.
@@ -104,7 +119,7 @@ wg_generate() {
 
 # ─── Імпорт готового .conf ───────────────────────────────────────────────────
 wg_import() {
-    local src="$1"
+    local src; src=$(clean_path "$1")
     [ -f "$src" ] || { echo "Файл не знайдено: $src"; exit 1; }
     [[ "$src" == *.conf ]] || { echo "Очікується .conf файл."; exit 1; }
     grep -qE '^\[Interface\]' "$src" || { echo "Не схоже на WireGuard-конфіг (немає [Interface])."; exit 1; }
@@ -149,8 +164,7 @@ case "${1:-}" in
     --generate|--new)   wg_generate; exit 0 ;;
     --delete)           wg_delete; exit 0 ;;
     *)
-        if [ -f "$1" ]; then wg_import "$1"; exit 0
-        else echo "Файл не знайдено: $1"; exit 1; fi ;;
+        wg_import "$1"; exit 0 ;;
 esac
 
 echo ""
