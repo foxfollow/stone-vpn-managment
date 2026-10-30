@@ -160,6 +160,11 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   (checked on the next runloop turn — `willClose` fires while the window is still visible).
 - Per-profile settings (alias, favourite, route-fix policy ask/LAN/fixed/off) live in UserDefaults;
   route-fix defaults: OpenVPN = ask, WireGuard = off.
+- Logins are remembered per VPN (pref `rememberUser`): OpenVPN in `ProfileSettings.lastUsername`,
+  Cisco per host in UserDefaults `ciscoUsers`/`ciscoGroups` (key = lowercased host incl. port).
+  A profile with no saved login falls back to OVPN_USERNAME/auth.txt — never to the shared
+  `LAST_USERNAME` (still written to state.env for the CLI); Cisco's own DefaultUser/Group are used
+  only when its DefaultHostName is the same host.
 - Debug parity check without UI: `make -C app status` (= `--dump-status`) vs
   `./main-vpn-manager.sh status`.
 - `NetService` clashes with Foundation's — the model type is `NetworkService`.

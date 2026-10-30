@@ -154,6 +154,8 @@ public struct RepoConfig: Sendable {
 
     /// Пріоритет як у vpn-up.sh: state → config → auth.txt.
     public var defaultUsername: String { [lastUsername, ovpnUsername, authUser].first { !$0.isEmpty } ?? "" }
+    /// Без state.env: LAST_USERNAME — останній логін будь-якого профілю, для нового профілю він чужий.
+    public var configuredUsername: String { [ovpnUsername, authUser].first { !$0.isEmpty } ?? "" }
     public var defaultGateway: String { lastGateway.isEmpty ? lanGateway : lastGateway }
     public var restoreServers: [String] { restoreDNS.split(separator: " ").map(String.init) }
 

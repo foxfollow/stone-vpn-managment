@@ -112,13 +112,13 @@ struct ConnectView: View {
                 if !r.hostOptions.isEmpty {
                     Menu {
                         ForEach(r.hostOptions, id: \.self) { h in
-                            Button(h) { model.connect?.host = h; Task { await model.probeCiscoGroups() } }
+                            Button(h) { Task { await model.selectCiscoHost(h) } }
                         }
                     } label: { Image(systemName: "chevron.down") }
                     .menuStyle(.borderlessButton).fixedSize()
                 }
             }
-            .onSubmit { Task { await model.probeCiscoGroups() } }
+            .onSubmit { Task { await model.selectCiscoHost(model.connect?.host ?? "") } }
         }
         HStack(alignment: .top, spacing: 10) {
             field("Група", hint: groupHint(r)) {
@@ -147,7 +147,7 @@ struct ConnectView: View {
                 TextField("", text: bind(\.username)).textFieldStyle(.roundedBorder).focused($focus, equals: .user)
             }
         }
-        field("Пароль", hint: "Не зберігається; передається клієнту Cisco лише на запит Password.") {
+        field("Пароль", hint: "Не зберігається; передається клієнту Cisco лише на запит Password. Логін і група запам'ятовуються для цього хоста.") {
             SecureField("", text: bind(\.password)).textFieldStyle(.roundedBorder).focused($focus, equals: .pass)
         }
         DisclosureGroup("Другий фактор (Duo / OTP)") {

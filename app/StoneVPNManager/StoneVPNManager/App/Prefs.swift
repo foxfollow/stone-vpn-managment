@@ -48,8 +48,9 @@ final class Prefs {
     var primaryDNSChoice: String? { didSet { d.set(primaryDNSChoice, forKey: "primaryDNSChoice") } }
     // Cisco: власні хости (з портом) — профіль head-end перезаписує, тож тримаємо свої
     var ciscoHosts: [String] { didSet { d.set(ciscoHosts, forKey: "ciscoHosts") } }
-    var ciscoLastUser: String { didSet { d.set(ciscoLastUser, forKey: "ciscoLastUser") } }
-    var ciscoLastGroup: String { didSet { d.set(ciscoLastGroup, forKey: "ciscoLastGroup") } }
+    /// Логін і група — окремо для кожного хоста (ключ — ciscoKey(host)), не один на всіх.
+    var ciscoUsers: [String: String] { didSet { d.set(ciscoUsers, forKey: "ciscoUsers") } }
+    var ciscoGroups: [String: String] { didSet { d.set(ciscoGroups, forKey: "ciscoGroups") } }
     // Сповіщення
     var notifyConnected: Bool { didSet { d.set(notifyConnected, forKey: "notifyConnected") } }
     var notifyDisconnected: Bool { didSet { d.set(notifyDisconnected, forKey: "notifyDisconnected") } }
@@ -91,8 +92,11 @@ final class Prefs {
         wgDNSSeen = d.stringArray(forKey: "wgDNSSeen") ?? []
         primaryDNSChoice = d.string(forKey: "primaryDNSChoice")
         ciscoHosts = d.stringArray(forKey: "ciscoHosts") ?? []
-        ciscoLastUser = d.string(forKey: "ciscoLastUser") ?? ""
-        ciscoLastGroup = d.string(forKey: "ciscoLastGroup") ?? ""
+        ciscoUsers = d.dictionary(forKey: "ciscoUsers") as? [String: String] ?? [:]
+        ciscoGroups = d.dictionary(forKey: "ciscoGroups") as? [String: String] ?? [:]
+        // Старий спільний логін для всіх хостів — не знаємо, чий він, тож не переносимо.
+        d.removeObject(forKey: "ciscoLastUser")
+        d.removeObject(forKey: "ciscoLastGroup")
         notifyConnected = d.bool(forKey: "notifyConnected")
         notifyDisconnected = d.bool(forKey: "notifyDisconnected")
         notifyDropped = d.bool(forKey: "notifyDropped")
@@ -122,4 +126,6 @@ final class Prefs {
     }
 
     func setSettings(_ s: ProfileSettings, for p: Profile) { profileSettings[p.key] = s }
+
+    static func ciscoKey(_ host: String) -> String { host.trimmingCharacters(in: .whitespaces).lowercased() }
 }

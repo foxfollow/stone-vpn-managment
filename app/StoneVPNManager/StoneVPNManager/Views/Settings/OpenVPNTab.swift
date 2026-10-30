@@ -12,8 +12,8 @@ struct OpenVPNTab: View {
             }
             Section("Логін") {
                 ConfigField(model: model, label: "OVPN_USERNAME", key: "OVPN_USERNAME", value: model.config.ovpnUsername,
-                            hint: "Пріоритет: логін профілю → state.env (останній) → config.env → auth.txt. OTP не зберігається ніколи.")
-                Toggle("Запам'ятовувати логін для кожного профілю (+ state.env)", isOn: $model.prefs.rememberUser)
+                            hint: "Пріоритет: логін цього профілю → config.env → auth.txt (спільний LAST_USERNAME зі state.env — лише для CLI). OTP не зберігається ніколи.")
+                Toggle("Запам'ятовувати логін окремо для кожного профілю OpenVPN і хоста Cisco (+ state.env для CLI)", isOn: $model.prefs.rememberUser)
             }
             Section("Route-fix") {
                 ConfigField(model: model, label: "LAN_GATEWAY", key: "LAN_GATEWAY", value: model.config.lanGateway, prompt: "192.168.0.1",

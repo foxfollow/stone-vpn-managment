@@ -366,7 +366,7 @@ final class AppModel {
             busy[p.key] = nil
             if p.backend == .openvpn, p.needsAuth {
                 r.needsAuth = true
-                r.username = s.lastUsername.flatMap { $0.isEmpty ? nil : $0 } ?? config.defaultUsername
+                r.username = s.lastUsername.flatMap { $0.isEmpty ? nil : $0 } ?? config.configuredUsername
             }
         case .defguard:
             if p.mfa != nil {
@@ -382,8 +382,7 @@ final class AppModel {
             // Обраний профіль; якщо в нього немає порту, а Cisco пам'ятає той самий хост з портом — пропонуємо з портом.
             r.host = p.name
             if !p.name.contains(":"), let s = cp.suggestedHost, s.hasPrefix(p.name + ":") { r.host = s }
-            r.username = prefs.ciscoLastUser.isEmpty ? cp.user : prefs.ciscoLastUser
-            r.group = prefs.ciscoLastGroup.isEmpty ? cp.group : prefs.ciscoLastGroup
+            (r.username, r.group) = ciscoLogin(for: r.host, cp)
         }
         if r.needsAuth || r.askGateway || r.mfa || p.backend == .cisco {
             connect = r
@@ -460,8 +459,9 @@ final class AppModel {
                         }
                     }
                 }
-                prefs.ciscoLastUser = r.username
-                prefs.ciscoLastGroup = r.group
+                let k = Prefs.ciscoKey(host)
+                if prefs.rememberUser, !r.username.isEmpty { prefs.ciscoUsers[k] = r.username }
+                prefs.ciscoGroups[k] = r.group
                 if !(snap.profiles[.cisco] ?? []).contains(where: { $0.name == host }), !prefs.ciscoHosts.contains(host) {
                     prefs.ciscoHosts.append(host)
                 }
@@ -524,12 +524,19 @@ final class AppModel {
         } else if !prefs.ciscoHosts.contains(host) {
             prefs.ciscoHosts.append(host)
         }
+        // Логін/група їдуть за хостом (копія профілю Cisco — копіюються, власний — переносяться).
+        let ok = Prefs.ciscoKey(old), nk = Prefs.ciscoKey(host), moved = !prefs.ciscoHosts.contains(old)
+        if prefs.ciscoUsers[nk] == nil, let u = prefs.ciscoUsers[ok] { prefs.ciscoUsers[nk] = u }
+        if prefs.ciscoGroups[nk] == nil, let g = prefs.ciscoGroups[ok] { prefs.ciscoGroups[nk] = g }
+        if moved, ok != nk { prefs.ciscoUsers[ok] = nil; prefs.ciscoGroups[ok] = nil }
         profilesSelection = "cisco:\(host)"
     }
 
     func removeCiscoHost(_ h: String) {
         prefs.ciscoHosts.removeAll { $0 == h }
         prefs.favorites.removeAll { $0 == "cisco:\(h)" }
+        prefs.ciscoUsers[Prefs.ciscoKey(h)] = nil
+        prefs.ciscoGroups[Prefs.ciscoKey(h)] = nil
         profilesSelection = nil
     }
 
@@ -561,6 +568,24 @@ final class AppModel {
             guard connect?.host == host else { return }
             connect?.groupsNote = error.localizedDescription
         }
+    }
+
+    /// Збережений логін/група цього хоста; інакше — дефолти самого Cisco, але лише якщо вони про той самий хост.
+    func ciscoLogin(for host: String, _ cp: CiscoPrefs = .load()) -> (user: String, group: String) {
+        let k = Prefs.ciscoKey(host)
+        func bare(_ h: String) -> String { String(Prefs.ciscoKey(h).split(separator: ":").first ?? "") }
+        let same = !cp.hostName.isEmpty && bare(cp.hostName) == bare(host)
+        return (prefs.ciscoUsers[k] ?? (same ? cp.user : ""), prefs.ciscoGroups[k] ?? (same ? cp.group : ""))
+    }
+
+    /// Хост у вікні підключення змінено — підставити логін і групу саме цього хоста.
+    func selectCiscoHost(_ host: String) async {
+        guard connect != nil else { return }
+        connect?.host = host
+        let l = ciscoLogin(for: host)
+        connect?.username = l.user
+        connect?.group = l.group
+        await probeCiscoGroups()
     }
 
     func ciscoInTerminal(_ host: String) {

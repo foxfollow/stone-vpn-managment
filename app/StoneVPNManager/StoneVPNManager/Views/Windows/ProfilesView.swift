@@ -212,6 +212,15 @@ struct ProfileDetail: View {
                             .disabled(hostEdit.isEmpty || hostEdit == p.name)
                         if custom { Button("Видалити", role: .destructive) { model.removeCiscoHost(p.name) } }
                     }
+                    if let u = model.prefs.ciscoUsers[Prefs.ciscoKey(p.name)], !u.isEmpty {
+                        LabeledContent("Останній логін") {
+                            HStack {
+                                Mono(u, size: 12)
+                                Button("Забути") { model.prefs.ciscoUsers.removeValue(forKey: Prefs.ciscoKey(p.name)) }
+                                    .buttonStyle(.borderless)
+                            }
+                        }
+                    }
                 }
                 if p.backend == .openvpn || p.backend == .wireguard {
                     Picker("Route-fix", selection: routeFixBinding(p)) {
