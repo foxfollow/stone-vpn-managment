@@ -158,6 +158,13 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   public API for one without the other. So the policy flips to `.regular` while a titled non-panel
   window (Profiles/Settings/Connect) is visible and back to `.accessory` after the last one closes
   (checked on the next runloop turn — `willClose` fires while the window is still visible).
+- **Profile files are managed in-app** (`OvpnFiles` in StoneVPNCore): OpenVPN import (new ms-id),
+  replace *this* file (whole .ovpn or one inline `<cert>/<key>/<ca>/tls-*` block, old copy →
+  `<id>.ovpn.bak`), delete → Trash; the profiles dir is user-owned, no helper. WireGuard delete goes
+  through `PrivOp.wgDelete` (helper protocol v4; refused while `/var/run/wireguard/<name>.name`
+  exists). Never match the target by `remote`: several profiles share one server (different
+  logins/certs) — that is how the old `vpn-cert.sh` replaced the wrong file. `vpn-cert.sh` menus
+  print to stderr because `pick_profile` is called inside `$(...)`.
 - Per-profile settings (alias, favourite, route-fix policy ask/LAN/fixed/off) live in UserDefaults;
   route-fix defaults: OpenVPN = ask, WireGuard = off.
 - Logins are remembered per VPN (pref `rememberUser`): OpenVPN in `ProfileSettings.lastUsername`,

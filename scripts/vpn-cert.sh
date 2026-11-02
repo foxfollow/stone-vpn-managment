@@ -5,7 +5,12 @@
 #   ./vpn-cert.sh /path/to/new.ovpn      — додати/замінити профіль
 #   ./vpn-cert.sh --delete               — видалити профіль (меню)
 
-PROFILES="$HOME/Library/Application Support/OpenVPN Connect/profiles"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR/.."
+# shellcheck disable=SC1091
+[ -f "$REPO_ROOT/config.env" ] && . "$REPO_ROOT/config.env"
+# Та сама тека, що й у vpn-up.sh та застосунку.
+PROFILES="${OVPN_PROFILES_DIR:-$HOME/Library/Application Support/OpenVPN Connect/profiles}"
 
 # ─── Допоміжні функції ──────────────────────────────────────────────────────
 
@@ -24,23 +29,58 @@ clean_path() {
     printf '%s' "$p"
 }
 
+# Людські назви з config.json OpenVPN Connect (файли названі ms-мітками): рядки "id<TAB>назва".
+# Та сама логіка, що Parse.ovpnConnectTitles у застосунку.
+profile_titles() {
+    python3 - "$PROFILES/../config.json" 2>/dev/null <<'PY'
+import json, re, sys
+def obj(v):
+    if isinstance(v, dict): return v
+    try: return json.loads(v)
+    except Exception: return None
+try:
+    root = obj(json.load(open(sys.argv[1])))
+    profiles = obj(obj(obj(root["persist:root"])["status"])["profiles"])
+except Exception:
+    sys.exit()
+for pid, p in profiles.items():
+    if not isinstance(p, dict): continue
+    raw = next((p[k] for k in ("profileDisplayName", "name", "profileName") if isinstance(p.get(k), str) and p[k]), None)
+    if not raw: continue
+    m = re.search(r"\[(.+)\]\s*$", raw)
+    t = re.sub(r"\.ovpn$", "", m.group(1) if m else raw)
+    print(f"{pid}\t{t}")
+PY
+}
+
+TITLES=""
+title_of() {
+    [ -n "$TITLES" ] || TITLES=$(profile_titles; echo .)
+    printf '%s\n' "$TITLES" | awk -F'\t' -v id="$(basename "$1" .ovpn)" '$1 == id { print $2; exit }'
+}
+
+# Меню — у stderr: pick_profile викликають через $(...), stdout має містити лише шлях.
+# (Раніше меню потрапляло в змінну разом зі шляхом → видалення/заміна ламалися.)
 list_profiles() {
+    {
     echo ""
     echo "Існуючі профілі:"
     local i=1
     for f in "$PROFILES"/*.ovpn; do
         [ -f "$f" ] || continue
         local remote
-        remote=$(grep "^remote " "$f" | awk '{print $2":"$3}')
-        printf "  %d) %-45s %s\n" "$i" "$(basename "$f")" "$remote"
+        remote=$(grep -m1 "^remote " "$f" | awk '{print $2":"$3}')
+        printf "  %2d) %-20s %-32s %s\n" "$i" "$(basename "$f")" "$(title_of "$f")" "$remote"
         i=$((i + 1))
     done
     echo ""
+    } >&2
 }
 
 pick_profile() {
     list_profiles
     read -rp "Номер профілю: " NUM
+    [[ "$NUM" =~ ^[0-9]+$ ]] || return 1
     local i=1
     for f in "$PROFILES"/*.ovpn; do
         [ -f "$f" ] || continue
@@ -50,7 +90,6 @@ pick_profile() {
         fi
         i=$((i + 1))
     done
-    echo ""
     return 1
 }
 
@@ -74,28 +113,32 @@ import_profile() {
     local new_remote
     new_remote=$(grep "^remote " "$src" | awk '{print $2":"$3}')
 
-    local existing=""
+    # Один remote часто мають кілька профілів (різні логіни/сертифікати на тому ж сервері).
+    # Раніше мовчки замінювався *перший* з них — не той, що мав на увазі користувач.
+    local matches=() f r
     for f in "$PROFILES"/*.ovpn; do
         [ -f "$f" ] || continue
-        local r
-        r=$(grep "^remote " "$f" | awk '{print $2":"$3}')
-        if [ "$r" = "$new_remote" ]; then
-            existing="$f"
-            break
-        fi
+        r=$(grep -m1 "^remote " "$f" | awk '{print $2":"$3}')
+        [ -n "$new_remote" ] && [ "$r" = "$new_remote" ] && matches+=("$f")
     done
 
-    if [ -n "$existing" ]; then
-        echo "Вже є профіль з remote $new_remote:"
-        echo "  $(basename "$existing")"
-        read -rp "Замінити існуючий? [y/N]: " CONFIRM
-        if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+    if [ ${#matches[@]} -gt 0 ]; then
+        echo "Вже є профілі з remote $new_remote:"
+        local i=1 m
+        for m in "${matches[@]}"; do
+            printf "  %d) %-20s %s\n" "$i" "$(basename "$m")" "$(title_of "$m")"
+            i=$((i + 1))
+        done
+        echo "  n) додати як новий окремий профіль"
+        read -rp "Замінити який? [номер / n, Enter = скасувати]: " CHOICE
+        if [[ "$CHOICE" =~ ^[0-9]+$ ]] && [ "$CHOICE" -ge 1 ] && [ "$CHOICE" -le ${#matches[@]} ]; then
+            local existing="${matches[$((CHOICE - 1))]}"
+            cp "$existing" "${existing}.bak"
             cp "$src" "$existing"
-            echo "Замінено: $(basename "$existing")"
+            echo "Замінено: $(basename "$existing") $(title_of "$existing") (стара версія: $(basename "$existing").bak)"
             return
         fi
-        read -rp "Додати як новий окремий профіль? [y/N]: " ADD_NEW
-        [[ "$ADD_NEW" =~ ^[Yy]$ ]] || { echo "Скасовано."; exit 0; }
+        [[ "$CHOICE" =~ ^[Nn]$ ]] || { echo "Скасовано."; exit 0; }
     fi
 
     # Генеруємо числове ім'я як у OpenVPN Connect
@@ -114,16 +157,16 @@ delete_profile() {
     local target
     target=$(pick_profile)
 
-    if [ -z "$target" ]; then
+    if [ -z "$target" ] || [ ! -f "$target" ]; then
         echo "Невірний вибір."
         exit 1
     fi
 
     local remote
-    remote=$(grep "^remote " "$target" | awk '{print $2":"$3}')
+    remote=$(grep -m1 "^remote " "$target" | awk '{print $2":"$3}')
     echo ""
     echo "Видалити профіль?"
-    echo "  Файл:   $(basename "$target")"
+    echo "  Файл:   $(basename "$target") $(title_of "$target")"
     echo "  Remote: $remote"
     read -rp "[y/N]: " CONFIRM
     [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Скасовано."; exit 0; }
@@ -139,12 +182,13 @@ replace_cert() {
     local target
     target=$(pick_profile)
 
-    if [ -z "$target" ]; then
+    if [ -z "$target" ] || [ ! -f "$target" ]; then
         echo "Невірний вибір."
         exit 1
     fi
 
     echo ""
+    echo "Профіль: $(basename "$target") $(title_of "$target")"
     echo "Що замінити?"
     echo "  1) <cert> (клієнтський сертифікат)"
     echo "  2) <key>  (приватний ключ)"
@@ -158,8 +202,13 @@ replace_cert() {
         2) TAG="key" ;;
         3) TAG="ca" ;;
         4)
+            # Саме цей файл, а не «перший з таким remote» (import_profile).
             read -rp "Шлях до нового .ovpn: " NEW_PATH
-            import_profile "$NEW_PATH"
+            NEW_PATH=$(clean_path "$NEW_PATH")
+            [ -f "$NEW_PATH" ] || { echo "Файл не знайдено: $NEW_PATH"; exit 1; }
+            cp "$target" "${target}.bak"
+            cp "$NEW_PATH" "$target"
+            echo "Замінено: $(basename "$target") (стара версія: $(basename "$target").bak)"
             return
             ;;
         *) echo "Невірний вибір."; exit 1 ;;
@@ -172,32 +221,28 @@ replace_cert() {
         exit 1
     fi
 
-    local PEM_CONTENT
-    PEM_CONTENT=$(cat "$PEM_PATH")
 
-    # Замінюємо блок <TAG>...</TAG> у профілі
+    # Замінюємо блок <TAG>...</TAG> у профілі. PEM передається шляхом, не вставкою в
+    # python-код (лапки/бекслеші в ньому ламали скрипт), і без re.sub (той трактує "\" у заміні).
     local BACKUP="${target}.bak"
     cp "$target" "$BACKUP"
 
-    python3 - "$target" "$TAG" <<EOF
-import sys, re
+    python3 - "$target" "$TAG" "$PEM_PATH" <<'PY' || { mv "$BACKUP" "$target"; exit 1; }
+import sys
 
-path = sys.argv[1]
-tag  = sys.argv[2]
-new_content = """$PEM_CONTENT"""
+path, tag, pem_path = sys.argv[1:4]
+new_content = open(pem_path).read().strip()
+data = open(path).read()
 
-with open(path, 'r') as f:
-    data = f.read()
-
-pattern = rf'<{tag}>.*?</{tag}>'
-replacement = f'<{tag}>\n{new_content.strip()}\n</{tag}>'
-updated = re.sub(pattern, replacement, data, flags=re.DOTALL)
-
-with open(path, 'w') as f:
-    f.write(updated)
-
+o, c = f"<{tag}>", f"</{tag}>"
+i = data.find(o)
+j = data.find(c, i + len(o)) if i >= 0 else -1
+if i < 0 or j < 0:
+    print(f"У профілі немає вбудованого <{tag}> — заміни профіль цілком.")
+    sys.exit(1)
+open(path, "w").write(data[:i + len(o)] + "\n" + new_content + "\n" + data[j:])
 print(f"Блок <{tag}> оновлено.")
-EOF
+PY
 
     echo "Резервна копія: $(basename "$BACKUP")"
 }

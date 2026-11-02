@@ -540,6 +540,60 @@ final class AppModel {
         profilesSelection = nil
     }
 
+    // MARK: файли профілів (OpenVPN — тека користувача; WireGuard — через helper)
+
+    /// Додати .ovpn як новий профіль (ім'я — ms-мітка, як у OpenVPN Connect).
+    func ovpnImport(_ url: URL) async {
+        do {
+            let id = try OvpnFiles.importProfile(from: url, into: config.ovpnProfilesDir)
+            await refresh(forceSlow: true)
+            profilesSelection = "openvpn:\(id)"
+            toast = "Додано профіль \(url.lastPathComponent)"
+        } catch { toast = error.localizedDescription }
+    }
+
+    /// Замінити саме цей профіль (весь .ovpn або один блок) — ID, alias і налаштування лишаються.
+    func ovpnReplace(_ p: Profile, with url: URL, block tag: String? = nil) async {
+        guard let path = p.path else { toast = "Файл профілю невідомий"; return }
+        do {
+            if let tag { try OvpnFiles.replaceBlock(at: path, tag: tag, pemFile: url) }
+            else { try OvpnFiles.replaceProfile(at: path, with: url) }
+            errors[p.key] = nil
+            let active = items(for: .openvpn).first { $0.id == p.key }?.status.isActive == true
+            toast = (tag.map { "<\($0)> оновлено" } ?? "Профіль замінено") + (active ? " — перепідключись, щоб застосувати" : "")
+                + " (стара версія: \((path as NSString).lastPathComponent).bak)"
+        } catch { toast = error.localizedDescription }
+        await refresh(forceSlow: true)
+    }
+
+    /// Видалити профіль: OpenVPN — у Кошик; WireGuard — через helper (конфіги root-only).
+    func deleteProfile(_ p: Profile) async {
+        if items(for: p.backend).first(where: { $0.id == p.key })?.status.isActive == true {
+            toast = "Спершу відключи \(prefs.display(p))"; return
+        }
+        do {
+            switch p.backend {
+            case .openvpn:
+                guard let path = p.path else { throw ActionError("файл профілю невідомий") }
+                try OvpnFiles.delete(at: path)
+            case .wireguard:
+                var prof = p
+                if prof.path == nil, let d = snap.wgDir { prof.path = "\(d)/\(p.name).conf" }
+                try await actions.wgDelete(prof)
+            default:
+                return
+            }
+            prefs.aliases.removeValue(forKey: p.key)
+            prefs.favorites.removeAll { $0 == p.key }
+            prefs.profileSettings.removeValue(forKey: p.key)
+            if prefs.lastProfile[p.backend.rawValue] == p.key { prefs.lastProfile.removeValue(forKey: p.backend.rawValue) }
+            errors[p.key] = nil
+            if profilesSelection == p.key { profilesSelection = nil }
+            toast = p.backend == .openvpn ? "Профіль переміщено в Кошик" : "Конфіг видалено"
+        } catch { toast = error.localizedDescription }
+        await refresh(forceSlow: true)
+    }
+
     /// Підтягнути групи з сервера для поточного хоста у вікні підключення.
     func probeCiscoGroups(closeGUI: Bool = false) async {
         guard let host = connect?.host.trimmingCharacters(in: .whitespaces), !host.isEmpty else { return }

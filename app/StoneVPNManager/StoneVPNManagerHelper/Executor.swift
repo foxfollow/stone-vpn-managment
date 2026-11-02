@@ -42,6 +42,12 @@ enum Executor {
                 return .fail("wg-quick не знайдено")
             }
             return run(wq, ["down", p])
+        case .wgDelete(let path):
+            guard let p = validWGConf(path) else { return .fail("недопустимий шлях конфігу: \(path)") }
+            let name = String((p as NSString).lastPathComponent.dropLast(5))
+            if FileManager.default.fileExists(atPath: "\(wgRun)/\(name).name") { return .fail("\(name) підключений — спершу відключи") }
+            do { try FileManager.default.removeItem(atPath: p) } catch { return .fail("не видалено: \(error.localizedDescription)") }
+            return PrivResult(ok: true, output: "видалено \(p)")
         case .wgRuntime:
             let fm = FileManager.default
             let names = ((try? fm.contentsOfDirectory(atPath: wgRun)) ?? []).filter { $0.hasSuffix(".name") }.sorted()
@@ -74,11 +80,15 @@ enum Executor {
         case .ovpnStart(let profilePath, let user, let pass, let addDev):
             return ovpnStart(profilePath, user: user, pass: pass, addDev: addDev, waitAuthCleanup: waitAuthCleanup)
         case .ovpnStop(let pid):
-            guard pid > 1, processComm(pid).hasSuffix("openvpn") else { return .fail("PID \(pid) — не openvpn") }
-            kill(pid, SIGTERM)
-            for _ in 0..<10 where processAlive(pid) { sleep(1) }
-            // ps -p, не kill -0: для root тут різниці нема, але тримаємо одну ідіому.
-            if processAlive(pid) { kill(pid, SIGKILL) }
+            guard pid > 1 else { return .fail("PID \(pid) — не openvpn") }
+            // Процес уже зник (впав / зупинений з CLI) — лишається тільки прибрати pid-файл.
+            if processAlive(pid) {
+                guard processComm(pid).hasSuffix("openvpn") else { return .fail("PID \(pid) — не openvpn") }
+                kill(pid, SIGTERM)
+                for _ in 0..<10 where processAlive(pid) { sleep(1) }
+                // ps -p, не kill -0: для root тут різниці нема, але тримаємо одну ідіому.
+                if processAlive(pid) { kill(pid, SIGKILL) }
+            }
             for f in (try? FileManager.default.contentsOfDirectory(atPath: "/tmp")) ?? [] where f.hasPrefix("openvpn") && f.hasSuffix(".pid") {
                 let pf = "/tmp/\(f)"
                 if (try? String(contentsOfFile: pf, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) == String(pid) {

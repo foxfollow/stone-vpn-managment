@@ -168,7 +168,14 @@ public final class Actions: @unchecked Sendable {
             .flatMap { Int32($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
     }
 
+    public func wgDelete(_ p: Profile) async throws {
+        guard let path = p.path else { throw ActionError("не знайдено конфіг \(p.name).conf") }
+        _ = try await priv(.wgDelete(confPath: path))
+    }
+
+    /// Процес уже завершився (сам упав / зупинили з CLI) — це не помилка відключення.
     public func ovpnDown(pid: Int32) async throws {
+        guard await Shell.run("/bin/ps", ["-p", String(pid)]).ok else { return }
         _ = try await priv(.ovpnStop(pid: pid))
     }
 

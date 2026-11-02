@@ -1,5 +1,6 @@
 import SwiftUI
 import StoneVPNCore
+import UniformTypeIdentifiers
 
 /// Вікно «Профілі»: провайдери → профілі → деталі + налаштування профілю (alias, обране, route-fix).
 struct ProfilesView: View {
@@ -7,6 +8,7 @@ struct ProfilesView: View {
     @State private var search = ""
     @State private var addingHost = false
     @State private var newHost = ""
+    @State private var pendingDelete: Profile?
 
     var body: some View {
         NavigationSplitView {
@@ -58,6 +60,11 @@ struct ProfilesView: View {
                     .contextMenu {
                         Button(it.status.isActive ? "Відключити" : "Підключити") { model.toggle(it) }
                         Button(model.prefs.isFavorite(it.id) ? "Прибрати з обраних" : "Додати в обрані") { model.prefs.toggleFavorite(it.id) }
+                        if it.profile.backend == .openvpn || it.profile.backend == .wireguard {
+                            Divider()
+                            Button("Видалити…", role: .destructive) { pendingDelete = it.profile }
+                                .disabled(it.status.isActive)
+                        }
                     }
                 }
             }
@@ -68,7 +75,7 @@ struct ProfilesView: View {
             .navigationSplitViewColumnWidth(min: 240, ideal: 280)
         } detail: {
             if let key = model.profilesSelection, let it = model.items(for: model.profilesBackend).first(where: { $0.id == key }) {
-                ProfileDetail(model: model, item: it).id(it.id)
+                ProfileDetail(model: model, item: it, onDelete: { pendingDelete = it.profile }).id(it.id)
             } else {
                 ContentUnavailableView("Оберіть профіль", systemImage: "sidebar.left")
             }
@@ -76,6 +83,12 @@ struct ProfilesView: View {
         .toolbar {
             ToolbarItem {
                 Menu {
+                    if model.profilesBackend == .openvpn {
+                        Button("Додати профіль (.ovpn)…") {
+                            if let u = pickFile(ovpn: true, title: "Новий профіль OpenVPN") { Task { await model.ovpnImport(u) } }
+                        }
+                        Divider()
+                    }
                     ForEach(manageCommands, id: \.0) { c in Button(c.0) { runInTerminal(c.1) } }
                     if model.profilesBackend == .cisco {
                         Button("Додати хост…") { newHost = CiscoPrefs.load().suggestedHost ?? ""; addingHost = true }
@@ -91,6 +104,26 @@ struct ProfilesView: View {
             }
         }
         .frame(minWidth: 860, minHeight: 520)
+        .overlay(alignment: .bottom) {
+            if let t = model.toast {
+                HStack(spacing: 8) {
+                    Text(t).font(.system(size: 12)).lineLimit(3)
+                    Button { model.toast = nil } label: { Image(systemName: "xmark").font(.system(size: 10)) }.buttonStyle(.borderless)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 9)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.bottom, 14)
+            }
+        }
+        .confirmationDialog(deleteTitle, isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                            titleVisibility: .visible, presenting: pendingDelete) { p in
+            Button("Видалити", role: .destructive) { Task { await model.deleteProfile(p) } }
+            Button("Скасувати", role: .cancel) {}
+        } message: { p in
+            Text(p.backend == .openvpn
+                 ? "Файл \(p.path.map { ($0 as NSString).lastPathComponent } ?? p.name) піде в Кошик (його можна відновити). Псевдонім і налаштування профілю буде забуто."
+                 : "Конфіг \(p.path ?? p.name) буде видалено назавжди (root — попросить пароль, якщо helper не встановлено), разом із приватним ключем.")
+        }
         .alert("Новий Cisco-хост", isPresented: $addingHost) {
             TextField("host:port", text: $newHost)
             Button("Додати") { model.addCiscoHost(newHost) }
@@ -107,11 +140,15 @@ struct ProfilesView: View {
         }
     }
 
+    private var deleteTitle: String {
+        pendingDelete.map { "Видалити «\(model.prefs.display($0))»?" } ?? ""
+    }
+
     /// Керування конфігами/сертифікатами — інтерактивні CLI-скрипти репо в Terminal.
     private var manageCommands: [(String, String)] {
         switch model.profilesBackend {
         case .wireguard: [("WireGuard: згенерувати / імпорт / видалити… (Terminal)", "cert wg")]
-        case .openvpn: [("OpenVPN: додати / замінити сертифікат / видалити… (Terminal)", "cert openvpn")]
+        case .openvpn: [("OpenVPN: меню скрипта (Terminal)", "cert openvpn")]
         default: []
         }
     }
@@ -126,9 +163,22 @@ struct ProfilesView: View {
     }
 }
 
+/// Діалог вибору файлу (.ovpn або будь-який — для PEM).
+@MainActor func pickFile(ovpn: Bool, title: String) -> URL? {
+    let panel = NSOpenPanel()
+    panel.title = title
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = false
+    if ovpn { panel.allowedContentTypes = [UTType(filenameExtension: "ovpn") ?? .data, .text] }
+    NSApp.activate()
+    return panel.runModal() == .OK ? panel.url : nil
+}
+
 struct ProfileDetail: View {
     @Bindable var model: AppModel
     var item: ProfileItem
+    var onDelete: () -> Void = {}
+    @State private var blocks: [String] = []
     @State private var info: [(String, String)] = []
     @State private var alias = ""
     @State private var fixedGW = ""
@@ -177,13 +227,40 @@ struct ProfileDetail: View {
                     if p.backend == .openvpn, FileManager.default.fileExists(atPath: "/tmp/openvpn-\(p.name).log") {
                         Button("Лог") { NSWorkspace.shared.open(URL(fileURLWithPath: "/tmp/openvpn-\(p.name).log")) }
                     }
+                    if p.backend == .openvpn, p.path != nil {
+                        Menu("Замінити") {
+                            Button("Весь профіль (.ovpn)…") {
+                                if let u = pickFile(ovpn: true, title: "Новий .ovpn для «\(model.prefs.display(p))»") {
+                                    Task { await model.ovpnReplace(p, with: u); loadBlocks() }
+                                }
+                            }
+                            if !blocks.isEmpty {
+                                Divider()
+                                ForEach(blocks, id: \.self) { tag in
+                                    Button(Self.blockTitle(tag)) {
+                                        if let u = pickFile(ovpn: false, title: "PEM для <\(tag)> у «\(model.prefs.display(p))»") {
+                                            Task { await model.ovpnReplace(p, with: u, block: tag) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .fixedSize()
+                        .help("Замінюється саме цей файл; стара версія лишається поруч як .ovpn.bak")
+                    }
+                    if p.backend == .openvpn || p.backend == .wireguard {
+                        Spacer()
+                        Button("Видалити…", role: .destructive, action: onDelete)
+                            .disabled(item.status.isActive)
+                            .help(item.status.isActive ? "Спершу відключи" : "Видалити профіль")
+                    }
                 }
 
                 settings(p)
             }
             .padding(24)
         }
-        .task { await loadInfo() }
+        .task { await loadInfo(); loadBlocks() }
         .onAppear {
             alias = model.prefs.aliases[p.key] ?? ""
             hostEdit = p.name
@@ -333,6 +410,22 @@ struct ProfileDetail: View {
         }
         if let path = p.path { r.append(("Файл", path)) }
         return r
+    }
+
+    static func blockTitle(_ tag: String) -> String {
+        switch tag {
+        case "cert": "Сертифікат <cert>…"
+        case "key": "Приватний ключ <key>…"
+        case "ca": "CA <ca>…"
+        default: "<\(tag)>…"
+        }
+    }
+
+    /// Які вбудовані блоки є у профілі — лише їх пропонуємо замінити.
+    private func loadBlocks() {
+        guard item.profile.backend == .openvpn, let path = item.profile.path,
+              let text = try? String(contentsOfFile: path, encoding: .utf8) else { blocks = []; return }
+        blocks = OvpnFiles.blockTags.filter { text.contains("<\($0)>") }
     }
 
     private func loadInfo() async {
