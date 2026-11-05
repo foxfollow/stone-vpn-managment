@@ -79,6 +79,7 @@ public enum CiscoDriver {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/script")
         p.arguments = ["-q", "/dev/null", cli, "connect", c.host]
+        reapOrphans(cli: cli)
         let inp = Pipe(), out = Pipe()
         p.standardInput = inp
         p.standardOutput = out
@@ -103,7 +104,7 @@ public enum CiscoDriver {
         defer {
             reader.readabilityHandler = nil
             try? inp.fileHandleForWriting.close()
-            if p.isRunning { p.terminate() }
+            stop(p)
         }
         func transcriptTail() -> String {
             lock.lock(); defer { lock.unlock() }
@@ -139,7 +140,7 @@ public enum CiscoDriver {
             }
             if failure(chunk) != nil {
                 Thread.sleep(forTimeInterval: 0.3)       // дочитати причину, якщо сервер її надсилає
-                throw ActionError(transcriptTail())
+                throw ActionError(explain(transcriptTail(), chunk))
             }
 
             let t = tail.trimmingCharacters(in: .whitespaces).lowercased()
@@ -196,7 +197,7 @@ public enum CiscoDriver {
         lock.lock(); let text = all; lock.unlock()
         if text.lowercased().contains("state: connected") { onEvent(.step("Connected")); return }
         let tailText = transcriptTail()
-        if failure(text) != nil { throw ActionError(tailText) }
+        if failure(text) != nil { throw ActionError(explain(tailText, text)) }
         throw ActionError((p.isRunning ? "Cisco не підключився вчасно" : "vpn завершився без підключення") + (tailText.isEmpty ? "" : ":\n" + tailText))
     }
 
@@ -221,6 +222,7 @@ public enum CiscoDriver {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: cli)
         p.arguments = ["-s"]
+        reapOrphans(cli: cli)
         let inp = Pipe(), out = Pipe()
         p.standardInput = inp
         p.standardOutput = out
@@ -237,7 +239,7 @@ public enum CiscoDriver {
         defer {
             out.fileHandleForReading.readabilityHandler = nil
             try? inp.fileHandleForWriting.close()
-            if p.isRunning { p.terminate() }
+            stop(p)
         }
         try? inp.fileHandleForWriting.write(contentsOf: Data("connect \(host)\n".utf8))
         let deadline = Date().addingTimeInterval(timeout)
@@ -245,7 +247,7 @@ public enum CiscoDriver {
             Thread.sleep(forTimeInterval: 0.15)
             lock.lock(); let text = all; lock.unlock()
             if let r = parseGroupPrompt(text) { return r }
-            if let err = failure(text) { throw ActionError(err) }
+            if let err = failure(text) { throw ActionError(explain(err, text)) }
             if !p.isRunning { break }
         }
         lock.lock(); let text = all; lock.unlock()
@@ -272,11 +274,60 @@ public enum CiscoDriver {
         return nil
     }
 
+    /// Підказка до «Connect capability is unavailable»: агент віддає право підключення лише
+    /// одному клієнту — GUI або іншому `vpn` (наприклад, у Terminal).
+    public static let capabilityHint = "Право підключення тримає інший клієнт Cisco: GUI Cisco Secure Client або `vpn` у Terminal. Закрий його і спробуй ще раз."
+
+    // MARK: процеси vpn
+
+    /// Зупинити дочірній процес напевно: `vpn` посеред connect ігнорує SIGTERM, а `script`
+    /// після SIGTERM лишає свого `vpn` сиротою. Тож: діти → SIGKILL, сам процес → TERM, потім KILL.
+    static func stop(_ p: Process) {
+        guard p.isRunning else { return }
+        let pid = p.processIdentifier
+        for c in childPids(pid) { kill(c, SIGKILL) }
+        p.terminate()
+        for _ in 0..<15 where p.isRunning { Thread.sleep(forTimeInterval: 0.1) }
+        if p.isRunning { kill(pid, SIGKILL) }
+    }
+
+    static func childPids(_ pid: Int32) -> [Int32] {
+        Shell.runSync("/usr/bin/pgrep", ["-P", String(pid)]).out.split(separator: "\n").compactMap { Int32($0.trimmingCharacters(in: .whitespaces)) }
+    }
+
+    /// Наші `vpn` (або `script … vpn`), що пережили батька: ppid 1, той самий uid. Лишаються, коли
+    /// застосунок закрили посеред перевірки груп/підключення. Такий процес тримає «connect capability»
+    /// агента, і кожен наступний connect падає з «Another Cisco Secure Client application acquired it».
+    /// `vpn` у Terminal має батьком shell, тому не зачіпається.
+    static func parseOrphans(_ ps: String, cli: String, uid: uid_t) -> [Int32] {
+        ps.split(separator: "\n").compactMap { line in
+            let f = line.split(separator: " ", maxSplits: 3, omittingEmptySubsequences: true)
+            guard f.count == 4, let pid = Int32(f[0]), f[1] == "1", f[2] == Substring(String(uid)) else { return nil }
+            let cmd = String(f[3])
+            let ours = cmd == cli || cmd.hasPrefix(cli + " ") || cmd.hasPrefix("/usr/bin/script -q /dev/null \(cli) ")
+            return ours ? pid : nil
+        }
+    }
+
+    @discardableResult
+    public static func reapOrphans(cli: String) -> [Int32] {
+        let ps = Shell.runSync("/bin/ps", ["-axww", "-o", "pid=,ppid=,uid=,command="]).out
+        let pids = parseOrphans(ps, cli: cli, uid: getuid())
+        for pid in pids { kill(pid, SIGKILL) }
+        if !pids.isEmpty { Thread.sleep(forTimeInterval: 0.5) }   // агент має помітити, що клієнт зник
+        return pids
+    }
+
+    static func explain(_ msg: String, _ output: String) -> String {
+        output.lowercased().contains("connect capability is unavailable") ? msg + "\n\n" + capabilityHint : msg
+    }
+
     static func failure(_ s: String) -> String? {
         for line in s.split(separator: "\n") {
             let l = line.lowercased()
             if l.contains("login failed") || l.contains("authentication failed") || l.contains("unable to contact")
-                || l.contains("connection attempt has failed") || l.contains("is not a valid") || l.contains("no address") {
+                || l.contains("connection attempt has failed") || l.contains("is not a valid") || l.contains("no address")
+                || l.contains("connect capability is unavailable") {
                 return line.replacingOccurrences(of: ">>", with: "").trimmingCharacters(in: .whitespaces)
             }
         }

@@ -117,3 +117,25 @@ final class CiscoGroupProbeTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: marker))
     }
 }
+
+final class CiscoOrphanTests: XCTestCase {
+    let cli = "/opt/cisco/secureclient/bin/vpn"
+
+    func testOnlyOwnOrphans() {
+        let ps = """
+        78884     1   501 /opt/cisco/secureclient/bin/vpn -s
+        78890     1   501 /usr/bin/script -q /dev/null /opt/cisco/secureclient/bin/vpn connect h:8448
+        78891   700   501 /opt/cisco/secureclient/bin/vpn connect h
+          857     1     0 /opt/cisco/secureclient/bin/vpnagentd
+          900     1     0 /opt/cisco/secureclient/bin/vpn -s
+          901     1   501 /opt/cisco/secureclient/bin/vpnui
+        """
+        XCTAssertEqual(CiscoDriver.parseOrphans(ps, cli: cli, uid: 501), [78884, 78890])
+    }
+
+    func testCapabilityIsFailureWithHint() {
+        let out = ">> error: Connect capability is unavailable. Another Cisco Secure Client application acquired it."
+        XCTAssertNotNil(CiscoDriver.failure(out))
+        XCTAssertTrue(CiscoDriver.explain("x", out).contains("GUI Cisco"))
+    }
+}
