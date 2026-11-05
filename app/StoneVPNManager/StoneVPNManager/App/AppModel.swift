@@ -345,6 +345,8 @@ final class AppModel {
         errors[p.key] = nil
         busy[p.key] = "перевірка DNS…"
         await prepareDNS(for: p)
+        busy[p.key] = "перевірка маршруту…"
+        await purgeDeadRoutes(await endpointHosts(p))
         await checkEndpointResolves(p)
         busy[p.key] = nil
         var r = ConnectRequest(profile: p)
@@ -391,6 +393,26 @@ final class AppModel {
         } else {
             _ = await perform(r)
         }
+    }
+
+    /// Хости, до яких піде підключення (для перевірки мертвих host-маршрутів).
+    func endpointHosts(_ p: Profile) async -> [String] {
+        switch p.backend {
+        case .openvpn: p.remotes
+        case .wireguard: await actions.wgEndpointHost(p).map { [$0] } ?? []
+        case .cisco: [p.name]
+        case .defguard: p.endpoint.map { [$0] } ?? []
+        }
+    }
+
+    /// Мертвий route-fix з попередньої мережі (шлюз не on-link) — прибрати перед підключенням.
+    /// Дія користувача, тож запит пароля без helper допустимий.
+    func purgeDeadRoutes(_ hosts: [String]) async {
+        guard !hosts.isEmpty else { return }
+        do {
+            let log = try await actions.purgeDeadHostRoutes(hosts)
+            if !log.isEmpty { toast = log.joined(separator: "\n") }
+        } catch { toast = "Не вдалося прибрати мертвий маршрут: \(error.localizedDescription)" }
     }
 
     /// Власне підключення (з панелі або напряму). true = успіх.
@@ -450,6 +472,7 @@ final class AppModel {
                 if r.guiRunning { step("Закриваю GUI Cisco"); await actions.ciscoQuitGUI() }
                 let host = r.host.trimmingCharacters(in: .whitespaces)
                 guard !host.isEmpty else { throw ActionError("вкажи хост") }
+                for l in try await actions.purgeDeadHostRoutes([host]) { step(l) }
                 let creds = CiscoCredentials(host: host, group: r.group, user: r.username, password: r.password, secondPassword: r.secondPassword)
                 try await actions.ciscoConnect(creds) { ev in
                     Task { @MainActor in
@@ -604,6 +627,7 @@ final class AppModel {
         }
         connect?.groupsLoading = true
         connect?.groupsNote = nil
+        await purgeDeadRoutes([host])
         defer { if connect?.host == host { connect?.groupsLoading = false } }
         do {
             let r = try await actions.ciscoProbeGroups(host)

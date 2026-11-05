@@ -80,6 +80,33 @@ public final class Actions: @unchecked Sendable {
         return plan
     }
 
+    /// Статичні -host маршрути до цих хостів через шлюз, якого вже немає в жодній локальній мережі
+    /// (route-fix у попередній мережі: Wi-Fi змінився, а маршрут лишився). Такий маршрут веде в нікуди
+    /// і ламає *будь-який* VPN до того ж сервера (OpenVPN і Cisco на одному IP). Ознака: до самого
+    /// шлюзу ядро теж іде через шлюз (GATEWAY у `route get <gw>`), тобто він не on-link.
+    public func deadHostRoutes(_ hosts: [String]) async -> [(ip: String, gw: String)] {
+        var out: [(String, String)] = []
+        for h in Set(hosts) {
+            let host = h.hasPrefix("[") ? h : (h.split(separator: ":").first.map(String.init) ?? h)
+            guard let ip = Interfaces.resolve(host) else { continue }
+            let r = await Shell.run("/sbin/route", ["-n", "get", ip]).out
+            guard let flags = Parse.firstMatch(#"flags: <([^>]*)>"#, r)?.split(separator: ",").map(String.init),
+                  flags.contains("HOST"), flags.contains("STATIC"), flags.contains("GATEWAY"),
+                  let gw = Parse.firstMatch(#"gateway: (\S+)"#, r), Parse.ipv4(gw) != nil else { continue }
+            let g = await Shell.run("/sbin/route", ["-n", "get", gw]).out
+            if g.contains("GATEWAY") { out.append((ip, gw)) }
+        }
+        return out
+    }
+
+    /// Прибрати мертві host-маршрути; повертає опис для журналу підключення.
+    public func purgeDeadHostRoutes(_ hosts: [String]) async throws -> [String] {
+        let dead = await deadHostRoutes(hosts)
+        guard !dead.isEmpty else { return [] }
+        _ = try await priv(.batch(dead.map { .routeHostDelete(ip: $0.ip) }))
+        return dead.map { "прибрано мертвий маршрут \($0.ip) → \($0.gw) (шлюз не в поточній мережі)" }
+    }
+
     /// Шлюз за політикою профілю, без питань. nil + .ask = треба спитати.
     public func resolveGateway(_ mode: RouteFixMode, plan: RouteFixPlan) -> (gw: String?, ask: Bool) {
         guard !plan.isEmpty else { return (nil, false) }

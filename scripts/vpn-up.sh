@@ -157,6 +157,14 @@ echo ""
 NEED_IPS=(); NEED_HOSTS=()
 for VPN_HOST in $(grep -E '^[[:space:]]*remote ' "$PROFILE" | awk '{print $2}' | sort -u); do
     HOST_IP=$(python3 -c "import socket; print(socket.gethostbyname('$VPN_HOST'))" 2>/dev/null || echo "$VPN_HOST")
+    # Мертвий route-fix з іншої мережі: шлюз маршруту не on-link (до нього самого — через шлюз).
+    ROUTE_NOW=$(route -n get "$HOST_IP" 2>/dev/null)
+    NOW_FLAGS=$(awk '/flags:/{print $2}' <<< "$ROUTE_NOW"); NOW_GW=$(awk '/gateway:/{print $2}' <<< "$ROUTE_NOW")
+    if [[ "$NOW_FLAGS" == *GATEWAY*HOST*STATIC* && "$NOW_GW" =~ ^[0-9.]+$ ]] \
+       && route -n get "$NOW_GW" 2>/dev/null | grep -q 'flags:.*GATEWAY'; then
+        echo "Мертвий маршрут $HOST_IP → $NOW_GW (route-fix з іншої мережі) — прибираю."
+        sudo route -q delete -host "$HOST_IP" >/dev/null 2>&1 || true
+    fi
     VIA_TUN=$(tunnel_iface_for "$HOST_IP")
     if [ -n "$VIA_TUN" ]; then
         echo "Сервер $VPN_HOST ($HOST_IP) доступний через тунель $VIA_TUN — route-fix не потрібен."
