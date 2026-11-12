@@ -211,14 +211,25 @@ public enum CiscoDriver {
     /// (Group / Username) → обриваємо, нічого не надсилаючи. Тунель не піднімається.
     /// НЕ викликати, поки Cisco підключений: `connect` під час сесії її перепідніме.
     public static func probeGroups(cli: String, host: String, timeout: TimeInterval = 25) async throws -> GroupProbe {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<GroupProbe, Error>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do { cont.resume(returning: try probe(cli: cli, host: host, timeout: timeout)) } catch { cont.resume(throwing: error) }
+        let cancel = CancelFlag()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<GroupProbe, Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do { cont.resume(returning: try probe(cli: cli, host: host, timeout: timeout, cancelled: { cancel.isSet })) }
+                    catch { cont.resume(throwing: error) }
+                }
             }
-        }
+        } onCancel: { cancel.set() }
     }
 
-    static func probe(cli: String, host: String, timeout: TimeInterval) throws -> GroupProbe {
+    final class CancelFlag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+        func set() { lock.lock(); value = true; lock.unlock() }
+        var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+    }
+
+    static func probe(cli: String, host: String, timeout: TimeInterval, cancelled: () -> Bool = { false }) throws -> GroupProbe {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: cli)
         p.arguments = ["-s"]
@@ -245,6 +256,7 @@ public enum CiscoDriver {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             Thread.sleep(forTimeInterval: 0.15)
+            if cancelled() { throw CancellationError() }
             lock.lock(); let text = all; lock.unlock()
             if let r = parseGroupPrompt(text) { return r }
             if let err = failure(text) { throw ActionError(explain(err, text)) }
@@ -256,20 +268,28 @@ public enum CiscoDriver {
     }
 
     /// Вивід до першого запиту: "    0) Employees\n    1) Staff\nGroup: [Employees]" або одразу "Username:".
+    /// Реальний вивід містить \r і асинхронні `>> notice:` / `VPN>`, які можуть прилетіти *після*
+    /// запиту — тож шукаємо останній рядок-запит, а не вимагаємо, щоб він був останнім.
     static func parseGroupPrompt(_ text: String) -> GroupProbe? {
-        let lines = text.components(separatedBy: "\n")
-        guard let last = lines.last?.trimmingCharacters(in: .whitespaces), !last.isEmpty else { return nil }
-        let lower = last.lowercased()
-        if lower.hasPrefix("group:") {
-            var groups: [String] = []
-            for l in lines.dropLast() {
-                if let g = Parse.firstMatch(#"^\s*\d+\)\s+(.+?)\s*$"#, l) { groups.append(g) }
+        let lines = text.replacingOccurrences(of: "\r", with: "\n").components(separatedBy: "\n")
+            .map { l -> String in
+                var t = l.trimmingCharacters(in: .whitespaces)
+                while t.hasPrefix("VPN>") { t = String(t.dropFirst(4)).trimmingCharacters(in: .whitespaces) }
+                return t
             }
-            let def = Parse.firstMatch(#"\[([^\]]*)\]"#, last).flatMap { $0.isEmpty ? nil : $0 }
-            return GroupProbe(groups: groups, defaultGroup: def ?? groups.first, asksGroup: true)
-        }
-        if lower.hasPrefix("username:") || lower.hasSuffix("password:") {
-            return GroupProbe(groups: [], defaultGroup: nil, asksGroup: false)
+        for (i, l) in lines.enumerated().reversed() {
+            let lower = l.lowercased()
+            if lower.hasPrefix("group:") {
+                var groups: [String] = []
+                for g in lines[..<i] {
+                    if let m = Parse.firstMatch(#"^\d+\)\s+(.+?)\s*$"#, g) { groups.append(m) }
+                }
+                let def = Parse.firstMatch(#"\[([^\]]*)\]"#, l).flatMap { $0.isEmpty ? nil : $0 }
+                return GroupProbe(groups: groups, defaultGroup: def ?? groups.first, asksGroup: true)
+            }
+            if lower.hasPrefix("username:") || lower.hasSuffix("password:") {
+                return GroupProbe(groups: [], defaultGroup: nil, asksGroup: false)
+            }
         }
         return nil
     }

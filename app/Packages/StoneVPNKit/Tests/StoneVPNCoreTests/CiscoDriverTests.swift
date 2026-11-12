@@ -96,6 +96,17 @@ final class CiscoGroupProbeTests: XCTestCase {
         XCTAssertNil(CiscoDriver.parseGroupPrompt("  >> contacting host (vpn.example.com)...\n"))
     }
 
+    /// Реальний вивід `vpn -s`: \r на початку рядків, а асинхронний notice може прийти після запиту.
+    func testParseGroupPromptWithCarriageReturnsAndLateNotice() {
+        let text = "\r  >> state: Disconnected\r\nVPN> connect vpn.example.com:8448\n"
+            + "\r  >> contacting host (vpn.example.com:8448) for login information...\n"
+            + "\rVPN> \r  >> notice: Contacting vpn.example.com:8448.\n"
+            + "    0) VPN1\n    1) VPN2\n    2) VPN2_special\nGroup: [VPN2_special] "
+        let want = CiscoDriver.GroupProbe(groups: ["VPN1", "VPN2", "VPN2_special"], defaultGroup: "VPN2_special", asksGroup: true)
+        XCTAssertEqual(CiscoDriver.parseGroupPrompt(text), want)
+        XCTAssertEqual(CiscoDriver.parseGroupPrompt(text + "\r\n  >> notice: Please respond to banner.\nVPN> "), want)
+    }
+
     func testProbeStopsAtGroupPromptWithoutCredentials() async throws {
         let marker = FileManager.default.temporaryDirectory.appendingPathComponent("probe-\(UUID())").path
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("fake-vpn-\(UUID().uuidString).sh")

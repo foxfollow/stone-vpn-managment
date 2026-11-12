@@ -314,15 +314,22 @@ public final class Actions: @unchecked Sendable {
         if Parse.ciscoConnectedHost(await Shell.run(cli, ["-s", "state"], timeout: 8).out) != nil {
             throw ActionError("Cisco вже підключений — групи не перевіряю, щоб не розірвати сесію")
         }
-        defer {
-            Task {
-                let st = await Shell.run(cli, ["-s", "state"], timeout: 8).out
-                if Parse.ciscoConnectedHost(st) == nil, !st.contains("state: Disconnected") {
-                    _ = await Shell.run(cli, ["-s", "disconnect"], timeout: 15)
-                }
+        // Прибирання — синхронно, до повернення: відкладений `disconnect` прилітав посеред наступної
+        // перевірки або справжнього connect і обривав її («Отримую групи…» до таймауту).
+        func cleanup() async {
+            let st = await Shell.run(cli, ["-s", "state"], timeout: 8).out
+            if Parse.ciscoConnectedHost(st) == nil, !st.contains("state: Disconnected") {
+                _ = await Shell.run(cli, ["-s", "disconnect"], timeout: 15)
             }
         }
-        return try await CiscoDriver.probeGroups(cli: cli, host: host)
+        do {
+            let r = try await CiscoDriver.probeGroups(cli: cli, host: host)
+            await cleanup()
+            return r
+        } catch {
+            await cleanup()
+            throw error
+        }
     }
 
     /// Запасний шлях: інтерактивно в Terminal (vpn сам питає group/user/password/banner).

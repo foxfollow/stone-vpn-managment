@@ -55,8 +55,8 @@ struct StoneVPNManagerApp: App {
         Window("Підключення", id: "connect") {
             ConnectView(model: model)
         }
+        // Звичайний рівень: floating-вікна не потрапляють в App Exposé (Cmd+Tab → ↓ «No Available Windows»).
         .windowResizability(.contentSize)
-        .windowLevel(.floating)
 
         Settings {
             SettingsView(model: model)

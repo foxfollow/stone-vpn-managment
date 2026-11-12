@@ -64,6 +64,8 @@ struct ConnectRequest: Identifiable {
     var groupsLoading = false
     var groupsNote: String?
     var groupsFor = ""            // хост, для якого отримано список
+    /// Хост без пробілів/переносів (вставлений з буфера часто має хвіст) — ключ для груп.
+    var hostKey: String { host.trimmingCharacters(in: .whitespacesAndNewlines) }
     var steps: [String] = []
     var error: String?
     var running = false
@@ -129,6 +131,8 @@ final class AppModel {
     @ObservationIgnored var openWindowAction: OpenWindowAction?
     @ObservationIgnored private var stopping: Set<String> = []
     @ObservationIgnored private var lastProbe = Date.distantPast
+    @ObservationIgnored private var groupsProbeTask: Task<Void, Never>?
+    @ObservationIgnored private var groupsProbeSeq = 0
     @ObservationIgnored private var lastOnlineProbe = Date.distantPast
     @ObservationIgnored private var refreshing = false
     @ObservationIgnored private var pendingRefresh = false
@@ -469,8 +473,9 @@ final class AppModel {
                 dgStale.remove(p.name)
                 stopping.remove(p.key)
             case .cisco:
+                await cancelGroupsProbe()
                 if r.guiRunning { step("Закриваю GUI Cisco"); await actions.ciscoQuitGUI() }
-                let host = r.host.trimmingCharacters(in: .whitespaces)
+                let host = r.hostKey
                 guard !host.isEmpty else { throw ActionError("вкажи хост") }
                 for l in try await actions.purgeDeadHostRoutes([host]) { step(l) }
                 let creds = CiscoCredentials(host: host, group: r.group, user: r.username, password: r.password, secondPassword: r.secondPassword)
@@ -618,20 +623,46 @@ final class AppModel {
     }
 
     /// Підтягнути групи з сервера для поточного хоста у вікні підключення.
+    /// Кожен виклик скасовує попередній: два `vpn -s` одночасно змагаються за connect capability
+    /// агента, а відповідь застарілого не повинна ні ставити групи, ні гасити спінер нового.
+    /// Спінер гасить лише останній запуск — незалежно від того, чи змінився хост (раніше умова
+    /// «хост той самий» лишала «Отримую групи…» назавжди, якщо поле відрізнялось хоч пробілом).
     func probeCiscoGroups(closeGUI: Bool = false) async {
-        guard let host = connect?.host.trimmingCharacters(in: .whitespaces), !host.isEmpty else { return }
+        guard let host = connect?.hostKey, !host.isEmpty else { return }
+        groupsProbeTask?.cancel()
+        groupsProbeSeq += 1
+        let id = groupsProbeSeq
+        let t = Task { await runGroupsProbe(id: id, host: host, closeGUI: closeGUI) }
+        groupsProbeTask = t
+        await t.value
+    }
+
+    /// Зупинити перевірку груп (перед підключенням: probe тримає connect capability агента).
+    func cancelGroupsProbe() async {
+        guard let t = groupsProbeTask else { return }
+        groupsProbeSeq += 1
+        t.cancel()
+        await t.value
+        groupsProbeTask = nil
+        connect?.groupsLoading = false
+    }
+
+    private func runGroupsProbe(id: Int, host: String, closeGUI: Bool) async {
+        func latest() -> Bool { groupsProbeSeq == id && !Task.isCancelled }
         if connect?.guiRunning == true {
             guard closeGUI else { connect?.groupsNote = "GUI Cisco відкритий — CLI не може отримати групи"; return }
             await actions.ciscoQuitGUI()
             connect?.guiRunning = false
         }
+        guard latest() else { return }
         connect?.groupsLoading = true
         connect?.groupsNote = nil
+        defer { if groupsProbeSeq == id { connect?.groupsLoading = false } }
         await purgeDeadRoutes([host])
-        defer { if connect?.host == host { connect?.groupsLoading = false } }
+        guard latest() else { return }
         do {
             let r = try await actions.ciscoProbeGroups(host)
-            guard connect?.host == host else { return }      // хост змінили, поки чекали
+            guard latest(), connect?.hostKey == host else { return }      // хост змінили / новий запуск
             connect?.groupsFor = host
             connect?.groups = r.groups
             if !r.asksGroup {
@@ -643,7 +674,7 @@ final class AppModel {
                 connect?.group = r.defaultGroup ?? r.groups.first ?? ""
             }
         } catch {
-            guard connect?.host == host else { return }
+            guard latest(), connect?.hostKey == host else { return }
             connect?.groupsNote = error.localizedDescription
         }
     }
