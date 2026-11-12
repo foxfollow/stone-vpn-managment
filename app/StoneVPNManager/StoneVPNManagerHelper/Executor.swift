@@ -10,6 +10,8 @@ enum Executor {
         "LANG": "en_US.UTF-8",
     ]
     static let wgDirs = ["/opt/homebrew/etc/wireguard", "/usr/local/etc/wireguard", "/etc/wireguard"]
+    /// Ті самі теки після розкриття симлінків (/etc — системний симлінк на /private/etc). Зашиті, не обчислені.
+    static let wgRealDirs: Set<String> = ["/opt/homebrew/etc/wireguard", "/usr/local/etc/wireguard", "/private/etc/wireguard"]
     static let wgRun = "/var/run/wireguard"
 
     /// `waitAuthCleanup`: у CLI-режимі (одноразовий запуск через osascript) процес
@@ -250,6 +252,13 @@ enum Executor {
     static func validWGConf(_ path: String) -> String? {
         let p = URL(fileURLWithPath: path).standardizedFileURL.path
         guard p.hasSuffix(".conf"), wgDirs.contains(where: { p.hasPrefix($0 + "/") }), !isSymlink(p) else { return nil }
+        // Симлінк у батьківській теці (напр. user-owned /opt/homebrew/etc/wireguard → /etc) інакше
+        // дав би root-у читати/видаляти чужі файли. Розкритий шлях теки має бути саме однією з
+        // канонічних — порівнювати з realpath(wgDir) не можна: підмінена тека розкрилась би так само.
+        let parent = (p as NSString).deletingLastPathComponent
+        guard let real = realpath(parent, nil) else { return nil }
+        defer { free(real) }
+        guard wgRealDirs.contains(String(cString: real)) else { return nil }
         let name = (p as NSString).lastPathComponent.dropLast(5)
         guard name.range(of: #"^[a-zA-Z0-9_=+.-]{1,15}$"#, options: .regularExpression) != nil else { return nil }
         return p
