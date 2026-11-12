@@ -80,6 +80,15 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   the daemon, the same binary runs once as root via `osascript … with administrator privileges`
   (`--run-file`, request in a 600 temp file — passwords never in argv; always exits 0 so
   `do shell script` returns the JSON).
+- **WG config paths in the helper go through `WGConfGuard`** (StoneVPNShared, helper protocol v5):
+  path directly inside one of `WGPaths.dirs`, no `.`/`..`; the dir may be a symlink, but if it
+  resolves outside `WGPaths.canonical` both dir and file must belong to the requesting uid (XPC
+  `effectiveUserIdentifier` / owner of the `--run-file` request) — a brew dir swapped for a link
+  to `/etc` is refused, `~/dotfiles/wireguard` works. File: not a symlink, regular, nlink 1.
+  Read/delete go through the opened dir fd (`openat`/`unlinkat`, O_NOFOLLOW); wg-quick gets the
+  resolved path. Don't "simplify" back to a realpath-prefix check: `realpath(wgDir)` of a swapped
+  dir matches whatever it points at. This does not make a user-owned conf safe from its own
+  `PostUp` (root) — same-user code can also replace brew's wg-quick; that is the accepted model.
 - **Status never prompts**: root-only reads go through `PrivilegedReader.readIfAvailable`,
   which returns nil unless the daemon is installed.
 - **Interop with the CLI is deliberate**: OpenVPN is launched with exactly vpn-up.sh's flags and

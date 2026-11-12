@@ -53,7 +53,7 @@ public enum HelperConst {
     public static let appBundleID = "com.foxfollow.stonevpnmanager"
     public static let helperExecutable = "StoneVPNManagerHelper"
     /// Підняти при зміні PrivOp — застосунок запропонує перевстановити helper.
-    public static let version = 4
+    public static let version = 5   // 5: WGConfGuard (перевірка тек/власників WG-конфігів)
     /// State-ключ основного DNS, який публікує helper (service id не має Setup-запису, як і Cisco).
     public static let dnsOverrideService = "com.foxfollow.stonevpnmanager.dns"
     public static var dnsOverrideKey: String { "State:/Network/Service/\(dnsOverrideService)/DNS" }
