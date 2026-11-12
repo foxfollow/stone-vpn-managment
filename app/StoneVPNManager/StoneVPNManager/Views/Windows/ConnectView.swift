@@ -127,7 +127,7 @@ struct ConnectView: View {
                         ProgressView().controlSize(.small)
                         Text("Отримую групи…").font(.system(size: 12)).foregroundStyle(.secondary)
                         Spacer(minLength: 0)
-                    } else if !r.groups.isEmpty, r.groupsFor == r.host {
+                    } else if !r.groups.isEmpty, r.groupsFor == r.hostKey {
                         Picker("", selection: bind(\.group)) {
                             ForEach(r.groups, id: \.self) { Text($0).tag($0) }
                         }
@@ -139,7 +139,7 @@ struct ConnectView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.borderless)
-                    .disabled(r.groupsLoading || r.host.isEmpty)
+                    .disabled(r.hostKey.isEmpty)
                     .help(r.guiRunning ? "Закрити GUI Cisco і отримати групи з сервера" : "Отримати групи з сервера")
                 }
             }
@@ -175,7 +175,7 @@ struct ConnectView: View {
     private func groupHint(_ r: ConnectRequest) -> String {
         if let n = r.groupsNote { return n }
         if r.groupsLoading { return "Питаю сервер, які групи доступні (без входу)" }
-        if !r.groups.isEmpty, r.groupsFor == r.host { return "Список із сервера" }
+        if !r.groups.isEmpty, r.groupsFor == r.hostKey { return "Список із сервера" }
         return "Порожньо = за замовчуванням"
     }
 
@@ -253,6 +253,7 @@ struct ConnectView: View {
     }
 
     private func close() {
+        Task { await model.cancelGroupsProbe() }
         model.connect = nil
         dismissWindow(id: "connect")
     }

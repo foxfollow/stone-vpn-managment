@@ -158,6 +158,13 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   public API for one without the other. So the policy flips to `.regular` while a titled non-panel
   window (Profiles/Settings/Connect) is visible and back to `.accessory` after the last one closes
   (checked on the next runloop turn — `willClose` fires while the window is still visible).
+- **Profile files are managed in-app** (`OvpnFiles` in StoneVPNCore): OpenVPN import (new ms-id),
+  replace *this* file (whole .ovpn or one inline `<cert>/<key>/<ca>/tls-*` block, old copy →
+  `<id>.ovpn.bak`), delete → Trash; the profiles dir is user-owned, no helper. WireGuard delete goes
+  through `PrivOp.wgDelete` (helper protocol v4; refused while `/var/run/wireguard/<name>.name`
+  exists). Never match the target by `remote`: several profiles share one server (different
+  logins/certs) — that is how the old `vpn-cert.sh` replaced the wrong file. `vpn-cert.sh` menus
+  print to stderr because `pick_profile` is called inside `$(...)`.
 - Per-profile settings (alias, favourite, route-fix policy ask/LAN/fixed/off) live in UserDefaults;
   route-fix defaults: OpenVPN = ask, WireGuard = off.
 - Logins are remembered per VPN (pref `rememberUser`): OpenVPN in `ProfileSettings.lastUsername`,
@@ -209,6 +216,17 @@ There are no unit tests. Validate changes like this:
   match over `netstat -rn`, ignoring our own stale `-host` route via the gateway and utun
   default/def1 routes) are skipped and the stale host route is removed — forcing them via
   the LAN gateway sends the handshake out en0 and it times out (`TLS key negotiation failed`).
+- **Route-fix host routes outlive the network they were made in.** They are never removed on
+  `down`; after switching Wi-Fi the `-host <server> <old gw>` route points at a gateway that is
+  not on-link → *every* VPN to that server dies (Cisco "Unable to contact", the group probe times
+  out) — OpenVPN and Cisco share server IPs here. "Dead" = static HOST+GATEWAY route whose gateway
+  itself is reached via a gateway (`route -n get <gw>` has GATEWAY). Purged before every connect:
+  app `purgeDeadHostRoutes` (all backends + the Cisco group probe), CLI `purge_dead_host_route`
+  (`cisco_up`) and inline in `vpn-up.sh`.
+- **Cisco connect capability is exclusive.** An orphaned `vpn -s` / `script … vpn` (ppid 1, our
+  uid — left when a child ignored SIGTERM) holds it → "Connect capability is unavailable. Another
+  Cisco Secure Client application acquired it". `CiscoDriver.reapOrphans` kills those before
+  probe/connect; `stop()` escalates to SIGKILL.
 - **OpenVPN profile menu is dynamic** in `vpn-up.sh` — built by scanning the profiles dir and
   reading each `remote` line (no hardcoded filenames/hosts). Profiles live in
   `~/Library/Application Support/OpenVPN Connect/profiles/` (shared with the GUI, named by

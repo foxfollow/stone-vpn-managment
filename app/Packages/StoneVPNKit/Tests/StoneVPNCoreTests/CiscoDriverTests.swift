@@ -96,6 +96,17 @@ final class CiscoGroupProbeTests: XCTestCase {
         XCTAssertNil(CiscoDriver.parseGroupPrompt("  >> contacting host (vpn.example.com)...\n"))
     }
 
+    /// Реальний вивід `vpn -s`: \r на початку рядків, а асинхронний notice може прийти після запиту.
+    func testParseGroupPromptWithCarriageReturnsAndLateNotice() {
+        let text = "\r  >> state: Disconnected\r\nVPN> connect vpn.example.com:8448\n"
+            + "\r  >> contacting host (vpn.example.com:8448) for login information...\n"
+            + "\rVPN> \r  >> notice: Contacting vpn.example.com:8448.\n"
+            + "    0) VPN1\n    1) VPN2\n    2) VPN2_special\nGroup: [VPN2_special] "
+        let want = CiscoDriver.GroupProbe(groups: ["VPN1", "VPN2", "VPN2_special"], defaultGroup: "VPN2_special", asksGroup: true)
+        XCTAssertEqual(CiscoDriver.parseGroupPrompt(text), want)
+        XCTAssertEqual(CiscoDriver.parseGroupPrompt(text + "\r\n  >> notice: Please respond to banner.\nVPN> "), want)
+    }
+
     func testProbeStopsAtGroupPromptWithoutCredentials() async throws {
         let marker = FileManager.default.temporaryDirectory.appendingPathComponent("probe-\(UUID())").path
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("fake-vpn-\(UUID().uuidString).sh")
@@ -115,5 +126,27 @@ final class CiscoGroupProbeTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(300))
         // Нічого не відповіли на запит групи (EOF ≠ рядок) — облікові дані не надсилались.
         XCTAssertFalse(FileManager.default.fileExists(atPath: marker))
+    }
+}
+
+final class CiscoOrphanTests: XCTestCase {
+    let cli = "/opt/cisco/secureclient/bin/vpn"
+
+    func testOnlyOwnOrphans() {
+        let ps = """
+        78884     1   501 /opt/cisco/secureclient/bin/vpn -s
+        78890     1   501 /usr/bin/script -q /dev/null /opt/cisco/secureclient/bin/vpn connect h:8448
+        78891   700   501 /opt/cisco/secureclient/bin/vpn connect h
+          857     1     0 /opt/cisco/secureclient/bin/vpnagentd
+          900     1     0 /opt/cisco/secureclient/bin/vpn -s
+          901     1   501 /opt/cisco/secureclient/bin/vpnui
+        """
+        XCTAssertEqual(CiscoDriver.parseOrphans(ps, cli: cli, uid: 501), [78884, 78890])
+    }
+
+    func testCapabilityIsFailureWithHint() {
+        let out = ">> error: Connect capability is unavailable. Another Cisco Secure Client application acquired it."
+        XCTAssertNotNil(CiscoDriver.failure(out))
+        XCTAssertTrue(CiscoDriver.explain("x", out).contains("GUI Cisco"))
     }
 }

@@ -85,6 +85,7 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
         switch op {
         case .wgUp: "підключити WireGuard"
         case .wgDown: "відключити WireGuard"
+        case .wgDelete: "видалити конфіг WireGuard"
         case .ovpnStart: "підключити OpenVPN"
         case .ovpnStop: "відключити OpenVPN"
         case .routeHostSet, .routeHostDelete: "змінити маршрут до VPN-сервера"

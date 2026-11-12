@@ -10,6 +10,7 @@ public enum PrivOp: Codable, Sendable, Equatable {
     case wgRuntime                       // /var/run/wireguard/*.name → "name utunN"
     case wgConfigs                       // "dir\nname\nname…" (теки бувають root-only)
     case readWGConf(path: String)        // без PrivateKey/PresharedKey
+    case wgDelete(confPath: String)      // лише неактивний тунель (v4)
     // OpenVPN
     case ovpnStart(profilePath: String, username: String?, password: String?, addDev: Bool)
     case ovpnStop(pid: Int32)
@@ -52,7 +53,7 @@ public enum HelperConst {
     public static let appBundleID = "com.foxfollow.stonevpnmanager"
     public static let helperExecutable = "StoneVPNManagerHelper"
     /// Підняти при зміні PrivOp — застосунок запропонує перевстановити helper.
-    public static let version = 3
+    public static let version = 4
     /// State-ключ основного DNS, який публікує helper (service id не має Setup-запису, як і Cisco).
     public static let dnsOverrideService = "com.foxfollow.stonevpnmanager.dns"
     public static var dnsOverrideKey: String { "State:/Network/Service/\(dnsOverrideService)/DNS" }
