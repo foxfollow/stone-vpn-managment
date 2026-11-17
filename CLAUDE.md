@@ -167,6 +167,9 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   public API for one without the other. So the policy flips to `.regular` while a titled non-panel
   window (Profiles/Settings/Connect) is visible and back to `.accessory` after the last one closes
   (checked on the next runloop turn — `willClose` fires while the window is still visible).
+  Every such window gets `.moveToActiveSpace` + `.fullScreenAuxiliary`: otherwise the flip to
+  `.regular` + `activate()` switched the user to the Space where the window last lived (or to a
+  separate desktop when opened over a full-screen app) just to type a 2FA code.
 - **Profile files are managed in-app** (`OvpnFiles` in StoneVPNCore): OpenVPN import (new ms-id),
   replace *this* file (whole .ovpn or one inline `<cert>/<key>/<ca>/tls-*` block, old copy →
   `<id>.ovpn.bak`), delete → Trash; the profiles dir is user-owned, no helper. WireGuard delete goes

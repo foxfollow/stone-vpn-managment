@@ -15,7 +15,8 @@ final class AppSwitcherPolicy {
         guard observers.isEmpty else { return }
         let nc = NotificationCenter.default
         for name in [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification,
-                     NSWindow.willCloseNotification, NSWindow.didMiniaturizeNotification] {
+                     NSWindow.willCloseNotification, NSWindow.didMiniaturizeNotification,
+                     NSWindow.didChangeOcclusionStateNotification] {
             observers.append(nc.addObserver(forName: name, object: nil, queue: .main) { _ in
                 // willClose приходить, поки вікно ще видиме — перевіряємо на наступному циклі.
                 DispatchQueue.main.async { MainActor.assumeIsolated { AppSwitcherPolicy.shared.update() } }
@@ -23,15 +24,32 @@ final class AppSwitcherPolicy {
         }
     }
 
+    private func isAppWindow(_ w: NSWindow) -> Bool {
+        w.styleMask.contains(.titled) && !(w is NSPanel) && w.level.rawValue < NSWindow.Level.statusBar.rawValue
+    }
+
     private func hasAppWindow(_ app: NSApplication) -> Bool {
-        app.windows.contains { w in
-            w.isVisible && w.styleMask.contains(.titled) && !(w is NSPanel) && w.level.rawValue < NSWindow.Level.statusBar.rawValue
+        app.windows.contains { $0.isVisible && isAppWindow($0) }
+    }
+
+    /// Вікно має з'являтися на поточному робочому столі, а не тягнути користувача туди, де воно
+    /// було востаннє: після переходу в .regular activate() (і системне «при перемиканні на
+    /// застосунок переходити на стіл з його вікнами») перекидало на інший Space — або, поверх
+    /// повноекранного застосунку, на окремий стіл. .moveToActiveSpace — вікно саме переїжджає
+    /// на активний Space; .fullScreenAuxiliary — може лежати поверх повноекранного.
+    private func pinToActiveSpace(_ app: NSApplication) {
+        for w in app.windows where isAppWindow(w) {
+            var b = w.collectionBehavior
+            b.remove([.canJoinAllSpaces, .stationary])
+            b.insert([.moveToActiveSpace, .fullScreenAuxiliary])
+            if b != w.collectionBehavior { w.collectionBehavior = b }
         }
     }
 
     func update() {
         // start() викликається з App.init — NSApplication ще не створено (NSApp == nil).
         guard let app = NSApp else { return }
+        pinToActiveSpace(app)
         let want: NSApplication.ActivationPolicy = enabled && hasAppWindow(app) ? .regular : .accessory
         guard app.activationPolicy() != want else { return }
         app.setActivationPolicy(want)
