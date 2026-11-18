@@ -64,6 +64,8 @@ struct ConnectRequest: Identifiable {
     var groupsLoading = false
     var groupsNote: String?
     var groupsFor = ""            // хост, для якого отримано список
+    /// Хост без пробілів/переносів (вставлений з буфера часто має хвіст) — ключ для груп.
+    var hostKey: String { host.trimmingCharacters(in: .whitespacesAndNewlines) }
     var steps: [String] = []
     var error: String?
     var running = false
@@ -129,6 +131,8 @@ final class AppModel {
     @ObservationIgnored var openWindowAction: OpenWindowAction?
     @ObservationIgnored private var stopping: Set<String> = []
     @ObservationIgnored private var lastProbe = Date.distantPast
+    @ObservationIgnored private var groupsProbeTask: Task<Void, Never>?
+    @ObservationIgnored private var groupsProbeSeq = 0
     @ObservationIgnored private var lastOnlineProbe = Date.distantPast
     @ObservationIgnored private var refreshing = false
     @ObservationIgnored private var pendingRefresh = false
@@ -345,6 +349,8 @@ final class AppModel {
         errors[p.key] = nil
         busy[p.key] = "перевірка DNS…"
         await prepareDNS(for: p)
+        busy[p.key] = "перевірка маршруту…"
+        await purgeDeadRoutes(await endpointHosts(p))
         await checkEndpointResolves(p)
         busy[p.key] = nil
         var r = ConnectRequest(profile: p)
@@ -391,6 +397,26 @@ final class AppModel {
         } else {
             _ = await perform(r)
         }
+    }
+
+    /// Хости, до яких піде підключення (для перевірки мертвих host-маршрутів).
+    func endpointHosts(_ p: Profile) async -> [String] {
+        switch p.backend {
+        case .openvpn: p.remotes
+        case .wireguard: await actions.wgEndpointHost(p).map { [$0] } ?? []
+        case .cisco: [p.name]
+        case .defguard: p.endpoint.map { [$0] } ?? []
+        }
+    }
+
+    /// Мертвий route-fix з попередньої мережі (шлюз не on-link) — прибрати перед підключенням.
+    /// Дія користувача, тож запит пароля без helper допустимий.
+    func purgeDeadRoutes(_ hosts: [String]) async {
+        guard !hosts.isEmpty else { return }
+        do {
+            let log = try await actions.purgeDeadHostRoutes(hosts)
+            if !log.isEmpty { toast = log.joined(separator: "\n") }
+        } catch { toast = "Не вдалося прибрати мертвий маршрут: \(error.localizedDescription)" }
     }
 
     /// Власне підключення (з панелі або напряму). true = успіх.
@@ -447,9 +473,11 @@ final class AppModel {
                 dgStale.remove(p.name)
                 stopping.remove(p.key)
             case .cisco:
+                await cancelGroupsProbe()
                 if r.guiRunning { step("Закриваю GUI Cisco"); await actions.ciscoQuitGUI() }
-                let host = r.host.trimmingCharacters(in: .whitespaces)
+                let host = r.hostKey
                 guard !host.isEmpty else { throw ActionError("вкажи хост") }
+                for l in try await actions.purgeDeadHostRoutes([host]) { step(l) }
                 let creds = CiscoCredentials(host: host, group: r.group, user: r.username, password: r.password, secondPassword: r.secondPassword)
                 try await actions.ciscoConnect(creds) { ev in
                     Task { @MainActor in
@@ -540,20 +568,101 @@ final class AppModel {
         profilesSelection = nil
     }
 
+    // MARK: файли профілів (OpenVPN — тека користувача; WireGuard — через helper)
+
+    /// Додати .ovpn як новий профіль (ім'я — ms-мітка, як у OpenVPN Connect).
+    func ovpnImport(_ url: URL) async {
+        do {
+            let id = try OvpnFiles.importProfile(from: url, into: config.ovpnProfilesDir)
+            await refresh(forceSlow: true)
+            profilesSelection = "openvpn:\(id)"
+            toast = "Додано профіль \(url.lastPathComponent)"
+        } catch { toast = error.localizedDescription }
+    }
+
+    /// Замінити саме цей профіль (весь .ovpn або один блок) — ID, alias і налаштування лишаються.
+    func ovpnReplace(_ p: Profile, with url: URL, block tag: String? = nil) async {
+        guard let path = p.path else { toast = "Файл профілю невідомий"; return }
+        do {
+            if let tag { try OvpnFiles.replaceBlock(at: path, tag: tag, pemFile: url) }
+            else { try OvpnFiles.replaceProfile(at: path, with: url) }
+            errors[p.key] = nil
+            let active = items(for: .openvpn).first { $0.id == p.key }?.status.isActive == true
+            toast = (tag.map { "<\($0)> оновлено" } ?? "Профіль замінено") + (active ? " — перепідключись, щоб застосувати" : "")
+                + " (стара версія: \((path as NSString).lastPathComponent).bak)"
+        } catch { toast = error.localizedDescription }
+        await refresh(forceSlow: true)
+    }
+
+    /// Видалити профіль: OpenVPN — у Кошик; WireGuard — через helper (конфіги root-only).
+    func deleteProfile(_ p: Profile) async {
+        if items(for: p.backend).first(where: { $0.id == p.key })?.status.isActive == true {
+            toast = "Спершу відключи \(prefs.display(p))"; return
+        }
+        do {
+            switch p.backend {
+            case .openvpn:
+                guard let path = p.path else { throw ActionError("файл профілю невідомий") }
+                try OvpnFiles.delete(at: path)
+            case .wireguard:
+                var prof = p
+                if prof.path == nil, let d = snap.wgDir { prof.path = "\(d)/\(p.name).conf" }
+                try await actions.wgDelete(prof)
+            default:
+                return
+            }
+            prefs.aliases.removeValue(forKey: p.key)
+            prefs.favorites.removeAll { $0 == p.key }
+            prefs.profileSettings.removeValue(forKey: p.key)
+            if prefs.lastProfile[p.backend.rawValue] == p.key { prefs.lastProfile.removeValue(forKey: p.backend.rawValue) }
+            errors[p.key] = nil
+            if profilesSelection == p.key { profilesSelection = nil }
+            toast = p.backend == .openvpn ? "Профіль переміщено в Кошик" : "Конфіг видалено"
+        } catch { toast = error.localizedDescription }
+        await refresh(forceSlow: true)
+    }
+
     /// Підтягнути групи з сервера для поточного хоста у вікні підключення.
+    /// Кожен виклик скасовує попередній: два `vpn -s` одночасно змагаються за connect capability
+    /// агента, а відповідь застарілого не повинна ні ставити групи, ні гасити спінер нового.
+    /// Спінер гасить лише останній запуск — незалежно від того, чи змінився хост (раніше умова
+    /// «хост той самий» лишала «Отримую групи…» назавжди, якщо поле відрізнялось хоч пробілом).
     func probeCiscoGroups(closeGUI: Bool = false) async {
-        guard let host = connect?.host.trimmingCharacters(in: .whitespaces), !host.isEmpty else { return }
+        guard let host = connect?.hostKey, !host.isEmpty else { return }
+        groupsProbeTask?.cancel()
+        groupsProbeSeq += 1
+        let id = groupsProbeSeq
+        let t = Task { await runGroupsProbe(id: id, host: host, closeGUI: closeGUI) }
+        groupsProbeTask = t
+        await t.value
+    }
+
+    /// Зупинити перевірку груп (перед підключенням: probe тримає connect capability агента).
+    func cancelGroupsProbe() async {
+        guard let t = groupsProbeTask else { return }
+        groupsProbeSeq += 1
+        t.cancel()
+        await t.value
+        groupsProbeTask = nil
+        connect?.groupsLoading = false
+    }
+
+    private func runGroupsProbe(id: Int, host: String, closeGUI: Bool) async {
+        func latest() -> Bool { groupsProbeSeq == id && !Task.isCancelled }
         if connect?.guiRunning == true {
             guard closeGUI else { connect?.groupsNote = "GUI Cisco відкритий — CLI не може отримати групи"; return }
             await actions.ciscoQuitGUI()
             connect?.guiRunning = false
         }
+        guard latest() else { return }
         connect?.groupsLoading = true
         connect?.groupsNote = nil
-        defer { if connect?.host == host { connect?.groupsLoading = false } }
+        defer { if groupsProbeSeq == id { connect?.groupsLoading = false } }
+        await purgeDeadRoutes([host])
+        guard latest() else { return }
         do {
             let r = try await actions.ciscoProbeGroups(host)
-            guard connect?.host == host else { return }      // хост змінили, поки чекали
+            guard latest(), connect?.hostKey == host else { return }      // хост змінили / новий запуск
             connect?.groupsFor = host
             connect?.groups = r.groups
             if !r.asksGroup {
@@ -565,7 +674,7 @@ final class AppModel {
                 connect?.group = r.defaultGroup ?? r.groups.first ?? ""
             }
         } catch {
-            guard connect?.host == host else { return }
+            guard latest(), connect?.hostKey == host else { return }
             connect?.groupsNote = error.localizedDescription
         }
     }

@@ -18,7 +18,7 @@ let package = Package(
             dependencies: ["StoneVPNShared"],
             linkerSettings: [.linkedFramework("SystemConfiguration")]
         ),
-        .testTarget(name: "StoneVPNCoreTests", dependencies: ["StoneVPNCore"]),
+        .testTarget(name: "StoneVPNCoreTests", dependencies: ["StoneVPNCore", "StoneVPNShared"]),
     ],
     swiftLanguageModes: [.v5]
 )

@@ -7,7 +7,7 @@ public protocol PrivilegedReader: Sendable {
 }
 
 public enum Paths {
-    public static let wgDirs = ["/opt/homebrew/etc/wireguard", "/usr/local/etc/wireguard", "/etc/wireguard"]
+    public static let wgDirs = WGPaths.dirs
     public static let wgRun = "/var/run/wireguard"
     public static let ciscoCLI = ["/opt/cisco/secureclient/bin/vpn", "/opt/cisco/anyconnect/bin/vpn"]
     public static let defguardBundleCLI = "/Applications/Defguard.app/Contents/MacOS/defguard-client"

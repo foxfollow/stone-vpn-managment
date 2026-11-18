@@ -9,12 +9,13 @@ enum Executor {
         "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin",
         "LANG": "en_US.UTF-8",
     ]
-    static let wgDirs = ["/opt/homebrew/etc/wireguard", "/usr/local/etc/wireguard", "/etc/wireguard"]
+    static let wgDirs = WGPaths.dirs
     static let wgRun = "/var/run/wireguard"
 
     /// `waitAuthCleanup`: у CLI-режимі (одноразовий запуск через osascript) процес
     /// не живе далі, тож тимчасовий auth-файл прибираємо синхронно.
-    static func execute(_ op: PrivOp, waitAuthCleanup: Bool) -> PrivResult {
+    /// `caller` — uid того, хто надіслав запит (XPC peer / власник файлу запиту); nil = невідомо.
+    static func execute(_ op: PrivOp, waitAuthCleanup: Bool, caller: uid_t?) -> PrivResult {
         switch op {
         case .ping:
             return PrivResult(ok: true, output: "pong \(HelperConst.version)")
@@ -23,7 +24,7 @@ enum Executor {
             var out: [String] = []
             var ok = true
             for o in ops {
-                let r = execute(o, waitAuthCleanup: waitAuthCleanup)
+                let r = execute(o, waitAuthCleanup: waitAuthCleanup, caller: caller)
                 if !r.ok { ok = false }
                 if !r.output.isEmpty { out.append(r.output) }
             }
@@ -31,17 +32,25 @@ enum Executor {
 
         // ── WireGuard ────────────────────────────────────────────────────────
         case .wgUp(let path):
-            guard let p = validWGConf(path) else { return .fail("недопустимий шлях конфігу: \(path)") }
+            let c: WGConfHandle
+            switch WGConfGuard.open(path, caller: caller) { case .success(let h): c = h; case .failure(let e): return .fail(e.message) }
             guard let wq = firstExecutable(["/opt/homebrew/bin/wg-quick", "/usr/local/bin/wg-quick"]) else {
                 return .fail("wg-quick не знайдено (brew install wireguard-tools)")
             }
-            return run(wq, ["up", p])
+            return run(wq, ["up", c.path])
         case .wgDown(let path):
-            guard let p = validWGConf(path) else { return .fail("недопустимий шлях конфігу: \(path)") }
+            let c: WGConfHandle
+            switch WGConfGuard.open(path, caller: caller) { case .success(let h): c = h; case .failure(let e): return .fail(e.message) }
             guard let wq = firstExecutable(["/opt/homebrew/bin/wg-quick", "/usr/local/bin/wg-quick"]) else {
                 return .fail("wg-quick не знайдено")
             }
-            return run(wq, ["down", p])
+            return run(wq, ["down", c.path])
+        case .wgDelete(let path):
+            let c: WGConfHandle
+            switch WGConfGuard.open(path, caller: caller) { case .success(let h): c = h; case .failure(let e): return .fail(e.message) }
+            if FileManager.default.fileExists(atPath: "\(wgRun)/\(c.name).name") { return .fail("\(c.name) підключений — спершу відключи") }
+            if case .failure(let e) = c.delete() { return .fail("не видалено: \(e.message)") }
+            return PrivResult(ok: true, output: "видалено \(c.path)")
         case .wgRuntime:
             let fm = FileManager.default
             let names = ((try? fm.contentsOfDirectory(atPath: wgRun)) ?? []).filter { $0.hasSuffix(".name") }.sorted()
@@ -56,13 +65,17 @@ enum Executor {
                 ((try? fm.contentsOfDirectory(atPath: d)) ?? []).filter { $0.hasSuffix(".conf") }.map { String($0.dropLast(5)) }.sorted()
             }
             // Та сама логіка, що wg_config_dir: тека з *.conf, інакше перша наявна.
-            var dir = wgDirs.first { !confs($0).isEmpty }
-            if dir == nil { dir = wgDirs.first { fm.fileExists(atPath: $0) } }
+            // Тека, що веде за межі стандартних і не належить запитувачу, не переглядається.
+            let dirs = wgDirs.filter { WGConfGuard.dirListable($0, caller: caller) }
+            var dir = dirs.first { !confs($0).isEmpty }
+            if dir == nil { dir = dirs.first { fm.fileExists(atPath: $0) } }
             guard let d = dir else { return PrivResult(ok: true, output: "") }
             return PrivResult(ok: true, output: ([d] + confs(d)).joined(separator: "\n"))
         case .readWGConf(let path):
-            guard let p = validWGConf(path), let c = try? String(contentsOfFile: p, encoding: .utf8) else {
-                return .fail("не читається: \(path)")
+            let c: String
+            switch WGConfGuard.open(path, caller: caller).flatMap({ $0.read() }) {
+            case .success(let s): c = s
+            case .failure(let e): return .fail("не читається: \(e.message)")
             }
             let safe = c.split(separator: "\n", omittingEmptySubsequences: false).filter { line in
                 let k = line.trimmingCharacters(in: .whitespaces).lowercased()
@@ -74,11 +87,15 @@ enum Executor {
         case .ovpnStart(let profilePath, let user, let pass, let addDev):
             return ovpnStart(profilePath, user: user, pass: pass, addDev: addDev, waitAuthCleanup: waitAuthCleanup)
         case .ovpnStop(let pid):
-            guard pid > 1, processComm(pid).hasSuffix("openvpn") else { return .fail("PID \(pid) — не openvpn") }
-            kill(pid, SIGTERM)
-            for _ in 0..<10 where processAlive(pid) { sleep(1) }
-            // ps -p, не kill -0: для root тут різниці нема, але тримаємо одну ідіому.
-            if processAlive(pid) { kill(pid, SIGKILL) }
+            guard pid > 1 else { return .fail("PID \(pid) — не openvpn") }
+            // Процес уже зник (впав / зупинений з CLI) — лишається тільки прибрати pid-файл.
+            if processAlive(pid) {
+                guard processComm(pid).hasSuffix("openvpn") else { return .fail("PID \(pid) — не openvpn") }
+                kill(pid, SIGTERM)
+                for _ in 0..<10 where processAlive(pid) { sleep(1) }
+                // ps -p, не kill -0: для root тут різниці нема, але тримаємо одну ідіому.
+                if processAlive(pid) { kill(pid, SIGKILL) }
+            }
             for f in (try? FileManager.default.contentsOfDirectory(atPath: "/tmp")) ?? [] where f.hasPrefix("openvpn") && f.hasSuffix(".pid") {
                 let pf = "/tmp/\(f)"
                 if (try? String(contentsOfFile: pf, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) == String(pid) {
@@ -136,7 +153,7 @@ enum Executor {
             do { try body.write(toFile: "/etc/resolver/\(domain)", atomically: true, encoding: .utf8) } catch {
                 return .fail("запис /etc/resolver/\(domain): \(error.localizedDescription)")
             }
-            _ = execute(.dnsFlush, waitAuthCleanup: false)
+            _ = execute(.dnsFlush, waitAuthCleanup: false, caller: caller)
             return PrivResult(ok: true, output: "*.\(domain) → \(servers.joined(separator: " "))")
         case .dnsOverride(let servers):
             guard !servers.isEmpty, servers.allSatisfy(isIP) else { return .fail("невірний DNS: \(servers.joined(separator: " "))") }
@@ -147,7 +164,7 @@ enum Executor {
                 return .fail("не вдалося записати основний DNS")
             }
             let moved = displaceCatchAll(store)
-            _ = execute(.dnsFlush, waitAuthCleanup: false)
+            _ = execute(.dnsFlush, waitAuthCleanup: false, caller: caller)
             return PrivResult(ok: true, output: "основний DNS → \(servers.joined(separator: " "))" +
                               (moved.isEmpty ? "" : "; витіснено catch-all: \(moved.joined(separator: ", "))"))
         case .dnsOverrideClear:
@@ -155,14 +172,14 @@ enum Executor {
                 SCDynamicStoreRemoveValue(store, HelperConst.dnsOverrideKey as CFString)
                 restoreCatchAll(store)
             }
-            _ = execute(.dnsFlush, waitAuthCleanup: false)
+            _ = execute(.dnsFlush, waitAuthCleanup: false, caller: caller)
             return PrivResult(ok: true, output: "основний DNS — як вирішила система")
         case .resolverRemove(let domain):
             guard isDomain(domain) else { return .fail("невірний домен") }
             do { try FileManager.default.removeItem(atPath: "/etc/resolver/\(domain)") } catch {
                 return .fail("немає правила для \(domain)")
             }
-            _ = execute(.dnsFlush, waitAuthCleanup: false)
+            _ = execute(.dnsFlush, waitAuthCleanup: false, caller: caller)
             return PrivResult(ok: true, output: "прибрано \(domain)")
 
         // ── Мережа / процеси ────────────────────────────────────────────────
@@ -237,14 +254,6 @@ enum Executor {
     }
 
     // ── Валідація ───────────────────────────────────────────────────────────
-    static func validWGConf(_ path: String) -> String? {
-        let p = URL(fileURLWithPath: path).standardizedFileURL.path
-        guard p.hasSuffix(".conf"), wgDirs.contains(where: { p.hasPrefix($0 + "/") }), !isSymlink(p) else { return nil }
-        let name = (p as NSString).lastPathComponent.dropLast(5)
-        guard name.range(of: #"^[a-zA-Z0-9_=+.-]{1,15}$"#, options: .regularExpression) != nil else { return nil }
-        return p
-    }
-
     static func isOvpnLogPath(_ p: String) -> Bool {
         p.range(of: #"^/tmp/openvpn(-[A-Za-z0-9._ -]+)?\.log$"#, options: .regularExpression) != nil && !p.contains("..")
     }

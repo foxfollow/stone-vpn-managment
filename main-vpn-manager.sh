@@ -262,6 +262,29 @@ cisco_gui_pid() {
 
 # Підключити Cisco через CLI (`vpn connect <хост>`). Групу, логін, пароль і банер
 # питає сам vpn у терміналі — тут нічого не зберігається.
+# Мертвий route-fix: статичний -host маршрут до <ip> через шлюз, якого немає в жодній
+# поточній мережі (route-fix робили в іншій Wi-Fi). Ознака — до самого шлюзу ядро теж іде
+# через шлюз (GATEWAY у `route get <gw>`), тобто він не on-link. Друкує шлюз, якщо мертвий.
+dead_host_route() {
+    local ip="$1" r gw
+    r=$(route -n get "$ip" 2>/dev/null) || return 1
+    local f; f=$(awk '/flags:/{print $2}' <<< "$r")
+    [[ "$f" == *GATEWAY* && "$f" == *HOST* && "$f" == *STATIC* ]] || return 1
+    gw=$(awk '/gateway:/{print $2}' <<< "$r")
+    [[ "$gw" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+    route -n get "$gw" 2>/dev/null | grep -q 'flags:.*GATEWAY' || return 1
+    echo "$gw"
+}
+
+# Прибрати мертвий host-маршрут до хоста (host або host:port) перед підключенням.
+purge_dead_host_route() {
+    local host="${1%%:*}" ip gw
+    ip=$(python3 -c "import socket,sys; print(socket.gethostbyname(sys.argv[1]))" "$host" 2>/dev/null) || return 0
+    gw=$(dead_host_route "$ip") || return 0
+    echo "${Y}Мертвий маршрут $ip → $gw${N} (route-fix з іншої мережі) — прибираю."
+    sudo route -q delete -host "$ip" >/dev/null 2>&1 || echo "${R}не вдалося прибрати маршрут${N}"
+}
+
 cisco_up() {
     local cli host="${1:-}" cur
     cli=$(cisco_cli) || die "Cisco Secure Client CLI не знайдено (/opt/cisco/secureclient/bin/vpn)"
@@ -298,6 +321,7 @@ cisco_up() {
         sleep 1
     fi
 
+    purge_dead_host_route "$host"
     echo "${B}Підключаю Cisco до $host...${N}"
     "$cli" connect "$host"
     cur=$(cisco_connected_host)

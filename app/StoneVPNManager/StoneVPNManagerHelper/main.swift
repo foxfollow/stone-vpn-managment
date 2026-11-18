@@ -21,10 +21,13 @@ func ownTeamID() -> String? {
 }
 
 final class Service: NSObject, HelperXPC {
+    let caller: uid_t
+    init(caller: uid_t) { self.caller = caller }
+
     func run(_ request: Data, withReply reply: @escaping (Data) -> Void) {
         let result: PrivResult
         if let op = try? JSONDecoder().decode(PrivOp.self, from: request) {
-            result = Executor.execute(op, waitAuthCleanup: false)
+            result = Executor.execute(op, waitAuthCleanup: false, caller: caller)
         } else {
             result = .fail("невідомий запит (оновіть helper)")
         }
@@ -48,7 +51,7 @@ final class Delegate: NSObject, NSXPCListenerDelegate {
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection c: NSXPCConnection) -> Bool {
         c.setCodeSigningRequirement(requirement)
         c.exportedInterface = NSXPCInterface(with: HelperXPC.self)
-        c.exportedObject = Service()
+        c.exportedObject = Service(caller: c.effectiveUserIdentifier)
         c.resume()
         return true
     }
@@ -57,11 +60,14 @@ final class Delegate: NSObject, NSXPCListenerDelegate {
 let args = CommandLine.arguments
 if args.count >= 3, args[1] == "--run-file" {
     let path = args[2]
+    // Запит пише застосунок від імені користувача (файл 600) — його власник і є запитувачем.
+    var st = stat()
+    let caller: uid_t? = lstat(path, &st) == 0 && st.st_uid != 0 ? st.st_uid : nil
     let data = FileManager.default.contents(atPath: path)
     try? FileManager.default.removeItem(atPath: path)
     let result: PrivResult
     if let data, let op = try? JSONDecoder().decode(PrivOp.self, from: data) {
-        result = Executor.execute(op, waitAuthCleanup: true)
+        result = Executor.execute(op, waitAuthCleanup: true, caller: caller)
     } else {
         result = .fail("не прочитав запит")
     }
