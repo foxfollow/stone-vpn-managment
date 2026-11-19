@@ -8,6 +8,7 @@ struct StoneVPNManagerApp: App {
     init() {
         if CommandLine.arguments.contains("--dump-status") { Self.dumpStatus() }
         AppModel.shared.start()
+        _ = Updater.shared
     }
 
     /// Діагностика без UI: знімок стану текстом (порівнювати з `main-vpn-manager.sh status`).

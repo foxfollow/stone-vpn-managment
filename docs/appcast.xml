@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>StoneVPN Manager</title>
+    <link>https://foxfollow.github.io/stone-vpn-managment/</link>
+    <description>Most recent changes with links to updates.</description>
+    <language>en</language>
+    <!--
+      Release notes for the NEXT release go into the "new" block below, one
+      list item per line. The release workflow turns them into the appcast item
+      and the GitHub release notes, then removes the block. New items are
+      inserted right after the language element.
+    -->
+    <new>
+      <li>First public release: WireGuard, OpenVPN, Defguard and Cisco Secure Client in one menu bar app</li>
+      <li>DNS doctor, primary DNS switch, split DNS and DNS guard after WireGuard</li>
+      <li>Route-fix per profile, routes view, network service priority (Auto)</li>
+      <li>Privileged helper with validated operations; automatic updates via Sparkle</li>
+    </new>
+  </channel>
+</rss>

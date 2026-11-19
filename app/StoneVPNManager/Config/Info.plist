@@ -10,5 +10,17 @@
 	<!-- Репозиторій з config.env/state.env, спільними з main-vpn-manager.sh (build setting STONEVPN_REPO_PATH). -->
 	<key>StoneVPNRepoPath</key>
 	<string>$(STONEVPN_REPO_PATH)</string>
+	<!-- Sparkle. Оновлення вмикає лише CI-реліз (STONEVPN_UPDATES=YES): локальна збірка з
+	     Team ID не може оновитися ad-hoc-релізом, тож вона Sparkle не запускає. -->
+	<key>StoneVPNUpdates</key>
+	<string>$(STONEVPN_UPDATES)</string>
+	<key>SUFeedURL</key>
+	<string>https://foxfollow.github.io/stone-vpn-managment/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_KEY)</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

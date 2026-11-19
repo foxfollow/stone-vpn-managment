@@ -1,0 +1,434 @@
+# =============================================================================
+# Build and Release — StoneVPN Manager (menu bar app in app/)
+# =============================================================================
+#
+# Same flow as Stone Clipboarder Tool: no Apple Developer ID, so the app is
+# ad-hoc signed; Sparkle EdDSA signatures secure the auto-updates.
+#
+#   push tag vX.Y.Z  →  test → build (unsigned) → ad-hoc sign → zip
+#                     →  Sparkle sign + verify against SUPublicEDKey
+#                     →  docs/appcast.xml item → GitHub Release
+#                     →  appcast committed to main (served by GitHub Pages)
+#                     →  Homebrew cask bumped in foxfollow/homebrew-stone
+#
+# One-time setup (secrets, variables, Pages): docs/RELEASING.md
+# =============================================================================
+
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (X.Y.Z, without v). Must equal MARKETING_VERSION."
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash  # bash -eo pipefail
+
+env:
+  APP_NAME: StoneVPNManager
+  DISPLAY_NAME: StoneVPN Manager
+  PROJECT: app/StoneVPNManager/StoneVPNManager.xcodeproj
+  SCHEME: StoneVPNManager
+  PACKAGE_DIR: app/Packages/StoneVPNKit
+  APPCAST: docs/appcast.xml
+  SITE_URL: https://foxfollow.github.io/stone-vpn-managment
+  TAP_REPO: foxfollow/homebrew-stone
+  CASK_PATH: Casks/stone-vpn-manager.rb
+  # sign_update reads the private key: keep the checksum pinned and update both
+  # together (same version as Package.resolved).
+  SPARKLE_VERSION: "2.10.1"
+  SPARKLE_SHA256: "1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27"
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: macos-26
+
+    steps:
+      # =======================================================================
+      # SETUP
+      # =======================================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Version '$VERSION' is not X.Y.Z"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "📦 Releasing version $VERSION"
+
+      - name: Validate signing configuration
+        env:
+          HAS_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY != '' }}
+          SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
+        run: |
+          if [[ "$HAS_PRIVATE_KEY" != "true" ]]; then
+            echo "❌ Secret SPARKLE_PRIVATE_KEY is missing (see docs/RELEASING.md)"
+            exit 1
+          fi
+          if [[ -z "$SPARKLE_PUBLIC_KEY" ]] && ! grep -q 'SPARKLE_PUBLIC_KEY = "[A-Za-z0-9+/=]\{40,\}"' "$PROJECT/project.pbxproj"; then
+            echo "❌ No Sparkle public key: set the repository variable SPARKLE_PUBLIC_KEY"
+            echo "   (or SPARKLE_PUBLIC_KEY in the Xcode project) — see docs/RELEASING.md"
+            exit 1
+          fi
+          echo "✅ Signing configuration present"
+
+      - name: Select Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)
+          if [[ -n "$LATEST_XCODE" ]]; then
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+          swift --version
+
+      - name: Install Sparkle tools
+        run: |
+          ARCHIVE="$RUNNER_TEMP/Sparkle-$SPARKLE_VERSION.tar.xz"
+          curl -fsSL --retry 3 -o "$ARCHIVE" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+          echo "$SPARKLE_SHA256  $ARCHIVE" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/sparkle"
+          tar -xJf "$ARCHIVE" -C "$RUNNER_TEMP/sparkle"
+          SIGN_UPDATE="$RUNNER_TEMP/sparkle/bin/sign_update"
+          test -x "$SIGN_UPDATE"
+          echo "SIGN_UPDATE=$SIGN_UPDATE" >> "$GITHUB_ENV"
+          echo "✅ sign_update $SPARKLE_VERSION"
+
+      # =======================================================================
+      # TEST + BUILD
+      # =======================================================================
+
+      - name: Unit tests (StoneVPNKit)
+        run: swift test --package-path "$PACKAGE_DIR"
+
+      - name: Build app (unsigned Release)
+        env:
+          SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
+        run: |
+          mkdir -p build
+          EXTRA=()
+          [[ -n "$SPARKLE_PUBLIC_KEY" ]] && EXTRA+=("SPARKLE_PUBLIC_KEY=$SPARKLE_PUBLIC_KEY")
+          # STONEVPN_REPO_PATH= : don't bake the runner's checkout path into Info.plist
+          #   (the app then looks for the CLI repo next to itself / in settings, else standalone).
+          # STONEVPN_UPDATES=YES : release builds run Sparkle (local builds don't).
+          xcodebuild build \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -derivedDataPath build/DerivedData \
+            -destination "generic/platform=macOS" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            STONEVPN_REPO_PATH= \
+            STONEVPN_UPDATES=YES \
+            "${EXTRA[@]}" \
+            2>&1 | tee build/build.log | grep -E "error:|warning: .*\.swift|BUILD (SUCCEEDED|FAILED)" || true
+          if ! grep -q "BUILD SUCCEEDED" build/build.log; then
+            echo "❌ Build failed"
+            tail -100 build/build.log
+            exit 1
+          fi
+
+      - name: Locate and inspect app bundle
+        run: |
+          APP_PATH="build/DerivedData/Build/Products/Release/$APP_NAME.app"
+          test -d "$APP_PATH"
+          test -x "$APP_PATH/Contents/MacOS/$APP_NAME"
+          test -x "$APP_PATH/Contents/MacOS/StoneVPNManagerHelper"
+          test -f "$APP_PATH/Contents/Library/LaunchDaemons/com.foxfollow.stonevpnmanager.helper.plist"
+          test -d "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+          PLIST="$APP_PATH/Contents/Info.plist"
+          pb() { /usr/libexec/PlistBuddy -c "Print :$1" "$PLIST"; }
+          {
+            echo "APP_PATH=$APP_PATH"
+            echo "BUILD_NUMBER=$(pb CFBundleVersion)"
+            echo "SHORT_VERSION=$(pb CFBundleShortVersionString)"
+            echo "SU_PUBLIC_KEY=$(pb SUPublicEDKey)"
+          } >> "$GITHUB_ENV"
+          echo "Updates flag: $(pb StoneVPNUpdates) · repo path: '$(pb StoneVPNRepoPath)' · feed: $(pb SUFeedURL)"
+          lipo -archs "$APP_PATH/Contents/MacOS/$APP_NAME"
+          lipo -archs "$APP_PATH/Contents/MacOS/StoneVPNManagerHelper"
+
+      - name: Verify version numbers
+        run: |
+          if [[ "$VERSION" != "$SHORT_VERSION" ]]; then
+            echo "❌ tag/input $VERSION != MARKETING_VERSION $SHORT_VERSION of the built app."
+            echo "   Bump MARKETING_VERSION in $PROJECT/project.pbxproj (all targets) or fix the tag."
+            exit 1
+          fi
+          if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "❌ CURRENT_PROJECT_VERSION ($BUILD_NUMBER) must be an integer"
+            exit 1
+          fi
+          # Sparkle offers an update only if sparkle:version (build number) grows.
+          LATEST_BUILD=$(grep -o '<sparkle:version>[0-9]*</sparkle:version>' "$APPCAST" | grep -o '[0-9][0-9]*' | sort -n | tail -1 || true)
+          if [[ -n "$LATEST_BUILD" && "$BUILD_NUMBER" -le "$LATEST_BUILD" ]]; then
+            echo "❌ Build number $BUILD_NUMBER is not above the newest appcast build ($LATEST_BUILD)."
+            echo "   Bump CURRENT_PROJECT_VERSION, or remove the stale <item> if this is a re-release."
+            exit 1
+          fi
+          if [[ -z "$SU_PUBLIC_KEY" ]]; then
+            echo "❌ The built app has an empty SUPublicEDKey"
+            exit 1
+          fi
+          echo "✅ $SHORT_VERSION (build $BUILD_NUMBER)"
+
+      - name: Ad-hoc sign
+        run: |
+          # Inside-out: Sparkle (framework + its XPC services/Updater.app), the
+          # root helper (identifier = its bundle id, the client checks it), then
+          # the app. The helper pins the app's cdhash for XPC in ad-hoc builds.
+          codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+          codesign --force --sign - --identifier com.foxfollow.stonevpnmanager.helper \
+            "$APP_PATH/Contents/MacOS/StoneVPNManagerHelper"
+          codesign --force --sign - "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          codesign -dv "$APP_PATH" 2>&1 | grep -E "Identifier|Signature"
+          codesign -d -r- "$APP_PATH" 2>&1 | tail -1
+
+      # =======================================================================
+      # PACKAGE + SPARKLE
+      # =======================================================================
+
+      - name: Create ZIP archive
+        run: |
+          mkdir -p release
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "release/$APP_NAME.zip"
+          unzip -tq "release/$APP_NAME.zip"
+          SIZE=$(stat -f%z "release/$APP_NAME.zip")
+          SHA256=$(shasum -a 256 "release/$APP_NAME.zip" | awk '{print $1}')
+          echo "FILE_SIZE=$SIZE" >> "$GITHUB_ENV"
+          echo "ZIP_SHA256=$SHA256" >> "$GITHUB_ENV"
+          echo "✅ release/$APP_NAME.zip ($SIZE bytes, sha256 $SHA256)"
+
+      - name: Sign ZIP with Sparkle EdDSA
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          KEY_FILE=$(mktemp)
+          trap 'rm -f "$KEY_FILE"' EXIT
+          printf '%s\n' "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+          SIGNATURE=$("$SIGN_UPDATE" --ed-key-file "$KEY_FILE" -p "release/$APP_NAME.zip")
+          if [[ ${#SIGNATURE} -lt 80 ]]; then
+            echo "❌ sign_update returned no signature"
+            exit 1
+          fi
+          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> "$GITHUB_ENV"
+          echo "✅ Signature: ${SIGNATURE:0:16}…"
+
+      - name: Verify signature against the app's SUPublicEDKey
+        run: |
+          # The exact check Sparkle does on the user's Mac. Catches a private key
+          # that doesn't belong to the public key baked into the app (updates
+          # would then fail for everyone).
+          OPENSSL="$(brew --prefix openssl@3 2>/dev/null)/bin/openssl"
+          if [[ ! -x "$OPENSSL" ]]; then
+            echo "⚠️ openssl@3 not found — skipping key pair check"
+            exit 0
+          fi
+          T="$RUNNER_TEMP/edcheck"; mkdir -p "$T"
+          { printf '\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00'; printf '%s' "$SU_PUBLIC_KEY" | base64 -d; } > "$T/pub.der"
+          printf '%s' "$SPARKLE_SIGNATURE" | base64 -d > "$T/sig.bin"
+          if ! "$OPENSSL" pkeyutl -verify -pubin -inkey "$T/pub.der" -keyform DER -rawin \
+                 -in "release/$APP_NAME.zip" -sigfile "$T/sig.bin"; then
+            echo "❌ SPARKLE_PRIVATE_KEY does not match SUPublicEDKey of the built app"
+            exit 1
+          fi
+
+      # =======================================================================
+      # APPCAST + RELEASE NOTES
+      # =======================================================================
+
+      - name: Update appcast.xml
+        run: |
+          # Bullets for this release come from the <new> block in the appcast
+          # (single source of truth); the block is removed afterwards.
+          NOTES=""
+          if grep -q "<new>" "$APPCAST"; then
+            NOTES=$(sed -n '/<new>/,/<\/new>/p' "$APPCAST" | grep '<li>' | sed 's/^[[:space:]]*//' || true)
+          fi
+          if [[ -n "$NOTES" ]]; then
+            DESCRIPTION_HTML="<h2>Version $SHORT_VERSION</h2><ul>$NOTES</ul>"
+          else
+            DESCRIPTION_HTML="<h2>Version $SHORT_VERSION</h2><p>See the release notes on GitHub.</p>"
+          fi
+          DOWNLOAD_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/v$SHORT_VERSION/$APP_NAME.zip"
+          RELEASE_DATE=$(LC_ALL=C date -u +"%a, %d %b %Y %H:%M:%S +0000")
+
+          ITEM=$(mktemp)
+          cat > "$ITEM" <<EOF
+
+              <item>
+                  <title>Version $SHORT_VERSION</title>
+                  <link>$SITE_URL/</link>
+                  <sparkle:version>$BUILD_NUMBER</sparkle:version>
+                  <sparkle:shortVersionString>$SHORT_VERSION</sparkle:shortVersionString>
+                  <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+                  <description><![CDATA[$DESCRIPTION_HTML]]></description>
+                  <pubDate>$RELEASE_DATE</pubDate>
+                  <enclosure
+                      url="$DOWNLOAD_URL"
+                      sparkle:version="$BUILD_NUMBER"
+                      sparkle:shortVersionString="$SHORT_VERSION"
+                      sparkle:edSignature="$SPARKLE_SIGNATURE"
+                      length="$FILE_SIZE"
+                      type="application/octet-stream"
+                  />
+              </item>
+          EOF
+
+          sed -i '' '/<new>/,/<\/new>/d' "$APPCAST"
+          awk -v item="$ITEM" '
+            /<\/language>/ { print; while ((getline l < item) > 0) print l; close(item); next }
+            { print }
+          ' "$APPCAST" > "$APPCAST.new"
+          mv "$APPCAST.new" "$APPCAST"
+          rm -f "$ITEM"
+          xmllint --noout "$APPCAST"
+          echo "✅ appcast updated"
+
+          {
+            echo "## ✨ What's new"
+            echo ""
+            if [[ -n "$NOTES" ]]; then
+              echo "$NOTES" | sed -E 's#</?li>##g; s/^/- /'
+            else
+              echo "- See the commits below."
+            fi
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 📥 Install"
+            echo ""
+            echo '```bash'
+            echo "brew tap foxfollow/stone"
+            echo "brew trust --tap foxfollow/stone"
+            echo "brew install --cask stone-vpn-manager"
+            echo '```'
+            echo ""
+            echo "Or download \`$APP_NAME.zip\` below, move \`$APP_NAME.app\` to \`/Applications\` and run once:"
+            echo ""
+            echo '```bash'
+            echo "xattr -cr /Applications/$APP_NAME.app"
+            echo '```'
+            echo ""
+            echo "The app is ad-hoc signed (no Apple Developer ID), so macOS needs this one-time approval."
+            echo "Requires **macOS 26 Tahoe** or later. Guide: $SITE_URL/installation.html"
+            echo ""
+            echo "## 🔄 Updates"
+            echo ""
+            echo "The app updates itself (Sparkle, EdDSA-signed). Settings → General → Check for updates."
+            echo ""
+            echo "---"
+            echo ""
+            echo "**SHA-256:** \`$ZIP_SHA256\`  "
+            echo "**Sparkle signature:** \`$SPARKLE_SIGNATURE\`  "
+            echo "**Size:** $FILE_SIZE bytes"
+          } > release/RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: "${{ env.DISPLAY_NAME }} v${{ env.VERSION }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: release/${{ env.APP_NAME }}.zip
+          body_path: release/RELEASE_NOTES.md
+
+      - name: Commit appcast to the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cp "$APPCAST" "$RUNNER_TEMP/appcast.xml"
+          git checkout -- "$APPCAST"
+          git fetch origin "$DEFAULT_BRANCH"
+          git checkout -B "$DEFAULT_BRANCH" "origin/$DEFAULT_BRANCH"
+          cp "$RUNNER_TEMP/appcast.xml" "$APPCAST"
+          if git diff --quiet -- "$APPCAST"; then
+            echo "ℹ️ appcast unchanged"
+            exit 0
+          fi
+          git add "$APPCAST"
+          git commit -m "ciflow: update appcast.xml for v$VERSION" -m "[skip ci]"
+          for i in 1 2 3; do
+            if git push origin "$DEFAULT_BRANCH"; then
+              echo "✅ appcast pushed to $DEFAULT_BRANCH"
+              exit 0
+            fi
+            echo "⚠️ push failed, retrying ($i/3)…"
+            git pull --rebase origin "$DEFAULT_BRANCH"
+            sleep 2
+          done
+          echo "❌ could not push the appcast"
+          exit 1
+
+      - name: Update Homebrew cask
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "⚠️ HOMEBREW_TAP_TOKEN not set — skipping the cask bump"
+            exit 0
+          fi
+          API="repos/$TAP_REPO/contents/$CASK_PATH"
+          if ! FILE_SHA=$(gh api "$API" --jq .sha 2>/dev/null); then
+            echo "⚠️ $CASK_PATH not found in $TAP_REPO — push the cask once (docs/RELEASING.md)"
+            exit 0
+          fi
+          gh api "$API" --jq .content | base64 -d > "$RUNNER_TEMP/cask.rb"
+          sed -i '' -E \
+            -e "s/^  version \"[^\"]*\"/  version \"$VERSION\"/" \
+            -e "s/^  sha256 \"[^\"]*\"/  sha256 \"$ZIP_SHA256\"/" \
+            "$RUNNER_TEMP/cask.rb"
+          grep -q "version \"$VERSION\"" "$RUNNER_TEMP/cask.rb"
+          grep -q "sha256 \"$ZIP_SHA256\"" "$RUNNER_TEMP/cask.rb"
+          gh api -X PUT "$API" \
+            -f message="ciflow: bump stone-vpn-manager to v$VERSION" \
+            -f content="$(base64 < "$RUNNER_TEMP/cask.rb" | tr -d '\n')" \
+            -f sha="$FILE_SHA" --jq '.commit.html_url'
+          echo "✅ cask bumped"
+
+      - name: Summary
+        run: |
+          {
+            echo "### $DISPLAY_NAME v$VERSION (build $BUILD_NUMBER)"
+            echo ""
+            echo "- Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/v$VERSION"
+            echo "- Appcast: $SITE_URL/appcast.xml"
+            echo "- Size: $FILE_SIZE bytes · SHA-256 \`$ZIP_SHA256\`"
+          } >> "$GITHUB_STEP_SUMMARY"

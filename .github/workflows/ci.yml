@@ -1,0 +1,56 @@
+# Checks on every push / PR: bash scripts (syntax + shellcheck) and the app
+# (StoneVPNKit unit tests + unsigned Release build with the runner's Xcode).
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore: ["docs/**", "**/*.md"]
+  pull_request:
+    paths-ignore: ["docs/**", "**/*.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  scripts:
+    name: Bash scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Syntax
+        run: for f in main-vpn-manager.sh scripts/*.sh; do bash -n "$f"; done
+      - name: shellcheck (errors)
+        run: shellcheck -S error main-vpn-manager.sh scripts/*.sh
+
+  app:
+    name: App (test + build)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)
+          [[ -n "$LATEST_XCODE" ]] && sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+      - name: Unit tests
+        run: swift test --package-path app/Packages/StoneVPNKit
+      - name: Build (unsigned Release)
+        run: |
+          xcodebuild build \
+            -project app/StoneVPNManager/StoneVPNManager.xcodeproj \
+            -scheme StoneVPNManager -configuration Release \
+            -derivedDataPath build/DerivedData -destination "generic/platform=macOS" \
+            ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            STONEVPN_REPO_PATH= \
+            2>&1 | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log

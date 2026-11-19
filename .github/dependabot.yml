@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Sparkle (Package.resolved of the Xcode project). Bumping it also means
+  # updating SPARKLE_VERSION + SPARKLE_SHA256 in .github/workflows/release.yml.
+  - package-ecosystem: "swift"
+    directory: "/app/StoneVPNManager"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

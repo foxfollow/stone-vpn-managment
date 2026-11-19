@@ -3,8 +3,20 @@ import StoneVPNCore
 
 struct GeneralTab: View {
     @Bindable var model: AppModel
+    @State private var autoUpdates = Updater.shared.automaticallyChecks
+
     var body: some View {
         Form {
+            Section("Версія \(Updater.shared.version)") {
+                if Updater.shared.enabled {
+                    Toggle("Автоматично перевіряти оновлення", isOn: $autoUpdates)
+                        .onChange(of: autoUpdates) { Updater.shared.automaticallyChecks = autoUpdates }
+                    Button("Перевірити оновлення…") { Updater.shared.checkForUpdates() }
+                } else {
+                    Text("Збірка з вихідного коду — оновлюється через git pull і make -C app install. Автооновлення є в релізах (Homebrew / GitHub Releases).")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            }
             Section("Запуск") {
                 Toggle("Запускати при вході", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
                 Toggle("Показувати в Cmd+Tab, поки відкрите вікно", isOn: $model.prefs.showInAppSwitcher)
