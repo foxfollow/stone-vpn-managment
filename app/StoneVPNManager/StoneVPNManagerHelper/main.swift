@@ -4,7 +4,7 @@ import StoneVPNShared
 
 // StoneVPNManagerHelper — два режими:
 //   • launchd-демон (SMAppService.daemon): XPC Mach service, приймає лише StoneVPNManager
-//     з тим самим Team ID;
+//     з тим самим Team ID, а в ad-hoc збірках — саме той бандл, у якому лежить helper;
 //   • `--run-file <json>` — одноразове виконання від root через osascript
 //     (fallback, поки демон не встановлено/не схвалено).
 
@@ -37,18 +37,38 @@ final class Service: NSObject, HelperXPC {
     func version(withReply reply: @escaping (Int) -> Void) { reply(HelperConst.version) }
 }
 
-final class Delegate: NSObject, NSXPCListenerDelegate {
-    let requirement: String
+/// Designated requirement застосунку, в бандлі якого лежить цей helper
+/// (…/StoneVPNManager.app/Contents/MacOS/StoneVPNManagerHelper). Для ad-hoc підпису
+/// це `cdhash H"…"` — його не підробиш, на відміну від `identifier`.
+func enclosingAppRequirement() -> String? {
+    guard let exe = Bundle.main.executableURL?.resolvingSymlinksInPath() else { return nil }
+    let app = exe.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    guard app.pathExtension == "app" else { return nil }
+    var sc: SecStaticCode?
+    guard SecStaticCodeCreateWithPath(app as CFURL, [], &sc) == errSecSuccess, let sc else { return nil }
+    var req: SecRequirement?
+    guard SecCodeCopyDesignatedRequirement(sc, [], &req) == errSecSuccess, let req else { return nil }
+    var str: CFString?
+    guard SecRequirementCopyString(req, [], &str) == errSecSuccess, let str else { return nil }
+    return str as String
+}
 
-    override init() {
-        if let team = ownTeamID() {
-            requirement = "anchor apple generic and identifier \"\(HelperConst.appBundleID)\" and certificate leaf[subject.OU] = \"\(team)\""
-        } else {
-            requirement = "identifier \"\(HelperConst.appBundleID)\""
-        }
+/// Вимога до клієнта XPC. З Team ID — той самий Team ID + bundle id застосунку.
+/// Без нього (ad-hoc релізи з CI) голий `identifier "…"` поставить будь-хто
+/// (`codesign -s - -i com.foxfollow.stonevpnmanager`), а helper запускає від root,
+/// зокрема openvpn зі script-security 2. Тому — DR застосунку-власника з диска; рахується
+/// на кожне з'єднання: після оновлення бандла старий демон приймає вже новий застосунок.
+func clientRequirement() -> String? {
+    if let team = ownTeamID() {
+        return "anchor apple generic and identifier \"\(HelperConst.appBundleID)\" and certificate leaf[subject.OU] = \"\(team)\""
     }
+    return enclosingAppRequirement().map { "identifier \"\(HelperConst.appBundleID)\" and (\($0))" }
+}
 
+final class Delegate: NSObject, NSXPCListenerDelegate {
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection c: NSXPCConnection) -> Bool {
+        // Немає вимоги (helper не в бандлі застосунку / бандл без підпису) — нікого не приймаємо.
+        guard let requirement = clientRequirement() else { return false }
         c.setCodeSigningRequirement(requirement)
         c.exportedInterface = NSXPCInterface(with: HelperXPC.self)
         c.exportedObject = Service(caller: c.effectiveUserIdentifier)
