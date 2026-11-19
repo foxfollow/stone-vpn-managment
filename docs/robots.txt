@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://foxfollow.github.io/stone-vpn-managment/sitemap.xml

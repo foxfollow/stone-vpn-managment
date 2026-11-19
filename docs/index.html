@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+  <title>StoneVPN Manager – one menu bar for every VPN on macOS</title>
+  <meta name="description" content="Free, open-source macOS menu bar app for WireGuard, OpenVPN, Defguard and Cisco Secure Client — with a DNS doctor, split DNS, route-fix and network diagnostics. Install with Homebrew.">
+  <meta name="keywords" content="VPN manager macOS, WireGuard menu bar, OpenVPN macOS, Defguard, Cisco Secure Client, DNS fix, split DNS, wg-quick, menu bar app, open source">
+  <link rel="canonical" href="https://foxfollow.github.io/stone-vpn-managment/">
+  <link rel="alternate" hreflang="en" href="https://foxfollow.github.io/stone-vpn-managment/">
+  <link rel="alternate" hreflang="uk" href="https://foxfollow.github.io/stone-vpn-managment/index-ua.html">
+  <link rel="alternate" hreflang="x-default" href="https://foxfollow.github.io/stone-vpn-managment/">
+  <link rel="icon" type="image/png" sizes="48x48" href="resources/favicon-48.png" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" sizes="48x48" href="resources/favicon-dark-48.png" media="(prefers-color-scheme: dark)">
+  <link rel="apple-touch-icon" href="resources/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="StoneVPN Manager">
+  <meta property="og:title" content="StoneVPN Manager – one menu bar for every VPN">
+  <meta property="og:description" content="WireGuard, OpenVPN, Defguard and Cisco in one macOS menu bar app — plus the DNS and routing fixes VPNs never do themselves.">
+  <meta property="og:url" content="https://foxfollow.github.io/stone-vpn-managment/">
+  <meta property="og:image" content="https://foxfollow.github.io/stone-vpn-managment/resources/og-image.png">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="uk_UA">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#061820">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="resources/site.css">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"StoneVPN Manager","operatingSystem":"macOS 26+","applicationCategory":"UtilitiesApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","url":"https://foxfollow.github.io/stone-vpn-managment/","downloadUrl":"https://github.com/foxfollow/stone-vpn-managment/releases/latest"}
+  </script>
+</head>
+<body>
+
+<nav class="nav" aria-label="Main">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="resources/icon-512.png" alt="" width="30" height="30">StoneVPN Manager</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#screens">Screens</a>
+      <a href="#how">How it works</a>
+      <a href="#cli">CLI</a>
+      <a href="#install">Install</a>
+    </div>
+    <div class="nav-tools">
+      <a class="chip-btn" href="index-ua.html" hreflang="uk" lang="uk" title="Українська версія">UA</a>
+      <button class="chip-btn" type="button" data-theme-toggle aria-label="Toggle light/dark theme">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4"/></svg>
+      </button>
+      <a class="chip-btn" href="https://github.com/foxfollow/stone-vpn-managment" aria-label="GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow reveal"><span class="pulse"></span><b>Free &amp; open source</b> · macOS 26 Tahoe</span>
+      <h1 class="reveal" style="--d:.05s">One menu bar<br>for <span class="lamp">every VPN.</span></h1>
+      <p class="lead reveal" style="--d:.1s">StoneVPN Manager puts WireGuard, OpenVPN, Defguard and Cisco Secure Client behind a single menu bar icon — and fixes the DNS and routing mess that VPNs leave behind.</p>
+      <div class="cmd reveal" style="--d:.15s"><span class="p">$</span><code>brew install --cask foxfollow/stone/stone-vpn-manager</code><button class="copy" type="button" data-copy="brew tap foxfollow/stone &amp;&amp; brew trust --tap foxfollow/stone &amp;&amp; brew install --cask stone-vpn-manager" data-done="Copied ✓">Copy</button></div>
+      <div class="hero-cta reveal" style="--d:.2s">
+        <a class="btn btn-primary" href="#install">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M4 16.5h12"/></svg>
+          Install with Homebrew
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/foxfollow/stone-vpn-managment/releases/latest">Download .zip</a>
+      </div>
+      <div class="hero-meta reveal" style="--d:.25s">
+        <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3 3 7-7"/></svg>Apple silicon &amp; Intel</span>
+        <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3 3 7-7"/></svg>No telemetry</span>
+        <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3 3 7-7"/></svg>Auto-updates (Sparkle)</span>
+        <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3 3 7-7"/></svg>MIT license</span>
+      </div>
+    </div>
+    <div class="stage-wrap reveal" style="--d:.15s">
+      <div class="stage-glow"></div>
+      <div class="stage-fit" data-hero-stage>
+        <div class="stage mk">
+          <div class="menubar" aria-hidden="true">
+            <span class="mb-ico" style="width:22px;height:16px">
+              <svg viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="4" width="17" height="8" rx="2.4"/><rect x="2.8" y="5.8" width="11" height="4.4" rx="1.2" fill="currentColor" stroke="none"/><path d="M19.6 6.6v2.8"/></svg>
+            </span>
+            <span class="mb-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M3.8 8.6a6.2 6.2 0 0 1 8.4 0M6 11.1a3 3 0 0 1 4 0"/><circle cx="8" cy="13.3" r=".9" fill="currentColor" stroke="none"/></svg></span>
+            <span class="mb-app"><span data-mb-icon></span><span class="mb-count" data-mb-count></span></span>
+            <span>Wed 9:41</span>
+          </div>
+          <div class="desk" role="img" aria-label="Animated mockup of the StoneVPN Manager popover: connecting WireGuard and Defguard, detecting a dead DNS resolver and fixing it. Made-up data."></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="backends">
+  <div class="wrap">
+    <span class="lbl">Drives the tools you already use</span>
+    <span class="be"><span class="badge b-wg">WG</span>WireGuard</span>
+    <span class="be"><span class="badge b-ov">OV</span>OpenVPN</span>
+    <span class="be"><span class="badge b-dg">DG</span>Defguard</span>
+    <span class="be"><span class="badge b-cs">CS</span>Cisco Secure Client</span>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Features</span>
+      <h2>Connecting is the easy part.</h2>
+      <p>The hard part is what happens around the tunnel: a resolver that silently died, a route out of the wrong interface, an Ethernet port without internet stealing Wi-Fi. StoneVPN watches all of it.</p>
+    </div>
+    <div class="features">
+      <article class="feat reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h4M7 15h4"/><circle cx="16" cy="9" r="1.6"/><circle cx="16" cy="15" r="1.6"/></svg></div>
+        <h3>Four VPNs, one switchboard</h3>
+        <p>WireGuard via <code>wg-quick</code>, OpenVPN via the Homebrew binary (it writes routes correctly, unlike the GUI), Defguard with MFA, and Cisco Secure Client with in-app login and Duo push. Favourites, aliases, last used.</p>
+      </article>
+      <article class="feat reveal" style="--d:.05s">
+        <div class="ico lamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M3.5 12h17M12 3c2.5 2.6 3.6 5.6 3.6 9"/><path d="m15.5 18 2 2 4-4"/></svg></div>
+        <h3>DNS doctor</h3>
+        <p>Notices a dead resolver within seconds, purges entries left by dead tunnels and bounces the service so macOS really recomputes DNS. If a live-but-broken VPN is the culprit, it says so instead of pretending.</p>
+      </article>
+      <article class="feat reveal" style="--d:.1s">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h7l2 3h7M4 18h7l2-3h7M4 12h16"/></svg></div>
+        <h3>Primary DNS &amp; split DNS</h3>
+        <p>Pick whose resolver answers first — WireGuard, Cisco, Defguard or the system — and route internal domains with <code>/etc/resolver</code> rules. Common mistakes (an interface IP instead of a DNS server) get flagged.</p>
+      </article>
+      <article class="feat reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19.5 6v5.5c0 4.6-3.2 7.8-7.5 9.5-4.3-1.7-7.5-4.9-7.5-9.5V6z"/><path d="M9 12.5h6M12 9.5v6"/></svg></div>
+        <h3>DNS guard after WireGuard</h3>
+        <p><code>wg-quick</code> writes its DNS on every service and doesn't always put it back. The app remembers each service's baseline and restores it after disconnect, so the next VPN's hostname still resolves.</p>
+      </article>
+      <article class="feat reveal" style="--d:.05s">
+        <div class="ico lamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18h5a4 4 0 0 0 4-4v-1a4 4 0 0 1 3-4"/></svg></div>
+        <h3>Route-fix &amp; VPN-in-VPN</h3>
+        <p>When macOS sends the handshake out the wrong interface, host routes to the VPN server go via your LAN gateway — per profile, remembered. Stale routes from yesterday's Wi-Fi are purged before every connect.</p>
+      </article>
+      <article class="feat reveal" style="--d:.1s">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.4" r="1.1" fill="currentColor" stroke="none"/></svg></div>
+        <h3>Network priority that makes sense</h3>
+        <p>macOS picks the primary interface by service order, not by internet. An Ethernet port into a dead router wins over working Wi-Fi. See real per-interface reachability and fix it with one click.</p>
+      </article>
+      <article class="feat reveal">
+        <div class="ico lamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></div>
+        <h3>Stale Defguard sessions</h3>
+        <p>After a long sleep the gateway drops your MFA session while macOS still says “Connected” — and every DNS query black-holes. StoneVPN detects it, turns red and renews the session with just a new code.</p>
+      </article>
+      <article class="feat reveal" style="--d:.05s">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14.5v2.5"/></svg></div>
+        <h3>A helper that can't be talked into things</h3>
+        <p>Root work runs in a small daemon that accepts only the app's own signature and a fixed set of checked operations — paths, IPs, service names, PIDs. No shell strings, no passwords in arguments.</p>
+      </article>
+      <article class="feat reveal" style="--d:.1s">
+        <div class="ico lamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="m7 10 3 2.5L7 15M12.5 15H17"/></svg></div>
+        <h3>A real CLI behind it</h3>
+        <p>Prefer the terminal? <code>main-vpn-manager.sh</code> does the same: <code>status</code>, <code>up</code>, <code>down</code>, <code>dns fix</code>, <code>route</code>, <code>net auto</code>. App and CLI share <code>config.env</code> — or the app runs on its own.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section id="screens">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Screens</span>
+      <h2>Native, quiet, honest.</h2>
+      <p>A SwiftUI menu bar popover for the everyday clicks, windows for the rest. Colour means state: green up, orange connecting, red broken, purple “someone else owns your network”.</p>
+    </div>
+    <div class="gallery reveal" data-gallery>
+      <div class="g-tabs" role="tablist">
+        <button class="g-tab" role="tab" type="button" data-for="dns">DNS doctor</button>
+        <button class="g-tab" role="tab" type="button" data-for="profiles">Profiles</button>
+        <button class="g-tab" role="tab" type="button" data-for="connect">Login &amp; route-fix</button>
+        <button class="g-tab" role="tab" type="button" data-for="routes">Routes</button>
+        <button class="g-tab" role="tab" type="button" data-for="settings">Settings</button>
+      </div>
+      <div class="g-stage">
+        <div class="g-pane" data-pane="dns"><div class="g-fit"></div><p class="g-cap">Resolvers with live probes, who owns DNS, the primary DNS switch and your split rules — Fix and Flush one click away.</p></div>
+        <div class="g-pane" data-pane="profiles"><div class="g-fit"></div><p class="g-cap">Every profile of every backend: aliases for cryptic <code>.ovpn</code> names, favourites, and a route-fix policy per profile.</p></div>
+        <div class="g-pane" data-pane="connect"><div class="g-fit"></div><p class="g-cap">OpenVPN login with OTP and a route-fix gateway picker. Passwords and codes are never stored.</p></div>
+        <div class="g-pane" data-pane="routes"><div class="g-fit"></div><p class="g-cap">Which tunnel carries what: routes per utun, labelled by owner, plus the host routes to VPN servers.</p></div>
+        <div class="g-pane" data-pane="settings"><div class="g-fit"></div><p class="g-cap">The same keys as <code>config.env</code>, plus the DNS guard, doctor and automation switches.</p></div>
+      </div>
+    </div>
+    <p class="mockup-note">Mockups with made-up data (documentation IP ranges, example.com hosts). UI text is translated for illustration — the app interface itself is in Ukrainian for now.</p>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap arch">
+    <div class="reveal" data-arch>
+      <script type="application/json">{"aria":"Architecture: the app talks to a root helper over XPC; the helper runs wg-quick, openvpn, DNS and route changes; Defguard and Cisco go through their own CLIs; the CLI shares the config.","app":"StoneVPN Manager","appS":"menu bar · your user","xpc":"XPC · PrivOp","helper":"Privileged helper","helperS":"root · launchd","dns":"DNS · scutil","routes":"routes","noRoot":"own CLI · no root","shared":"shared with the CLI"}</script>
+    </div>
+    <div>
+      <div class="reveal">
+        <span class="kicker">How it works</span>
+        <h2>Root only where it has to be.</h2>
+        <p style="color:var(--muted);margin:0 0 26px">The app runs as you. Anything that needs root goes to a launchd daemon as a typed request, gets validated, and runs — or doesn't.</p>
+      </div>
+      <ul class="checks reveal" style="--d:.05s">
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 4 4 8-9"/></svg><span><b>Signature-pinned XPC.</b> The helper accepts connections only from the app bundle it ships in.</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 4 4 8-9"/></svg><span><b>Every argument checked.</b> WireGuard configs only from WireGuard dirs, IPs parsed, service names matched, only tunnel PIDs killed.</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 4 4 8-9"/></svg><span><b>No helper? Still works.</b> Each root action then asks for your password once, via the standard macOS prompt.</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 4 4 8-9"/></svg><span><b>Status never prompts.</b> Reading state is sudo-free; root-only reads are skipped without the helper.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="cli">
+  <div class="wrap cli-grid">
+    <div>
+      <div class="reveal">
+        <span class="kicker">CLI</span>
+        <h2>Same brain, in your terminal.</h2>
+        <p style="color:var(--muted);margin:0 0 26px">The app grew out of a Bash toolkit that is still here. Clone the repo and both share one config.</p>
+      </div>
+      <div class="cmds reveal" style="--d:.05s">
+        <div><code>status</code><span>tunnels, primary network and the effective resolver</span></div>
+        <div><code>up homelab</code><span>bring up a WireGuard tunnel, OpenVPN, Cisco or Defguard</span></div>
+        <div><code>dns fix</code><span>three-case DNS doctor, re-probes and reports honestly</span></div>
+        <div><code>route</code><span>who holds the default route, every VPN route by owner</span></div>
+        <div><code>net auto</code><span>put the service that really has internet on top</span></div>
+      </div>
+    </div>
+    <div class="term reveal" style="--d:.1s">
+      <div class="term-bar"><span class="lights"><i></i><i></i><i></i></span><span class="t-title">zsh — stone-vpn-managment</span></div>
+      <pre data-term><script type="application/json">[
+        {"c":"./main-vpn-manager.sh list"},
+        {"o":"WireGuard  homelab · office · backup","k":"dim","w":120},
+        {"o":"OpenVPN    Staging · Client lab","k":"dim","w":120},
+        {"o":"Defguard   Engineering (MFA) · Lab","k":"dim","w":120},
+        {"o":"Cisco      vpn.example.com:8443","k":"dim","w":500},
+        {"c":"./main-vpn-manager.sh up homelab"},
+        {"o":"[#] wg-quick up /opt/homebrew/etc/wireguard/homelab.conf","k":"dim","w":420},
+        {"o":"✓ homelab → utun4 198.51.100.7","k":"ok","w":600},
+        {"c":"./main-vpn-manager.sh dns fix"},
+        {"o":"resolver 198.51.100.53 ✗ — not answering","k":"","w":300},
+        {"o":"orphaned DNS: 1 → removed · Wi-Fi bounced · flushed","k":"dim","w":420},
+        {"o":"✓ resolver answers again","k":"ok","w":300}
+      ]</script></pre>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Install</span>
+      <h2>Three commands and one click.</h2>
+      <p>Distributed through the <a href="https://github.com/foxfollow/homebrew-stone">foxfollow/stone</a> Homebrew tap, alongside Stone Clipboarder Tool.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <h3>Add the tap</h3>
+        <p>Homebrew asks you to trust third-party taps once.</p>
+        <div class="cmd"><code>brew tap foxfollow/stone &amp;&amp; brew trust --tap foxfollow/stone</code><button class="copy" type="button" data-copy="brew tap foxfollow/stone &amp;&amp; brew trust --tap foxfollow/stone" data-done="✓">Copy</button></div>
+      </div>
+      <div class="step reveal" style="--d:.05s">
+        <h3>Install the app</h3>
+        <p>Universal build, macOS 26 Tahoe or later. Updates itself afterwards.</p>
+        <div class="cmd"><code>brew install --cask stone-vpn-manager</code><button class="copy" type="button" data-copy="brew install --cask stone-vpn-manager" data-done="✓">Copy</button></div>
+      </div>
+      <div class="step reveal" style="--d:.1s">
+        <h3>Backends &amp; helper</h3>
+        <p>Install the VPN tools you use. Then Settings → Helper → <b>Install</b> and allow it in Login Items — optional, saves password prompts.</p>
+        <div class="cmd"><code>brew install wireguard-tools openvpn</code><button class="copy" type="button" data-copy="brew install wireguard-tools openvpn" data-done="✓">Copy</button></div>
+      </div>
+    </div>
+    <div class="term reveal" style="margin-top:28px;max-width:860px;margin-inline:auto">
+      <div class="term-bar"><span class="lights"><i></i><i></i><i></i></span><span class="t-title">Terminal</span></div>
+      <pre data-term style="min-height:200px"><script type="application/json">[
+        {"c":"brew install --cask stone-vpn-manager"},
+        {"o":"==> Downloading StoneVPNManager.zip","k":"hl","w":500},
+        {"o":"==> Installing Cask stone-vpn-manager","k":"hl","w":300},
+        {"o":"==> Moving App 'StoneVPNManager.app' to '/Applications/StoneVPNManager.app'","k":"dim","w":400},
+        {"o":"🍺  stone-vpn-manager was successfully installed!","k":"ok","w":500},
+        {"c":"open -a StoneVPNManager"}
+      ]</script></pre>
+    </div>
+    <div class="req reveal">
+      <span><b>macOS 26</b> Tahoe or later</span>
+      <span><b>Universal</b> Apple silicon + Intel</span>
+      <span>Backends: <b>wireguard-tools</b>, <b>openvpn</b>, Defguard, Cisco — whichever you use</span>
+      <span><a href="installation.html">Full installation guide →</a></span>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">FAQ</span>
+      <h2>Good questions.</h2>
+    </div>
+    <div class="faq reveal">
+      <details>
+        <summary>Why does macOS warn about the app on first launch?</summary>
+        <p>It is free and signed ad-hoc, without a paid Apple Developer ID. The Homebrew cask removes the quarantine flag for you. With the manual <code>.zip</code>, run <code>xattr -cr /Applications/StoneVPNManager.app</code> once, or right-click → Open. Updates are verified with an EdDSA signature.</p>
+      </details>
+      <details>
+        <summary>What exactly runs as root?</summary>
+        <p><code>wg-quick</code>, <code>openvpn</code>, DNS and route changes, network service order and stopping tunnel processes — through the helper, and only as typed, validated operations. Defguard and Cisco go through their own CLIs and need no root at all.</p>
+      </details>
+      <details>
+        <summary>Does it send anything anywhere?</summary>
+        <p>No telemetry, no accounts. Network traffic is limited to the update check (an appcast on GitHub Pages), DNS probes (<code>dig apple.com</code>) and reachability probes per interface. That is also why macOS asks for <b>Local Network</b> access — your resolver usually lives in the LAN.</p>
+      </details>
+      <details>
+        <summary>Do I need the Bash scripts or the git repo?</summary>
+        <p>No. Without the repo the app keeps its settings in <code>~/Library/Application Support/StoneVPNManager/</code>. If you clone the repo, app and CLI can share <code>config.env</code> and <code>state.env</code>.</p>
+      </details>
+      <details>
+        <summary>Is the app in English?</summary>
+        <p>Not yet — the interface is currently Ukrainian. The screens on this page are translated mockups. Localization is welcome as a contribution.</p>
+      </details>
+      <details>
+        <summary>How do I update or uninstall?</summary>
+        <p>The app checks for updates itself (Settings → General). With Homebrew: <code>brew upgrade --cask --greedy stone-vpn-manager</code>. To remove: Settings → Helper → Remove, then <code>brew uninstall --cask --zap stone-vpn-manager</code>.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:20px">
+  <div class="wrap">
+    <div class="cta reveal">
+      <img src="resources/icon-512.png" alt="StoneVPN Manager icon" width="96" height="96">
+      <h2>Light at the end of every tunnel.</h2>
+      <p>Free, MIT-licensed, built for people who run more than one VPN and are tired of guessing why ping hangs.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#install">Install with Homebrew</a>
+        <a class="btn btn-ghost" href="https://github.com/foxfollow/stone-vpn-managment">Star on GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 foxfollow · <a href="https://github.com/foxfollow/stone-vpn-managment/blob/main/LICENSE">MIT</a></span>
+    <span class="sp"></span>
+    <a href="installation.html">Installation</a>
+    <a href="https://github.com/foxfollow/stone-vpn-managment/releases">Releases</a>
+    <a href="https://github.com/foxfollow/homebrew-stone">Homebrew tap</a>
+    <a href="https://github.com/foxfollow/stone-vpn-managment/blob/main/SECURITY.md">Security</a>
+    <a href="index-ua.html" hreflang="uk" lang="uk">Українською</a>
+  </div>
+</footer>
+
+<script src="resources/site.js" defer></script>
+</body>
+</html>

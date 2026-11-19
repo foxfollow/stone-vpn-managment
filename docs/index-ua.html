@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+  <title>StoneVPN Manager – одна іконка в menubar для всіх VPN на macOS</title>
+  <meta name="description" content="Безкоштовний open-source menubar-застосунок для macOS: WireGuard, OpenVPN, Defguard і Cisco Secure Client в одному місці — з DNS-доктором, split DNS, route-fix і діагностикою мережі. Встановлення через Homebrew.">
+  <meta name="keywords" content="VPN менеджер macOS, WireGuard, OpenVPN, Defguard, Cisco Secure Client, DNS fix, split DNS, wg-quick, menubar, open source, українською">
+  <link rel="canonical" href="https://foxfollow.github.io/stone-vpn-managment/index-ua.html">
+  <link rel="alternate" hreflang="en" href="https://foxfollow.github.io/stone-vpn-managment/">
+  <link rel="alternate" hreflang="uk" href="https://foxfollow.github.io/stone-vpn-managment/index-ua.html">
+  <link rel="alternate" hreflang="x-default" href="https://foxfollow.github.io/stone-vpn-managment/">
+  <link rel="icon" type="image/png" sizes="48x48" href="resources/favicon-48.png" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" sizes="48x48" href="resources/favicon-dark-48.png" media="(prefers-color-scheme: dark)">
+  <link rel="apple-touch-icon" href="resources/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="StoneVPN Manager">
+  <meta property="og:title" content="StoneVPN Manager – одна іконка для всіх VPN">
+  <meta property="og:description" content="WireGuard, OpenVPN, Defguard і Cisco в одному menubar-застосунку для macOS — і ремонт DNS та маршрутів, який VPN самі ніколи не роблять.">
+  <meta property="og:url" content="https://foxfollow.github.io/stone-vpn-managment/index-ua.html">
+  <meta property="og:image" content="https://foxfollow.github.io/stone-vpn-managment/resources/og-image.png">
+  <meta property="og:locale" content="uk_UA">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#061820">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="resources/site.css">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"StoneVPN Manager","operatingSystem":"macOS 26+","applicationCategory":"UtilitiesApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","url":"https://foxfollow.github.io/stone-vpn-managment/index-ua.html","inLanguage":"uk","downloadUrl":"https://github.com/foxfollow/stone-vpn-managment/releases/latest"}
+  </script>
+</head>
+<body>
+
+<nav class="nav" aria-label="Навігація">
+  <div class="wrap">
+    <a class="brand" href="index-ua.html"><img src="resources/icon-512.png" alt="" width="30" height="30">StoneVPN Manager</a>
+    <div class="nav-links">
+      <a href="#features">Можливості</a>
+      <a href="#screens">Екрани</a>
+      <a href="#how">Як це працює</a>
+      <a href="#cli">CLI</a>
+      <a href="#install">Встановлення</a>
+    </div>
+    <div class="nav-tools">
+      <a class="chip-btn" href="./" hreflang="en" lang="en" title="English version">EN</a>
+      <button class="chip-btn" type="button" data-theme-toggle aria-label="Світла/темна тема">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4"/></svg>
+      </button>
+      <a class="chip-btn" href="https://github.com/foxfollow/stone-vpn-managment" aria-label="GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow reveal"><span class="pulse"></span><b>Безкоштовно й open source</b> · macOS 26 Tahoe</span>
+      <h1 class="reveal" style="--d:.05s">Одна іконка<br>для <span class="lamp">усіх VPN.</span></h1>
+      <p class="lead reveal" style="--d:.1s">StoneVPN Manager збирає WireGuard, OpenVPN, Defguard і Cisco Secure Client під однією іконкою в menubar — і лагодить DNS та маршрути, які VPN після себе ламають.</p>
+      <div class="cmd reveal" style="--d:.15s"><span class="p">$</span><code>brew install --cask foxfollow/stone/stone-vpn-manager</code><button class="copy" type="button" data-copy="brew tap foxfollow/stone &amp;&amp; brew trust --tap foxfollow/stone &amp;&amp; brew install --cask stone-vpn-manager" data-done="Скопійовано ✓">Копіювати</button></div>
+      <div class="hero-cta reveal" style="--d:.2s">
+        <a class="btn btn-primary" href="#install">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M4 16.5h12"/></svg>
+          Встановити через Homebrew
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/foxfollow/stone-vpn-managment/releases/latest">Завантажити .zip</a>
+      </div>
+      <div class="hero-meta reveal" style="--d:.25s">
+        <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3 3 7-7"/></svg>Apple silicon і Intel</span>
+        <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3 3 7-7"/></svg>Без телеметрії</span>
+        <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3 3 7-7"/></svg>Автооновлення (Sparkle)</span>
+        <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3 3 7-7"/></svg>Ліцензія MIT</span>
+      </div>
+    </div>
+    <div class="stage-wrap reveal" style="--d:.15s">
+      <div class="stage-glow"></div>
+      <div class="stage-fit" data-hero-stage>
+        <div class="stage mk">
+          <div class="menubar" aria-hidden="true">
+            <span class="mb-ico" style="width:22px;height:16px">
+              <svg viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="4" width="17" height="8" rx="2.4"/><rect x="2.8" y="5.8" width="11" height="4.4" rx="1.2" fill="currentColor" stroke="none"/><path d="M19.6 6.6v2.8"/></svg>
+            </span>
+            <span class="mb-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M3.8 8.6a6.2 6.2 0 0 1 8.4 0M6 11.1a3 3 0 0 1 4 0"/><circle cx="8" cy="13.3" r=".9" fill="currentColor" stroke="none"/></svg></span>
+            <span class="mb-app"><span data-mb-icon></span><span class="mb-count" data-mb-count></span></span>
+            <span>Ср 9:41</span>
+          </div>
+          <div class="desk" role="img" aria-label="Анімований макет поповера StoneVPN Manager: підключення WireGuard і Defguard, виявлення мертвого DNS-резолвера і його ремонт. Вигадані дані."></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="backends">
+  <div class="wrap">
+    <span class="lbl">Керує інструментами, якими ти вже користуєшся</span>
+    <span class="be"><span class="badge b-wg">WG</span>WireGuard</span>
+    <span class="be"><span class="badge b-ov">OV</span>OpenVPN</span>
+    <span class="be"><span class="badge b-dg">DG</span>Defguard</span>
+    <span class="be"><span class="badge b-cs">CS</span>Cisco Secure Client</span>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Можливості</span>
+      <h2>Підключитись — найпростіше.</h2>
+      <p>Складне — все навколо тунелю: резолвер, що тихо помер, маршрут не через той інтерфейс, Ethernet без інтернету, який забирає трафік у Wi-Fi. StoneVPN стежить за всім цим.</p>
+    </div>
+    <div class="features">
+      <article class="feat reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h4M7 15h4"/><circle cx="16" cy="9" r="1.6"/><circle cx="16" cy="15" r="1.6"/></svg></div>
+        <h3>Чотири VPN — один пульт</h3>
+        <p>WireGuard через <code>wg-quick</code>, OpenVPN через Homebrew-бінарник (він, на відміну від GUI, правильно прописує маршрути), Defguard з MFA і Cisco Secure Client з логіном і Duo push прямо в застосунку. Обрані, псевдоніми, останній профіль.</p>
+      </article>
+      <article class="feat reveal" style="--d:.05s">
+        <div class="ico lamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M3.5 12h17M12 3c2.5 2.6 3.6 5.6 3.6 9"/><path d="m15.5 18 2 2 4-4"/></svg></div>
+        <h3>DNS-доктор</h3>
+        <p>За секунди помічає мертвий резолвер, прибирає записи мертвих тунелів і «перебиває» сервіс, щоб macOS справді перерахувала DNS. Якщо винен живий, але зламаний VPN — чесно про це скаже.</p>
+      </article>
+      <article class="feat reveal" style="--d:.1s">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h7l2 3h7M4 18h7l2-3h7M4 12h16"/></svg></div>
+        <h3>Основний DNS і split DNS</h3>
+        <p>Обери, чий резолвер питати першим — WireGuard, Cisco, Defguard чи системи — і направ внутрішні домени правилами <code>/etc/resolver</code>. Типові помилки (IP інтерфейсу замість DNS-сервера) підсвічуються.</p>
+      </article>
+      <article class="feat reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19.5 6v5.5c0 4.6-3.2 7.8-7.5 9.5-4.3-1.7-7.5-4.9-7.5-9.5V6z"/><path d="M9 12.5h6M12 9.5v6"/></svg></div>
+        <h3>Повернення DNS після WireGuard</h3>
+        <p><code>wg-quick</code> ставить свій DNS на всі сервіси і не завжди повертає старий. Застосунок пам'ятає еталон кожного сервісу і повертає його після відключення — адреса наступного VPN резолвиться.</p>
+      </article>
+      <article class="feat reveal" style="--d:.05s">
+        <div class="ico lamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18h5a4 4 0 0 0 4-4v-1a4 4 0 0 1 3-4"/></svg></div>
+        <h3>Route-fix і VPN у VPN</h3>
+        <p>Коли macOS шле хендшейк не через той інтерфейс, host-маршрути до VPN-сервера йдуть через твій LAN-шлюз — окремо для кожного профілю, з пам'яттю. Мертві маршрути від учорашнього Wi-Fi прибираються перед кожним підключенням.</p>
+      </article>
+      <article class="feat reveal" style="--d:.1s">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.4" r="1.1" fill="currentColor" stroke="none"/></svg></div>
+        <h3>Пріоритет мережі з глуздом</h3>
+        <p>macOS обирає первинний інтерфейс за порядком сервісів, а не за наявністю інтернету: Ethernet у мертвий роутер перемагає робочий Wi-Fi. Бач реальну доступність кожного інтерфейсу і виправ одним кліком.</p>
+      </article>
+      <article class="feat reveal">
+        <div class="ico lamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></div>
+        <h3>Протухлі сесії Defguard</h3>
+        <p>Після довгого сну gateway скидає MFA-сесію, а macOS і далі пише «Підключено» — і всі DNS-запити зникають. StoneVPN це бачить, червоніє і оновлює сесію лише з новим кодом.</p>
+      </article>
+      <article class="feat reveal" style="--d:.05s">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14.5v2.5"/></svg></div>
+        <h3>Helper, якого не вмовиш</h3>
+        <p>Root-дії виконує маленький демон, що приймає лише підпис самого застосунку і фіксований набір перевірених операцій — шляхи, IP, назви сервісів, PID. Жодних shell-рядків, жодних паролів в аргументах.</p>
+      </article>
+      <article class="feat reveal" style="--d:.1s">
+        <div class="ico lamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="m7 10 3 2.5L7 15M12.5 15H17"/></svg></div>
+        <h3>Справжній CLI під капотом</h3>
+        <p>Любиш термінал? <code>main-vpn-manager.sh</code> робить те саме: <code>status</code>, <code>up</code>, <code>down</code>, <code>dns fix</code>, <code>route</code>, <code>net auto</code>. Застосунок і CLI ділять <code>config.env</code> — або застосунок працює сам.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section id="screens">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Екрани</span>
+      <h2>Нативно, тихо, чесно.</h2>
+      <p>SwiftUI-поповер у menubar для щоденних кліків, вікна — для решти. Колір = стан: зелений — працює, помаранчевий — підключається, червоний — зламано, фіолетовий — «мережу тримає хтось інший».</p>
+    </div>
+    <div class="gallery reveal" data-gallery>
+      <div class="g-tabs" role="tablist">
+        <button class="g-tab" role="tab" type="button" data-for="dns">DNS-доктор</button>
+        <button class="g-tab" role="tab" type="button" data-for="profiles">Профілі</button>
+        <button class="g-tab" role="tab" type="button" data-for="connect">Логін і route-fix</button>
+        <button class="g-tab" role="tab" type="button" data-for="routes">Маршрути</button>
+        <button class="g-tab" role="tab" type="button" data-for="settings">Налаштування</button>
+      </div>
+      <div class="g-stage">
+        <div class="g-pane" data-pane="dns"><div class="g-fit"></div><p class="g-cap">Резолвери з живою перевіркою, хто власник DNS, перемикач основного DNS і твої split-правила — Fix і Flush на відстані кліку.</p></div>
+        <div class="g-pane" data-pane="profiles"><div class="g-fit"></div><p class="g-cap">Усі профілі всіх бекендів: псевдоніми для незрозумілих назв <code>.ovpn</code>, обрані й політика route-fix для кожного профілю.</p></div>
+        <div class="g-pane" data-pane="connect"><div class="g-fit"></div><p class="g-cap">Логін OpenVPN з OTP і вибором route-fix шлюзу. Паролі й коди ніде не зберігаються.</p></div>
+        <div class="g-pane" data-pane="routes"><div class="g-fit"></div><p class="g-cap">Який тунель що везе: маршрути кожного utun з підписом власника, плюс host-маршрути до VPN-серверів.</p></div>
+        <div class="g-pane" data-pane="settings"><div class="g-fit"></div><p class="g-cap">Ті самі ключі, що в <code>config.env</code>, плюс повернення DNS, doctor і автоматика.</p></div>
+      </div>
+    </div>
+    <p class="mockup-note">Макети з вигаданими даними (документаційні діапазони IP, хости example.com) — не знімки чиїхось реальних мереж.</p>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap arch">
+    <div class="reveal" data-arch>
+      <script type="application/json">{"aria":"Архітектура: застосунок звертається до root-helper через XPC; helper виконує wg-quick, openvpn, зміни DNS і маршрутів; Defguard і Cisco — через власні CLI; CLI ділить конфіг.","app":"StoneVPN Manager","appS":"menubar · твій юзер","xpc":"XPC · PrivOp","helper":"Privileged helper","helperS":"root · launchd","dns":"DNS · scutil","routes":"маршрути","noRoot":"свій CLI · без root","shared":"спільно з CLI"}</script>
+    </div>
+    <div>
+      <div class="reveal">
+        <span class="kicker">Як це працює</span>
+        <h2>Root — лише там, де без нього ніяк.</h2>
+        <p style="color:var(--muted);margin:0 0 26px">Застосунок працює від твого імені. Усе, що потребує root, іде до launchd-демона типізованим запитом, перевіряється — і виконується або ні.</p>
+      </div>
+      <ul class="checks reveal" style="--d:.05s">
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 4 4 8-9"/></svg><span><b>XPC з прив'язкою до підпису.</b> Helper приймає з'єднання лише від того бандла застосунку, в якому лежить.</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 4 4 8-9"/></svg><span><b>Кожен аргумент перевірено.</b> Конфіги WireGuard — лише з тек WireGuard, IP розбираються, назви сервісів звіряються, зупиняються тільки процеси тунелів.</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 4 4 8-9"/></svg><span><b>Без helper теж працює.</b> Тоді кожна root-дія разово питає пароль через стандартне вікно macOS.</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 4 4 8-9"/></svg><span><b>Статус ніколи не питає пароль.</b> Читання стану — без sudo; root-only читання без helper просто пропускаються.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="cli">
+  <div class="wrap cli-grid">
+    <div>
+      <div class="reveal">
+        <span class="kicker">CLI</span>
+        <h2>Той самий мозок — у терміналі.</h2>
+        <p style="color:var(--muted);margin:0 0 26px">Застосунок виріс із набору Bash-скриптів, і вони нікуди не ділись. Клонуй репозиторій — і обидва ділитимуть один конфіг.</p>
+      </div>
+      <div class="cmds reveal" style="--d:.05s">
+        <div><code>status</code><span>тунелі, первинна мережа й фактичний резолвер</span></div>
+        <div><code>up homelab</code><span>підняти тунель WireGuard, OpenVPN, Cisco або Defguard</span></div>
+        <div><code>dns fix</code><span>DNS-доктор на три випадки, перевіряє ще раз і звітує чесно</span></div>
+        <div><code>route</code><span>хто тримає default route, усі VPN-маршрути з власниками</span></div>
+        <div><code>net auto</code><span>підняти нагору сервіс, де інтернет справді є</span></div>
+      </div>
+    </div>
+    <div class="term reveal" style="--d:.1s">
+      <div class="term-bar"><span class="lights"><i></i><i></i><i></i></span><span class="t-title">zsh — stone-vpn-managment</span></div>
+      <pre data-term><script type="application/json">[
+        {"c":"./main-vpn-manager.sh list"},
+        {"o":"WireGuard  homelab · office · backup","k":"dim","w":120},
+        {"o":"OpenVPN    Staging · Client lab","k":"dim","w":120},
+        {"o":"Defguard   Engineering (MFA) · Lab","k":"dim","w":120},
+        {"o":"Cisco      vpn.example.com:8443","k":"dim","w":500},
+        {"c":"./main-vpn-manager.sh up homelab"},
+        {"o":"[#] wg-quick up /opt/homebrew/etc/wireguard/homelab.conf","k":"dim","w":420},
+        {"o":"✓ homelab → utun4 198.51.100.7","k":"ok","w":600},
+        {"c":"./main-vpn-manager.sh dns fix"},
+        {"o":"резолвер 198.51.100.53 ✗ — не відповідає","k":"","w":300},
+        {"o":"осиротілі DNS: 1 → прибрано · Wi-Fi переключено · кеш скинуто","k":"dim","w":420},
+        {"o":"✓ резолвер знову відповідає","k":"ok","w":300}
+      ]</script></pre>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Встановлення</span>
+      <h2>Три команди й один клік.</h2>
+      <p>Поширюється через Homebrew-tap <a href="https://github.com/foxfollow/homebrew-stone">foxfollow/stone</a> — разом зі Stone Clipboarder Tool.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <h3>Додай tap</h3>
+        <p>Homebrew один раз просить довіритися сторонньому tap.</p>
+        <div class="cmd"><code>brew tap foxfollow/stone &amp;&amp; brew trust --tap foxfollow/stone</code><button class="copy" type="button" data-copy="brew tap foxfollow/stone &amp;&amp; brew trust --tap foxfollow/stone" data-done="✓">Копіювати</button></div>
+      </div>
+      <div class="step reveal" style="--d:.05s">
+        <h3>Встанови застосунок</h3>
+        <p>Universal-збірка, macOS 26 Tahoe і новіші. Далі оновлюється сам.</p>
+        <div class="cmd"><code>brew install --cask stone-vpn-manager</code><button class="copy" type="button" data-copy="brew install --cask stone-vpn-manager" data-done="✓">Копіювати</button></div>
+      </div>
+      <div class="step reveal" style="--d:.1s">
+        <h3>Бекенди й helper</h3>
+        <p>Встанови VPN-інструменти, якими користуєшся. Потім Settings → Helper → <b>Встановити</b> і дозволь у Login Items — необов'язково, але без запитів пароля.</p>
+        <div class="cmd"><code>brew install wireguard-tools openvpn</code><button class="copy" type="button" data-copy="brew install wireguard-tools openvpn" data-done="✓">Копіювати</button></div>
+      </div>
+    </div>
+    <div class="term reveal" style="margin-top:28px;max-width:860px;margin-inline:auto">
+      <div class="term-bar"><span class="lights"><i></i><i></i><i></i></span><span class="t-title">Terminal</span></div>
+      <pre data-term style="min-height:200px"><script type="application/json">[
+        {"c":"brew install --cask stone-vpn-manager"},
+        {"o":"==> Downloading StoneVPNManager.zip","k":"hl","w":500},
+        {"o":"==> Installing Cask stone-vpn-manager","k":"hl","w":300},
+        {"o":"==> Moving App 'StoneVPNManager.app' to '/Applications/StoneVPNManager.app'","k":"dim","w":400},
+        {"o":"🍺  stone-vpn-manager was successfully installed!","k":"ok","w":500},
+        {"c":"open -a StoneVPNManager"}
+      ]</script></pre>
+    </div>
+    <div class="req reveal">
+      <span><b>macOS 26</b> Tahoe і новіші</span>
+      <span><b>Universal</b> Apple silicon + Intel</span>
+      <span>Бекенди: <b>wireguard-tools</b>, <b>openvpn</b>, Defguard, Cisco — що використовуєш</span>
+      <span><a href="installation-ua.html">Повна інструкція зі встановлення →</a></span>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">FAQ</span>
+      <h2>Слушні питання.</h2>
+    </div>
+    <div class="faq reveal">
+      <details>
+        <summary>Чому macOS попереджає про застосунок при першому запуску?</summary>
+        <p>Він безкоштовний і підписаний ad-hoc, без платного Apple Developer ID. Homebrew-cask сам знімає прапорець карантину. Для ручного <code>.zip</code> один раз виконай <code>xattr -cr /Applications/StoneVPNManager.app</code> або правий клік → Open. Оновлення перевіряються підписом EdDSA.</p>
+      </details>
+      <details>
+        <summary>Що саме працює від root?</summary>
+        <p><code>wg-quick</code>, <code>openvpn</code>, зміни DNS і маршрутів, порядок мережевих сервісів і зупинка процесів тунелів — через helper і лише як типізовані перевірені операції. Defguard і Cisco йдуть через власні CLI і root не потребують.</p>
+      </details>
+      <details>
+        <summary>Чи надсилає він кудись дані?</summary>
+        <p>Ні телеметрії, ні акаунтів. Мережа — лише перевірка оновлень (appcast на GitHub Pages), перевірка DNS (<code>dig apple.com</code>) і доступності кожного інтерфейсу. Тому macOS і питає дозвіл <b>Local Network</b> — резолвер зазвичай живе в LAN.</p>
+      </details>
+      <details>
+        <summary>Чи потрібні Bash-скрипти або git-репозиторій?</summary>
+        <p>Ні. Без репозиторію застосунок тримає налаштування в <code>~/Library/Application Support/StoneVPNManager/</code>. Якщо склонуєш репо — застосунок і CLI ділитимуть <code>config.env</code> і <code>state.env</code>.</p>
+      </details>
+      <details>
+        <summary>Якою мовою інтерфейс?</summary>
+        <p>Українською. Англійська локалізація — у планах, допомога вітається.</p>
+      </details>
+      <details>
+        <summary>Як оновити або видалити?</summary>
+        <p>Застосунок сам перевіряє оновлення (Налаштування → Загальні). Через Homebrew: <code>brew upgrade --cask --greedy stone-vpn-manager</code>. Видалити: Settings → Helper → Видалити, потім <code>brew uninstall --cask --zap stone-vpn-manager</code>.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:20px">
+  <div class="wrap">
+    <div class="cta reveal">
+      <img src="resources/icon-512.png" alt="Іконка StoneVPN Manager" width="96" height="96">
+      <h2>Світло в кінці кожного тунелю.</h2>
+      <p>Безкоштовно, ліцензія MIT — для тих, у кого більше одного VPN і хто втомився гадати, чому «висить» ping.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#install">Встановити через Homebrew</a>
+        <a class="btn btn-ghost" href="https://github.com/foxfollow/stone-vpn-managment">Зірочка на GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 foxfollow · <a href="https://github.com/foxfollow/stone-vpn-managment/blob/main/LICENSE">MIT</a></span>
+    <span class="sp"></span>
+    <a href="installation-ua.html">Встановлення</a>
+    <a href="https://github.com/foxfollow/stone-vpn-managment/releases">Релізи</a>
+    <a href="https://github.com/foxfollow/homebrew-stone">Homebrew tap</a>
+    <a href="https://github.com/foxfollow/stone-vpn-managment/blob/main/SECURITY.md">Безпека</a>
+    <a href="./" hreflang="en" lang="en">English</a>
+  </div>
+</footer>
+
+<script src="resources/site.js" defer></script>
+</body>
+</html>
