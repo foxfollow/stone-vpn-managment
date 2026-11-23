@@ -19,10 +19,13 @@ final class CiscoDriverTests: XCTestCase {
     echo "    1) Staff"
     printf 'Group: [Employees] '; read g; echo "$g" > "$OUT.group"
     printf 'Username: [j.doe] '; read u; echo "$u" > "$OUT.user"
-    printf 'Password: '
-    # Як справжній клієнт: спершу підказка, потім вимкнення відлуння з TCSAFLUSH — усе, що
-    # надіслали надто рано, стирається; порожній пароль → сервер каже Login failed.
-    sleep 0.2; python3 -c 'import termios; a=termios.tcgetattr(0); a[3] &= ~termios.ECHO; termios.tcsetattr(0, termios.TCSAFLUSH, a)'
+    # Як справжній клієнт: спершу підказка, через 0.2 с — вимкнення відлуння з TCSAFLUSH: усе,
+    # що надіслали надто рано, стирається; порожній пароль → сервер каже Login failed.
+    # Підказку друкує сам python — інакше його холодний старт на повільному CI-раннері (>0.4 с)
+    # додається до цих 0.2 с і драйвер (відповідає після 0.6 с тиші) потрапляє у вікно до flush.
+    python3 -c 'import sys, time, termios
+    sys.stdout.write("Password: "); sys.stdout.flush(); time.sleep(0.2)
+    a = termios.tcgetattr(0); a[3] &= ~termios.ECHO; termios.tcsetattr(0, termios.TCSAFLUSH, a)'
     IFS= read -r -t 3 p; echo; [ "$p" = "s3cret" ] || { echo "  >> Login failed."; exit 1; }
     printf 'Second Password: '; read -s d; echo; echo "$d" > "$OUT.duo"
     sleep 1   # «підтвердження на телефоні»
