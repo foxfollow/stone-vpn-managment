@@ -100,6 +100,7 @@ struct PopoverView: View {
         case .busy: .orange
         case .problem: .red
         case .foreign: .purple
+        case .question: .yellow
         }
     }
 
@@ -134,12 +135,13 @@ struct PopoverView: View {
 
     @ViewBuilder private var banner: some View {
         let n = model.snap.network
-        if model.tone == .foreign, let f = model.snap.foreign.first(where: { $0.iface == n.primaryIface }) {
+        if model.tone == .foreign, let f = model.primaryForeign {
             Banner(color: .purple,
-                   text: model.dnsHealthy == false
-                       ? String(localized: "\(f.name) (\(f.iface ?? "")) holds the default route and DNS, but passes no traffic. DNS edits won't help.")
-                       : String(localized: "\(f.name) (\(f.iface ?? "")) holds the default route and DNS."),
-                   action: String(localized: "Take Down…")) { model.openTool = "dns"; Task { await model.runDNSFix() } }
+                   text: "\(f.name) (\(f.iface ?? "")) тримає default route і DNS" + (model.dnsHealthy == false ? ", але не пропускає трафік. Правки DNS не допоможуть." : "."),
+                   action: "Розірвати…", secondary: model.dnsHealthy == false ? nil : ("Дозволити", { model.allowForeign(f.name) }),
+                   close: { model.foreignDismissed.insert(f.id) }) {
+                model.openTool = "dns"; Task { await model.runDNSFix() }
+            }
         } else if let name = model.dgStale.sorted().first, model.busy.isEmpty {
             Banner(color: .red,
                    text: model.dnsFailover.map {
@@ -157,6 +159,14 @@ struct PopoverView: View {
             let svc = n.primaryService ?? n.primaryIface ?? String(localized: "The primary service")
             Banner(color: .red, text: String(localized: "\(svc) has no internet — macOS picks by service order, not by reachability."),
                    action: String(localized: "Auto")) { model.runAction(String(localized: "Network")) { try await model.actions.netAuto(primaryIface: n.primaryIface) } }
+        }
+        ForEach(model.routeIssues) { i in
+            Banner(color: .orange,
+                   text: "\(i.label): сервер \(i.host) іде через \(i.viaOwner) (\(i.via)) — тунель у тунелі. Працює, але повільніше, і перепідключення \(i.viaOwner) рве сесію.",
+                   action: i.gateway.map { "Напряму · \($0)" } ?? "Погодити",
+                   secondary: i.gateway == nil ? nil : ("Погодити", { model.keepRoute(i) })) {
+                if i.gateway != nil { model.directRoute(i) } else { model.keepRoute(i) }
+            }
         }
         if let t = model.toast {
             HStack(alignment: .top) {
@@ -226,17 +236,35 @@ struct Banner: View {
     var color: Color
     var text: String
     var action: String
+    var secondary: (String, () -> Void)? = nil
+    /// × у куті — сховати банер (що саме це означає, вирішує викликач).
+    var close: (() -> Void)? = nil
     var perform: () -> Void
+
+    /// Підпис на заливці кольору банера: на світлих (жовтий/помаранчевий) — темний.
+    private var onTint: Color { color == .orange || color == .yellow ? .black : .white }
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(text).font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
+            // Колір банера — лише тексту: на кнопках він давав жовте на жовтому.
+            Text(text).font(.system(size: 12)).foregroundStyle(color).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            Button(action, action: perform).buttonStyle(.borderedProminent).tint(color).controlSize(.small)
+            VStack(alignment: .trailing, spacing: 4) {
+                Button(action: perform) { Text(action).foregroundStyle(onTint) }
+                    .buttonStyle(.borderedProminent).tint(color).controlSize(.small)
+                if let sec = secondary { Button(sec.0, action: sec.1).buttonStyle(.bordered).controlSize(.small) }
+            }
         }
-        .foregroundStyle(color)
         .padding(10)
+        .padding(.trailing, close == nil ? 0 : 8)
         .background(color.opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(alignment: .topTrailing) {
+            if let close {
+                Button(action: close) { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
+                    .buttonStyle(.borderless).foregroundStyle(.secondary).padding(6)
+                    .help("Сховати до перезапуску застосунку")
+            }
+        }
     }
 }
 

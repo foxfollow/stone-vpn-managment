@@ -170,6 +170,18 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   TOTP; perform quits Defguard.app, `dgDownAndWait`, `dgUp`), and a DNS failover via the helper's
   `dnsOverride` to a live candidate / the primary service DNS. It is undone once the session is
   renewed or gone. DNS Fix does not help here and says so.
+- **ClearVPN in IKEv2 mode is `ipsec0`, not a utun** (personal VPN, no Setup service — only a UUID
+  State service, so it is labelled via the running app: `StatusReader.foreignVPNApp`). Everything that
+  meant "tunnel interface" goes through `Parse.isTunnelIface` (utun|ipsec). It owns a real `default`
+  (not 0/1) and a *non*-supplemental DNS, so a catch-all Defguard DNS still wins resolver #1.
+- **Route issues (`AppModel+Routes`)**: a server of one of *our* up sessions whose best non-scoped
+  route is another tunnel's full default (`Parse.fullTunnelCapture`, plen ≤ 1; specific routes =
+  deliberate VPN-in-VPN, ignored) → `routeIssues`, yellow "?" icon, banner + notification with
+  actions (category `route`, `NotificationHandler`). "Погодити" = `routeDecisions[profileKey|owner]
+  = keep`; "напряму" = `direct`: `-host <server> <LAN gw>` now and automatically later (helper only),
+  tracked in `directRoutes` and removed once its gateway is not on-link. Allowed foreign VPNs
+  (`allowedForeign`) don't turn the icon purple. DNS picker also offers the foreign VPN's DNS,
+  Cloudflare and a custom list (`customDNS`), all via the same `dnsOverride`.
 - **Split rules are editable** (`splitReplace`: write new + remove old in one batch) and checked:
   a server that equals a local interface address (the tunnel's own IP instead of its DNS) or a
   "domain" without a dot that looks like an interface name (`utun3`) gets a warning.

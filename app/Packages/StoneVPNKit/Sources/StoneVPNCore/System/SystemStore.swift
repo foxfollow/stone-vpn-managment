@@ -60,16 +60,22 @@ public final class SystemStore: @unchecked Sendable {
         value("State:/Network/Service/\(uuid)/DNS")?["InterfaceName"] as? String
     }
 
-    /// Сторонній VPN, що володіє utun: State-сервіс з IPv4.InterfaceName == utun.
-    public func foreignOwner(of utun: String) -> String? {
-        for key in keys("State:/Network/Service/.*/IPv4") {
-            guard (value(key)?["InterfaceName"] as? String) == utun else { continue }
-            let svc = key.replacingOccurrences(of: "State:/Network/Service/", with: "").replacingOccurrences(of: "/IPv4", with: "")
-            if svc == "com.cisco.anyconnect" { return "Cisco Secure Client" }
-            return serviceName(svc) ?? String(localized: "VPN service \(svc)", bundle: .module)
+    /// Сторонній VPN, що володіє тунелем: ID State-сервісу з IPv4.InterfaceName == iface.
+    public func foreignService(of iface: String) -> String? {
+        for key in keys("State:/Network/Service/.*/IPv4") where (value(key)?["InterfaceName"] as? String) == iface {
+            return key.replacingOccurrences(of: "State:/Network/Service/", with: "").replacingOccurrences(of: "/IPv4", with: "")
         }
         return nil
     }
+
+    /// Людська назва стороннього VPN-сервісу. Персональні VPN (IKEv2 від ClearVPN тощо) не мають
+    /// Setup-запису, тож назви немає — тоді `appHint` (єдиний запущений відомий VPN-застосунок).
+    public func foreignLabel(_ svc: String, appHint: String? = nil) -> String {
+        if svc == "com.cisco.anyconnect" { return "Cisco Secure Client" }
+        return serviceName(svc) ?? appHint ?? "VPN-сервіс \(svc)"
+    }
+
+    public func foreignOwner(of iface: String) -> String? { foreignService(of: iface).map { foreignLabel($0) } }
 
     /// ServerAddresses State-DNS сервісу (напр. com.cisco.anyconnect) — DNS тунелю.
     public func serviceDNS(_ id: String) -> [String] {
@@ -135,8 +141,8 @@ public enum Interfaces {
         return out
     }
 
-    /// Живі utun = utun з IPv4 (utun лише з link-local IPv6 — не тунель).
-    public static func liveUtuns() -> [String: String] { ipv4().filter { $0.key.hasPrefix("utun") } }
+    /// Живі тунелі = utun/ipsec з IPv4 (utun лише з link-local IPv6 — не тунель).
+    public static func liveUtuns() -> [String: String] { ipv4().filter { Parse.isTunnelIface($0.key) } }
 
     public static func resolve(_ host: String) -> String? {
         if Parse.ipv4(host) != nil { return host }
