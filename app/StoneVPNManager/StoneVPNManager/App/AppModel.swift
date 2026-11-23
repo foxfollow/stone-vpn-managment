@@ -76,14 +76,17 @@ enum DoctorPrompt {
     case kill(procs: [Actions.TunnelProc], iface: String, owner: String?)
 }
 
-enum IconTone { case idle, ok, busy, problem, foreign }
+enum IconTone { case idle, ok, busy, problem, foreign, question }
 
-/// DNS активного тунелю — кандидат на основний DNS і підказка для split-правил.
+/// Кандидат на основний DNS: DNS активного тунелю (наш або сторонній VPN) або фіксований
+/// (Cloudflare, свій). DNS тунелів — ще й підказка для split-правил.
 struct DNSCandidate: Identifiable, Hashable {
-    var id: String          // session id
+    enum Kind { case tunnel, foreign, fixed }
+    var id: String          // session id | "public:cloudflare" | "custom"
     var label: String
     var servers: [String]
     var iface: String?
+    var kind: Kind = .tunnel
 }
 
 @Observable @MainActor
@@ -127,6 +130,14 @@ final class AppModel {
     var dgStale: Set<String> = []
     /// Основний DNS, який ми поставили, бо резолвер протухлої Defguard-сесії мертвий.
     var dnsFailover: [String]?
+    /// Сервери наших VPN, які забрав повний тунель стороннього (AppModel+Routes).
+    var routeIssues: [RouteIssue] = []
+    /// Сторонні VPN (Session.id), чий банер закрито хрестиком — до перезапуску.
+    var foreignDismissed: Set<String> = []
+    @ObservationIgnored var lastRouteCheck = Date.distantPast
+    @ObservationIgnored var wgEndpointCache: [String: String] = [:]
+    @ObservationIgnored var resolveCache: [String: (ip: String, at: Date)] = [:]
+    @ObservationIgnored var directAttempts: [String: Date] = [:]
 
     @ObservationIgnored var openWindowAction: OpenWindowAction?
     @ObservationIgnored private var stopping: Set<String> = []
@@ -160,6 +171,7 @@ final class AppModel {
         reloadConfig()
         AppSwitcherPolicy.shared.start(enabled: prefs.showInAppSwitcher)
         reader.store.watch { Task { @MainActor in AppModel.shared.scheduleRefresh() } }
+        NotificationHandler.shared.install()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         Task { await checkHelper() }
         Task { await refresh(forceSlow: true) }
@@ -206,6 +218,7 @@ final class AppModel {
         if loaded { notifyDiff(old: old, new: new) }
         await checkDefguardStale()
         await loadDNSCandidates()
+        if loaded { await checkRoutesIfDue(old: old) }
         await applyDNSFailover()
         await dropStalePrimaryDNS()
         await reassertPrimaryDNS()
@@ -258,7 +271,7 @@ final class AppModel {
     }
 
     func checkPrimaryOnline() async {
-        guard let p = snap.network.primaryIface, !p.hasPrefix("utun") else { primaryOnline = nil; return }
+        guard let p = snap.network.primaryIface, !Parse.isTunnelIface(p) else { primaryOnline = nil; return }
         primaryOnline = await actions.ifaceOnline(p)
         if primaryOnline == false, prefs.netAutoFix, helper.isEnabled {
             if let msg = try? await actions.netAuto(primaryIface: p) { notify("Мережа", msg) }
@@ -269,11 +282,12 @@ final class AppModel {
 
     var tone: IconTone {
         let n = snap.network
-        if n.primaryIsTunnel, snap.foreign.contains(where: { $0.iface == n.primaryIface }) { return .foreign }
+        if let f = primaryForeign, !isQuietForeign(f) { return .foreign }
         // Під час підключення/повернення DNS мертвий резолвер — очікуваний проміжний стан.
         if !busy.isEmpty || dnsGuardActive { return .busy }
         if !dgStale.isEmpty { return .problem }
         if snap.erroredCount > 0 || dnsHealthy == false || primaryOnline == false { return .problem }
+        if !routeIssues.isEmpty { return .question }
         if snap.connectingCount > 0 { return .busy }
         return snap.upCount > 0 ? .ok : .idle
     }
@@ -285,9 +299,31 @@ final class AppModel {
         if let n = dgStale.sorted().first, busy.isEmpty { return "Defguard «\(n)»: сесія протухла" }
         if dnsHealthy == false, busy.isEmpty { return "Проблема з DNS" }
         if primaryOnline == false { return "Немає інтернету" }
+        if let i = routeIssues.first, busy.isEmpty { return "Маршрут під питанням: \(i.label)" }
         if up == 0 && conn == 0 { return "Немає активних тунелів" }
         let tunnels = up == 1 ? "1 тунель активний" : "\(up) тунелі активні"
         return conn > 0 ? (up > 0 ? "\(tunnels) · \(conn) підключається" : "Підключення…") : tunnels
+    }
+
+    /// Сторонній VPN, що зараз первинний (тримає default route).
+    var primaryForeign: Session? {
+        let n = snap.network
+        return n.primaryIsTunnel ? snap.foreign.first { $0.iface == n.primaryIface } : nil
+    }
+
+    /// Дозволено явно або неявно: рішення щодо маршруту повз цей VPN (погодити / напряму) —
+    /// уже свідомий вибір працювати поряд з ним.
+    func isAllowedForeign(_ s: Session) -> Bool {
+        prefs.allowedForeign.contains(s.name) || prefs.routeDecisions.keys.contains { $0.hasSuffix("|\(s.name)") }
+    }
+
+    /// Фіолетове попередження про цей сторонній VPN приховано (×) до перезапуску застосунку.
+    func isQuietForeign(_ s: Session) -> Bool { isAllowedForeign(s) || foreignDismissed.contains(s.id) }
+
+    /// Дозволити сторонньому VPN (ClearVPN…) тримати мережу поряд з нашими тунелями.
+    func allowForeign(_ name: String, _ on: Bool = true) {
+        prefs.allowedForeign.removeAll { $0 == name }
+        if on { prefs.allowedForeign.append(name) }
     }
 
     func items(for b: Backend) -> [ProfileItem] {
@@ -810,7 +846,7 @@ final class AppModel {
             }
             return
         }
-        var servers = (dnsCandidates.first { $0.id == prefs.primaryDNSChoice } ?? dnsCandidates.first)?.servers ?? []
+        var servers = (dnsCandidates.first { $0.id == prefs.primaryDNSChoice } ?? dnsCandidates.first { $0.kind != .fixed })?.servers ?? []
         if servers.isEmpty, let u = n.primaryUUID, !n.primaryIsTunnel { servers = reader.store.serviceDNS(u).filter { !dead.contains($0) } }
         if servers.isEmpty { servers = config.restoreServers }
         if servers.isEmpty { servers = ["1.1.1.1"] }
@@ -1134,6 +1170,15 @@ final class AppModel {
             let prof = snap.profiles[b]?.first { $0.key == s.profileKey }
             out.append(DNSCandidate(id: s.id, label: "\(b.title) · \(prof.map(prefs.display) ?? s.name)", servers: servers, iface: s.iface))
         }
+        // DNS стороннього VPN (ClearVPN тощо) — з його State-сервісу.
+        for f in snap.foreign {
+            let servers = f.dnsServers.filter { Parse.ipv4($0) != nil || $0.contains(":") }
+            if !servers.isEmpty { out.append(DNSCandidate(id: f.id, label: f.name, servers: servers, iface: f.iface, kind: .foreign)) }
+        }
+        out.append(DNSCandidate(id: "public:cloudflare", label: "Cloudflare", servers: ["1.1.1.1", "1.0.0.1"], kind: .fixed))
+        if !prefs.customDNS.isEmpty {
+            out.append(DNSCandidate(id: "custom", label: "Свій", servers: prefs.customDNS, kind: .fixed))
+        }
         dnsCandidates = out
     }
 
@@ -1327,7 +1372,7 @@ final class AppModel {
         }
         let oldF = Set(old.foreign.map(\.id)), newF = Set(new.foreign.map(\.id))
         if prefs.notifyForeign, new.network.primaryIsTunnel, !newF.subtracting(oldF).isEmpty,
-           let f = new.foreign.first(where: { $0.iface == new.network.primaryIface }) {
+           let f = new.foreign.first(where: { $0.iface == new.network.primaryIface }), !isQuietForeign(f) {
             notify("Сторонній VPN тримає мережу", "\(f.name) (\(f.iface ?? "")) став первинним")
         }
     }

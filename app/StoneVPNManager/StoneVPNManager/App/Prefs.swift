@@ -46,6 +46,16 @@ final class Prefs {
     var wgDNSSeen: [String] { didSet { d.set(wgDNSSeen, forKey: "wgDNSSeen") } }
     /// Який кандидат обрано основним DNS (кілька тунелів можуть мати однакові сервери).
     var primaryDNSChoice: String? { didSet { d.set(primaryDNSChoice, forKey: "primaryDNSChoice") } }
+    /// Свій основний DNS (вибір «Свій…» у DNS → Основний).
+    var customDNS: [String] { didSet { d.set(customDNS, forKey: "customDNS") } }
+    /// Сервер нашого VPN іде через повний тунель чужого: рішення за RouteIssue.decisionKey —
+    /// "keep" (погоджено, не питати) | "direct" (завжди -host маршрут через LAN-шлюз).
+    var routeDecisions: [String: String] { didSet { d.set(routeDecisions, forKey: "routeDecisions") } }
+    /// -host маршрути, які поставили ми: IP → "шлюз|decisionKey" (щоб прибрати мертві й при скиданні).
+    var directRoutes: [String: String] { didSet { d.set(directRoutes, forKey: "directRoutes") } }
+    /// Сторонні VPN (за назвою), які дозволено тримати мережу поряд з нашими: без фіолетового
+    /// «тримає мережу» і без пропозиції розірвати.
+    var allowedForeign: [String] { didSet { d.set(allowedForeign, forKey: "allowedForeign") } }
     // Cisco: власні хости (з портом) — профіль head-end перезаписує, тож тримаємо свої
     var ciscoHosts: [String] { didSet { d.set(ciscoHosts, forKey: "ciscoHosts") } }
     /// Логін і група — окремо для кожного хоста (ключ — ciscoKey(host)), не один на всіх.
@@ -57,6 +67,7 @@ final class Prefs {
     var notifyDropped: Bool { didSet { d.set(notifyDropped, forKey: "notifyDropped") } }
     var notifyDNS: Bool { didSet { d.set(notifyDNS, forKey: "notifyDNS") } }
     var notifyForeign: Bool { didSet { d.set(notifyForeign, forKey: "notifyForeign") } }
+    var notifyRoutes: Bool { didSet { d.set(notifyRoutes, forKey: "notifyRoutes") } }
 
     init() {
         d.register(defaults: [
@@ -65,7 +76,7 @@ final class Prefs {
             "autoRestoreDNS": true, "dnsWatch": true, "netAutoFix": false,
             "rememberUser": true, "rememberGateway": true, "ovpnTimeout": 45,
             "notifyConnected": true, "notifyDisconnected": false, "notifyDropped": true,
-            "notifyDNS": true, "notifyForeign": true, "dnsGuard": true, "showInAppSwitcher": true,
+            "notifyDNS": true, "notifyForeign": true, "notifyRoutes": true, "dnsGuard": true, "showInAppSwitcher": true,
         ])
         iconColored = d.bool(forKey: "iconColored")
         iconShowCount = d.bool(forKey: "iconShowCount")
@@ -91,6 +102,10 @@ final class Prefs {
         dnsBaseline = d.dictionary(forKey: "dnsBaseline") as? [String: [String]] ?? [:]
         wgDNSSeen = d.stringArray(forKey: "wgDNSSeen") ?? []
         primaryDNSChoice = d.string(forKey: "primaryDNSChoice")
+        customDNS = d.stringArray(forKey: "customDNS") ?? []
+        routeDecisions = d.dictionary(forKey: "routeDecisions") as? [String: String] ?? [:]
+        directRoutes = d.dictionary(forKey: "directRoutes") as? [String: String] ?? [:]
+        allowedForeign = d.stringArray(forKey: "allowedForeign") ?? []
         ciscoHosts = d.stringArray(forKey: "ciscoHosts") ?? []
         ciscoUsers = d.dictionary(forKey: "ciscoUsers") as? [String: String] ?? [:]
         ciscoGroups = d.dictionary(forKey: "ciscoGroups") as? [String: String] ?? [:]
@@ -102,6 +117,7 @@ final class Prefs {
         notifyDropped = d.bool(forKey: "notifyDropped")
         notifyDNS = d.bool(forKey: "notifyDNS")
         notifyForeign = d.bool(forKey: "notifyForeign")
+        notifyRoutes = d.bool(forKey: "notifyRoutes")
     }
 
     var orderedBackends: [Backend] {

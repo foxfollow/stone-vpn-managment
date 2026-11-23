@@ -11,6 +11,7 @@ struct NotificationsTab: View {
                 Toggle("Тунель упав неочікувано", isOn: $model.prefs.notifyDropped)
                 Toggle("DNS не відповідає", isOn: $model.prefs.notifyDNS)
                 Toggle("Сторонній VPN захопив маршрут", isOn: $model.prefs.notifyForeign)
+                Toggle("Сервер VPN іде через чужий тунель", isOn: $model.prefs.notifyRoutes)
             }
         }
         .formStyle(.grouped)

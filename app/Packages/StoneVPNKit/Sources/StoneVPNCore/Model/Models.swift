@@ -143,7 +143,7 @@ public struct NetworkInfo: Sendable, Equatable {
     public var defaultRouteIface: String?
     public var defaultRouteGateway: String?
     public var splitDefault: [String] = []  // 0/1 + 128.0/1 → utunN
-    public var primaryIsTunnel: Bool { primaryIface?.hasPrefix("utun") ?? false }
+    public var primaryIsTunnel: Bool { primaryIface.map(Parse.isTunnelIface) ?? false }
 }
 
 public struct Snapshot: Sendable {
@@ -153,6 +153,8 @@ public struct Snapshot: Sendable {
     public var network = NetworkInfo()
     public var routeGroups: [RouteGroup] = []
     public var routeFixRoutes: [RouteRow] = []
+    /// Уся таблиця `netstat -rn -f inet` знімка (для перевірки маршрутів до серверів VPN).
+    public var routes: [RouteRow] = []
     public var disabled: Set<Backend> = []
     public var wgDir: String?
     public var updated = Date()
