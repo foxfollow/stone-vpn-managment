@@ -289,8 +289,17 @@ code, kbd, pre { font-family: var(--mono); }
 .sw.sm { width: 30px; height: 18px; } .sw.sm::after { width: 14px; height: 14px; }
 .sw.on::after { transform: translateX(15px); } .sw.sm.on::after { transform: translateX(12px); }
 .sw.up { background: var(--g); } .sw.busy { background: var(--o); } .sw.bad { background: var(--r); }
-.sw.busy::after { background: conic-gradient(from 0deg, transparent 0 25%, #fff 25%); -webkit-mask: radial-gradient(circle, transparent 4px, #000 4.5px); mask: radial-gradient(circle, transparent 4px, #000 4.5px); box-shadow: none; animation: spin .8s linear infinite; }
-@keyframes spin { to { rotate: 360deg; } }
+/* busy: the knob becomes a ring spinner in the "on" position (like ProgressView .mini).
+   Translate + rotate live in one transform so the ring spins in place in every engine. */
+.sw.busy::after {
+  top: 4px; left: 4px; width: 15px; height: 15px; box-sizing: border-box;
+  background: transparent; box-shadow: none;
+  border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+  transform-origin: 50% 50%; animation: spin-on .8s linear infinite;
+}
+.sw.sm.busy::after { top: 3px; left: 3px; width: 12px; height: 12px; animation-name: spin-on-sm; }
+@keyframes spin-on { from { transform: translateX(15px) rotate(0deg); } to { transform: translateX(15px) rotate(360deg); } }
+@keyframes spin-on-sm { from { transform: translateX(12px) rotate(0deg); } to { transform: translateX(12px) rotate(360deg); } }
 .pinfo { flex: 1; min-width: 0; }
 .ptitle { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
 .ptitle b { font-weight: 600; }
