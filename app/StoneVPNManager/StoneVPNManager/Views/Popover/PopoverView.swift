@@ -235,16 +235,20 @@ struct Banner: View {
     var secondary: (String, () -> Void)? = nil
     var perform: () -> Void
 
+    /// Підпис на заливці кольору банера: на світлих (жовтий/помаранчевий) — темний.
+    private var onTint: Color { color == .orange || color == .yellow ? .black : .white }
+
     var body: some View {
         HStack(spacing: 10) {
-            Text(text).font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
+            // Колір банера — лише тексту: на кнопках він давав жовте на жовтому.
+            Text(text).font(.system(size: 12)).foregroundStyle(color).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 4) {
-                Button(action, action: perform).buttonStyle(.borderedProminent).tint(color).controlSize(.small)
+                Button(action: perform) { Text(action).foregroundStyle(onTint) }
+                    .buttonStyle(.borderedProminent).tint(color).controlSize(.small)
                 if let sec = secondary { Button(sec.0, action: sec.1).buttonStyle(.bordered).controlSize(.small) }
             }
         }
-        .foregroundStyle(color)
         .padding(10)
         .background(color.opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
