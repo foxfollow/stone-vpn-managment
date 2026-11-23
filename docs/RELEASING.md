@@ -35,11 +35,18 @@ gh variable set SPARKLE_PUBLIC_KEY --body "<public key>"
 gh secret set SPARKLE_PRIVATE_KEY < sparkle_private_key.txt && rm -P sparkle_private_key.txt
 ```
 
-### 2. Homebrew tap token
+### 2. Homebrew tap access
 
-Fine-grained personal access token with **Contents: Read and write** on `foxfollow/homebrew-stone` only →
-repository secret `HOMEBREW_TAP_TOKEN` (the Clipboarder token can be reused if it covers the tap).
-Without it the release still works; the cask bump is skipped with a warning.
+Preferred — a **deploy key** with write access to `foxfollow/homebrew-stone` only:
+
+```bash
+ssh-keygen -t ed25519 -N "" -C "stone-vpn-managment release" -f tap_key
+gh repo deploy-key add tap_key.pub -R foxfollow/homebrew-stone --allow-write -t "stone-vpn-managment release"
+gh secret set HOMEBREW_TAP_DEPLOY_KEY -R foxfollow/stone-vpn-managment < tap_key && rm -P tap_key tap_key.pub
+```
+
+Fallback — a fine-grained PAT (Contents: Read and write on the tap) as `HOMEBREW_TAP_TOKEN`.
+Without either, the release still works; the cask bump is skipped with a warning.
 
 The cask file `Casks/stone-vpn-manager.rb` must exist in the tap before the first release — the workflow
 only bumps `version` and `sha256`.

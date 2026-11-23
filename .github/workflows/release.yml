@@ -254,8 +254,8 @@ jobs:
           # would then fail for everyone).
           OPENSSL="$(brew --prefix openssl@3 2>/dev/null)/bin/openssl"
           if [[ ! -x "$OPENSSL" ]]; then
-            echo "⚠️ openssl@3 not found — skipping key pair check"
-            exit 0
+            brew install openssl@3 >/dev/null
+            OPENSSL="$(brew --prefix openssl@3)/bin/openssl"
           fi
           T="$RUNNER_TEMP/edcheck"; mkdir -p "$T"
           { printf '\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00'; printf '%s' "$SU_PUBLIC_KEY" | base64 -d; } > "$T/pub.der"
@@ -361,6 +361,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.VERSION }}
+          # The tag (created here on manual runs) must point at the commit that was built.
+          target_commitish: ${{ github.sha }}
           name: "${{ env.DISPLAY_NAME }} v${{ env.VERSION }}"
           draft: false
           prerelease: false
@@ -399,28 +401,50 @@ jobs:
 
       - name: Update Homebrew cask
         env:
+          # Preferred: deploy key with write access to the tap repo only.
+          TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          # Fallback: fine-grained PAT (Contents: write on the tap).
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          if [[ -z "$GH_TOKEN" ]]; then
-            echo "⚠️ HOMEBREW_TAP_TOKEN not set — skipping the cask bump"
+          bump() {
+            sed -i '' -E \
+              -e "s/^  version \"[^\"]*\"/  version \"$VERSION\"/" \
+              -e "s/^  sha256 \"[^\"]*\"/  sha256 \"$ZIP_SHA256\"/" "$1"
+            grep -q "version \"$VERSION\"" "$1"
+            grep -q "sha256 \"$ZIP_SHA256\"" "$1"
+          }
+          MSG="ciflow: bump stone-vpn-manager to v$VERSION"
+          if [[ -n "$TAP_DEPLOY_KEY" ]]; then
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            printf '%s\n' "$TAP_DEPLOY_KEY" > ~/.ssh/tap_key && chmod 600 ~/.ssh/tap_key
+            # GitHub's published ed25519 host key (no trust-on-first-use).
+            echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > ~/.ssh/known_hosts_tap
+            export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_key -o IdentitiesOnly=yes -o UserKnownHostsFile=~/.ssh/known_hosts_tap -o StrictHostKeyChecking=yes"
+            TAP="$RUNNER_TEMP/tap"
+            git clone --depth 1 "git@github.com:$TAP_REPO.git" "$TAP"
+            if [[ ! -f "$TAP/$CASK_PATH" ]]; then
+              echo "⚠️ $CASK_PATH not found in $TAP_REPO — push the cask once (docs/RELEASING.md)"
+              exit 0
+            fi
+            bump "$TAP/$CASK_PATH"
+            git -C "$TAP" -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
+              commit -am "$MSG"
+            git -C "$TAP" push origin HEAD
+            rm -f ~/.ssh/tap_key
+          elif [[ -n "$GH_TOKEN" ]]; then
+            API="repos/$TAP_REPO/contents/$CASK_PATH"
+            if ! FILE_SHA=$(gh api "$API" --jq .sha 2>/dev/null); then
+              echo "⚠️ $CASK_PATH not found in $TAP_REPO — push the cask once (docs/RELEASING.md)"
+              exit 0
+            fi
+            gh api "$API" --jq .content | base64 -d > "$RUNNER_TEMP/cask.rb"
+            bump "$RUNNER_TEMP/cask.rb"
+            gh api -X PUT "$API" -f message="$MSG" \
+              -f content="$(base64 < "$RUNNER_TEMP/cask.rb" | tr -d '\n')" -f sha="$FILE_SHA" --jq '.commit.html_url'
+          else
+            echo "⚠️ Neither HOMEBREW_TAP_DEPLOY_KEY nor HOMEBREW_TAP_TOKEN is set — skipping the cask bump"
             exit 0
           fi
-          API="repos/$TAP_REPO/contents/$CASK_PATH"
-          if ! FILE_SHA=$(gh api "$API" --jq .sha 2>/dev/null); then
-            echo "⚠️ $CASK_PATH not found in $TAP_REPO — push the cask once (docs/RELEASING.md)"
-            exit 0
-          fi
-          gh api "$API" --jq .content | base64 -d > "$RUNNER_TEMP/cask.rb"
-          sed -i '' -E \
-            -e "s/^  version \"[^\"]*\"/  version \"$VERSION\"/" \
-            -e "s/^  sha256 \"[^\"]*\"/  sha256 \"$ZIP_SHA256\"/" \
-            "$RUNNER_TEMP/cask.rb"
-          grep -q "version \"$VERSION\"" "$RUNNER_TEMP/cask.rb"
-          grep -q "sha256 \"$ZIP_SHA256\"" "$RUNNER_TEMP/cask.rb"
-          gh api -X PUT "$API" \
-            -f message="ciflow: bump stone-vpn-manager to v$VERSION" \
-            -f content="$(base64 < "$RUNNER_TEMP/cask.rb" | tr -d '\n')" \
-            -f sha="$FILE_SHA" --jq '.commit.html_url'
           echo "✅ cask bumped"
 
       - name: Summary

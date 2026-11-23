@@ -215,7 +215,10 @@ code, kbd, pre { font-family: var(--mono); }
     radial-gradient(120% 80% at 80% 0%, rgba(63,182,201,.35), transparent 60%),
     radial-gradient(90% 80% at 0% 100%, rgba(243,205,116,.22), transparent 60%),
     linear-gradient(160deg, #0d3a4a, #071c25 70%);
-  border: 1px solid rgba(255,255,255,.08); border-top: 0; overflow: hidden; min-height: 640px;
+  border: 1px solid rgba(255,255,255,.08); border-top: 0; overflow: hidden;
+  /* Fixed, not min-height: the popover grows (banner, DNS panel) inside the desk,
+     so the hero layout never changes height and the text beside it doesn't jump. */
+  height: 790px;
 }
 .cursor {
   position: absolute; left: 0; top: 0; z-index: 5; width: 22px; height: 22px; pointer-events: none;

@@ -263,11 +263,12 @@
       '<span class="k">' + S.primary + '</span><span>' + (o.primary || "Defguard Engineering") + ' <span class="c-s">⌄</span></span></div>' +
       '<div class="btnrow"><span class="pbtn blue">Fix DNS</span><span class="pbtn plain">Flush</span></div>' +
       '<div class="log" data-log>' + (o.log || []).map(function (l) { return "<div>" + esc(l) + "</div>"; }).join("") + "</div>" +
+      (o.compact ? "" :
       '<div class="split"><b style="font-size:11.5px">Split DNS</b>' +
       '<div class="rule"><span class="mono">corp.example</span><span class="arrow">→</span><span class="mono">' + D.dgDNS + "</span></div>" +
       '<div class="rule"><span class="mono">lab.example.net</span><span class="arrow">→</span><span class="mono">' + D.wgDNS + "</span></div>" +
       '<div class="rule c-s">' + S.addRule + "</div></div>" +
-      '<div class="c-s">› ' + S.setDNS + "</div>";
+      '<div class="c-s">› ' + S.setDNS + "</div>");
   }
 
   function routesPanelHTML() {
@@ -450,7 +451,7 @@
         await sleep(1900);
         await moveTo(pop.$("[data-fix]")); await click();
         pop.banner(null);
-        pop.tool("dns", dnsPanelHTML({ res: [[D.dgDNS, false]], log: [] }));
+        pop.tool("dns", dnsPanelHTML({ res: [[D.dgDNS, false]], log: [], compact: true }));
         relayout();
         var log = pop.$("[data-log]");
         var lines = [S.log1(D.dgDNS), S.log2, S.log3, S.log4];
