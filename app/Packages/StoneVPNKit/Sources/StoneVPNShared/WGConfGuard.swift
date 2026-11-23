@@ -68,19 +68,24 @@ public enum WGConfGuard {
         case foreignOwner(dir: String, dirOwner: uid_t, fileOwner: uid_t)
         case changed
 
-        public var message: String {
+        /// Текст для користувача. Ключі — англійські; helper перекладає їх таблицею Helper
+        /// мовою клієнта (`L(failure.text)`), тут лише джерело.
+        public var text: String.LocalizationValue {
             switch self {
-            case .notInDirs(let p): "\(p): конфіг має лежати прямо в одній із тек WireGuard (\(WGPaths.dirs.joined(separator: ", ")))"
-            case .badName(let n): "\(n): ім'я не підходить для wg-quick (*.conf, [a-zA-Z0-9_=+.-], до 15 символів)"
+            case .notInDirs(let p): "\(p): the config must sit directly in one of the WireGuard folders (\(WGPaths.dirs.joined(separator: ", ")))"
+            case .badName(let n): "\(n): not a valid wg-quick name (*.conf, [a-zA-Z0-9_=+.-], up to 15 characters)"
             case .cannotOpen(let p, let e): "\(p): \(e)"
-            case .symlink(let p): "\(p): сам конфіг — симлінк; симлінком може бути лише тека"
-            case .notRegular(let p): "\(p): не звичайний файл"
-            case .hardLinks(let p, let n): "\(p): файл має \(n) жорстких посилань — відмовлено"
+            case .symlink(let p): "\(p): the config itself is a symlink; only the folder may be one"
+            case .notRegular(let p): "\(p): not a regular file"
+            case .hardLinks(let p, let n): "\(p): the file has \(n) hard links — refused"
             case .foreignOwner(let d, let downer, let fowner):
-                "тека конфігів веде в \(d) (власник uid \(downer), файл — uid \(fowner)): поза стандартними теками helper працює лише з твоїми файлами у твоїй теці"
-            case .changed: "конфіг змінився під час перевірки — спробуй ще раз"
+                "the configs folder points to \(d) (owner uid \(String(downer)), file uid \(String(fowner))): outside the standard folders the helper only works with your own files in your own folder"
+            case .changed: "the config changed during the check — try again"
             }
         }
+
+        /// Те саме без перекладу (англійською) — для логів і тестів.
+        public var message: String { String(localized: text) }
     }
 
     /// Рішення про власників — окремо, щоб покрити тестами без root.

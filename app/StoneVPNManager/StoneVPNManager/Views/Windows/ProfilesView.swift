@@ -13,7 +13,7 @@ struct ProfilesView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: Binding(get: { model.profilesBackend }, set: { if let b = $0 { model.profilesBackend = b; model.profilesSelection = nil } })) {
-                Section("Провайдери") {
+                Section("Providers") {
                     ForEach(Backend.allCases.filter { model.config.isOn($0) }) { b in
                         let items = model.items(for: b)
                         HStack(spacing: 9) {
@@ -28,7 +28,7 @@ struct ProfilesView: View {
                 }
                 let off = Backend.allCases.filter { !model.config.isOn($0) }
                 if !off.isEmpty {
-                    Section("Вимкнені (DISABLED_BACKENDS)") {
+                    Section("Disabled (DISABLED_BACKENDS)") {
                         ForEach(off) { b in Text(b.title).foregroundStyle(.secondary) }
                     }
                 }
@@ -49,7 +49,7 @@ struct ProfilesView: View {
                                 Text(model.prefs.display(it.profile)).fontWeight(.medium)
                                 if model.prefs.isFavorite(it.id) { Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(.yellow) }
                                 if model.prefs.lastProfile[it.profile.backend.rawValue] == it.id {
-                                    Text("останній").font(.system(size: 9.5)).foregroundStyle(.secondary)
+                                    Text("last used").font(.system(size: 9.5)).foregroundStyle(.secondary)
                                         .padding(.horizontal, 4).background(.quaternary, in: Capsule())
                                 }
                             }
@@ -58,49 +58,49 @@ struct ProfilesView: View {
                     }
                     .tag(it.id)
                     .contextMenu {
-                        Button(it.status.isActive ? "Відключити" : "Підключити") { model.toggle(it) }
-                        Button(model.prefs.isFavorite(it.id) ? "Прибрати з обраних" : "Додати в обрані") { model.prefs.toggleFavorite(it.id) }
+                        Button(it.status.isActive ? "Disconnect" : "Connect") { model.toggle(it) }
+                        Button(model.prefs.isFavorite(it.id) ? "Remove from Favourites" : "Add to Favourites") { model.prefs.toggleFavorite(it.id) }
                         if it.profile.backend == .openvpn || it.profile.backend == .wireguard {
                             Divider()
-                            Button("Видалити…", role: .destructive) { pendingDelete = it.profile }
+                            Button("Delete…", role: .destructive) { pendingDelete = it.profile }
                                 .disabled(it.status.isActive)
                         }
                     }
                 }
             }
-            .searchable(text: $search, placement: .sidebar, prompt: "Пошук")
+            .searchable(text: $search, placement: .sidebar, prompt: "Search")
             .overlay {
-                if items.isEmpty { ContentUnavailableView("Немає профілів", systemImage: "shield.slash", description: Text(emptyHint)) }
+                if items.isEmpty { ContentUnavailableView("No Profiles", systemImage: "shield.slash", description: Text(emptyHint)) }
             }
             .navigationSplitViewColumnWidth(min: 240, ideal: 280)
         } detail: {
             if let key = model.profilesSelection, let it = model.items(for: model.profilesBackend).first(where: { $0.id == key }) {
                 ProfileDetail(model: model, item: it, onDelete: { pendingDelete = it.profile }).id(it.id)
             } else {
-                ContentUnavailableView("Оберіть профіль", systemImage: "sidebar.left")
+                ContentUnavailableView("Select a Profile", systemImage: "sidebar.left")
             }
         }
         .toolbar {
             ToolbarItem {
                 Menu {
                     if model.profilesBackend == .openvpn {
-                        Button("Додати профіль (.ovpn)…") {
-                            if let u = pickFile(ovpn: true, title: "Новий профіль OpenVPN") { Task { await model.ovpnImport(u) } }
+                        Button("Add Profile (.ovpn)…") {
+                            if let u = pickFile(ovpn: true, title: String(localized: "New OpenVPN Profile")) { Task { await model.ovpnImport(u) } }
                         }
                         Divider()
                     }
                     ForEach(manageCommands, id: \.0) { c in Button(c.0) { runInTerminal(c.1) } }
                     if model.profilesBackend == .cisco {
-                        Button("Додати хост…") { newHost = CiscoPrefs.load().suggestedHost ?? ""; addingHost = true }
+                        Button("Add Host…") { newHost = CiscoPrefs.load().suggestedHost ?? ""; addingHost = true }
                     }
                     if model.profilesBackend == .defguard {
-                        Button("Відкрити Defguard.app") { NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Defguard.app")) }
+                        Button("Open Defguard.app") { NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Defguard.app")) }
                     }
-                } label: { Label("Керування", systemImage: "plus") }
-                .help("Додати / імпорт / сертифікати")
+                } label: { Label("Manage", systemImage: "plus") }
+                .help("Add / import / certificates")
             }
             ToolbarItem {
-                Button { Task { await model.refresh(forceSlow: true) } } label: { Label("Оновити", systemImage: "arrow.clockwise") }
+                Button { Task { await model.refresh(forceSlow: true) } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
             }
         }
         .frame(minWidth: 860, minHeight: 520)
@@ -117,45 +117,49 @@ struct ProfilesView: View {
         }
         .confirmationDialog(deleteTitle, isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
                             titleVisibility: .visible, presenting: pendingDelete) { p in
-            Button("Видалити", role: .destructive) { Task { await model.deleteProfile(p) } }
-            Button("Скасувати", role: .cancel) {}
+            Button("Delete", role: .destructive) { Task { await model.deleteProfile(p) } }
+            Button("Cancel", role: .cancel) {}
         } message: { p in
-            Text(p.backend == .openvpn
-                 ? "Файл \(p.path.map { ($0 as NSString).lastPathComponent } ?? p.name) піде в Кошик (його можна відновити). Псевдонім і налаштування профілю буде забуто."
-                 : "Конфіг \(p.path ?? p.name) буде видалено назавжди (root — попросить пароль, якщо helper не встановлено), разом із приватним ключем.")
+            if p.backend == .openvpn {
+                let file = p.path.map { ($0 as NSString).lastPathComponent } ?? p.name
+                Text("The file \(file) will go to the Trash (it can be restored). The profile's alias and settings will be forgotten.")
+            } else {
+                let conf = p.path ?? p.name
+                Text("The config \(conf) will be deleted permanently (needs root — asks for a password if the helper isn't installed), together with its private key.")
+            }
         }
-        .alert("Новий Cisco-хост", isPresented: $addingHost) {
-            TextField("host:port", text: $newHost)
-            Button("Додати") { model.addCiscoHost(newHost) }
-            Button("Скасувати", role: .cancel) {}
-        } message: { Text("Можна з портом, напр. vpn.example.com:8448") }
+        .alert("New Cisco Host", isPresented: $addingHost) {
+            TextField(text: $newHost) { Text(verbatim: "host:port") }
+            Button("Add") { model.addCiscoHost(newHost) }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("A port is allowed, e.g. vpn.example.com:8448") }
     }
 
     private var emptyHint: String {
         switch model.profilesBackend {
-        case .wireguard: "Конфіги *.conf у /opt/homebrew/etc/wireguard, /usr/local/etc/wireguard або /etc/wireguard (root-only теки видно після встановлення helper)."
-        case .openvpn: "Профілі *.ovpn у \(model.config.ovpnProfilesDir)."
-        case .defguard: "Локації додаються в Defguard.app."
-        case .cisco: "Хости з профілю Cisco (vpn -s hosts)."
+        case .wireguard: String(localized: "*.conf configs in /opt/homebrew/etc/wireguard, /usr/local/etc/wireguard or /etc/wireguard (root-only folders become visible once the helper is installed).")
+        case .openvpn: String(localized: "*.ovpn profiles in \(model.config.ovpnProfilesDir).")
+        case .defguard: String(localized: "Locations are added in Defguard.app.")
+        case .cisco: String(localized: "Hosts from the Cisco profile (vpn -s hosts).")
         }
     }
 
     private var deleteTitle: String {
-        pendingDelete.map { "Видалити «\(model.prefs.display($0))»?" } ?? ""
+        pendingDelete.map { String(localized: "Delete “\(model.prefs.display($0))”?") } ?? ""
     }
 
     /// Керування конфігами/сертифікатами — інтерактивні CLI-скрипти репо в Terminal.
     private var manageCommands: [(String, String)] {
         switch model.profilesBackend {
-        case .wireguard: [("WireGuard: згенерувати / імпорт / видалити… (Terminal)", "cert wg")]
-        case .openvpn: [("OpenVPN: меню скрипта (Terminal)", "cert openvpn")]
+        case .wireguard: [(String(localized: "WireGuard: generate / import / delete… (Terminal)"), "cert wg")]
+        case .openvpn: [(String(localized: "OpenVPN: script menu (Terminal)"), "cert openvpn")]
         default: []
         }
     }
 
     private func runInTerminal(_ args: String) {
         guard model.config.sharedWithCLI, let repo = model.config.repo else {
-            model.toast = "Керування сертифікатами працює через CLI-репозиторій (Settings → Додатково)"; return
+            model.toast = String(localized: "Certificate management works through the CLI repository (Settings → Advanced)"); return
         }
         let cmd = "cd '\(repo.path)' && ./main-vpn-manager.sh \(args)"
         let script = "tell application \"Terminal\"\nactivate\ndo script \"\(cmd.replacingOccurrences(of: "\"", with: "\\\""))\"\nend tell"
@@ -214,23 +218,23 @@ struct ProfileDetail: View {
                 .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 11))
 
                 HStack(spacing: 8) {
-                    Button(item.status.isActive ? "Відключити" : "Підключити") { model.toggle(item) }
+                    Button(item.status.isActive ? "Disconnect" : "Connect") { model.toggle(item) }
                         .buttonStyle(.borderedProminent)
                         .tint(item.status.isActive ? .red : .accentColor)
                     let fav = model.prefs.isFavorite(item.id)
                     Button { model.prefs.toggleFavorite(item.id) } label: {
-                        Label(fav ? "В обраних" : "В обрані", systemImage: fav ? "star.fill" : "star")
+                        Label(fav ? "In Favourites" : "Favourite", systemImage: fav ? "star.fill" : "star")
                     }
                     if let path = p.path {
-                        Button("Показати у Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
                     }
                     if p.backend == .openvpn, FileManager.default.fileExists(atPath: "/tmp/openvpn-\(p.name).log") {
-                        Button("Лог") { NSWorkspace.shared.open(URL(fileURLWithPath: "/tmp/openvpn-\(p.name).log")) }
+                        Button("Log") { NSWorkspace.shared.open(URL(fileURLWithPath: "/tmp/openvpn-\(p.name).log")) }
                     }
                     if p.backend == .openvpn, p.path != nil {
-                        Menu("Замінити") {
-                            Button("Весь профіль (.ovpn)…") {
-                                if let u = pickFile(ovpn: true, title: "Новий .ovpn для «\(model.prefs.display(p))»") {
+                        Menu("Replace") {
+                            Button("Whole Profile (.ovpn)…") {
+                                if let u = pickFile(ovpn: true, title: String(localized: "New .ovpn for “\(model.prefs.display(p))”")) {
                                     Task { await model.ovpnReplace(p, with: u); loadBlocks() }
                                 }
                             }
@@ -238,7 +242,7 @@ struct ProfileDetail: View {
                                 Divider()
                                 ForEach(blocks, id: \.self) { tag in
                                     Button(Self.blockTitle(tag)) {
-                                        if let u = pickFile(ovpn: false, title: "PEM для <\(tag)> у «\(model.prefs.display(p))»") {
+                                        if let u = pickFile(ovpn: false, title: String(localized: "PEM for <\(tag)> in “\(model.prefs.display(p))”")) {
                                             Task { await model.ovpnReplace(p, with: u, block: tag) }
                                         }
                                     }
@@ -246,13 +250,13 @@ struct ProfileDetail: View {
                             }
                         }
                         .fixedSize()
-                        .help("Замінюється саме цей файл; стара версія лишається поруч як .ovpn.bak")
+                        .help("Replaces exactly this file; the old version stays next to it as .ovpn.bak")
                     }
                     if p.backend == .openvpn || p.backend == .wireguard {
                         Spacer()
-                        Button("Видалити…", role: .destructive, action: onDelete)
+                        Button("Delete…", role: .destructive, action: onDelete)
                             .disabled(item.status.isActive)
-                            .help(item.status.isActive ? "Спершу відключи" : "Видалити профіль")
+                            .help(item.status.isActive ? "Disconnect first" : "Delete the profile")
                     }
                 }
 
@@ -272,28 +276,28 @@ struct ProfileDetail: View {
 
     @ViewBuilder private func settings(_ p: Profile) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionLabel(text: "Налаштування профілю")
+            SectionLabel(text: "Profile Settings")
             Form {
-                TextField("Псевдонім", text: $alias, prompt: Text(p.title ?? p.name))
+                TextField("Alias", text: $alias, prompt: Text(verbatim: p.title ?? p.name))
                     .onSubmit { saveAlias(p) }
                     .onChange(of: alias) { saveAlias(p) }
                 if p.backend == .cisco {
                     let custom = model.prefs.ciscoHosts.contains(p.name)
-                    TextField("Хост", text: $hostEdit, prompt: Text("host:port"))
+                    TextField("Host", text: $hostEdit, prompt: Text(verbatim: "host:port"))
                         .onSubmit { model.editCiscoHost(p.name, to: hostEdit) }
                     HStack {
-                        Text(custom ? "Власний хост StoneVPN (не з профілю Cisco)." : "З профілю Cisco (head-end перезаписує його) — зміна збереже копію у StoneVPN.")
+                        Text(custom ? "A StoneVPN host (not from the Cisco profile)." : "From the Cisco profile (the head-end rewrites it) — editing saves a copy in StoneVPN.")
                             .font(.system(size: 11)).foregroundStyle(.secondary)
                         Spacer()
-                        Button(custom ? "Зберегти" : "Зберегти копію") { model.editCiscoHost(p.name, to: hostEdit) }
+                        Button(custom ? "Save" : "Save a Copy") { model.editCiscoHost(p.name, to: hostEdit) }
                             .disabled(hostEdit.isEmpty || hostEdit == p.name)
-                        if custom { Button("Видалити", role: .destructive) { model.removeCiscoHost(p.name) } }
+                        if custom { Button("Delete", role: .destructive) { model.removeCiscoHost(p.name) } }
                     }
                     if let u = model.prefs.ciscoUsers[Prefs.ciscoKey(p.name)], !u.isEmpty {
-                        LabeledContent("Останній логін") {
+                        LabeledContent("Last Username") {
                             HStack {
                                 Mono(u, size: 12)
-                                Button("Забути") { model.prefs.ciscoUsers.removeValue(forKey: Prefs.ciscoKey(p.name)) }
+                                Button("Forget") { model.prefs.ciscoUsers.removeValue(forKey: Prefs.ciscoKey(p.name)) }
                                     .buttonStyle(.borderless)
                             }
                         }
@@ -301,24 +305,24 @@ struct ProfileDetail: View {
                 }
                 if p.backend == .openvpn || p.backend == .wireguard {
                     Picker("Route-fix", selection: routeFixBinding(p)) {
-                        Text("Питати при підключенні").tag(0)
-                        Text("Поточний LAN-шлюз").tag(1)
-                        Text("Фіксований шлюз").tag(2)
-                        Text("Ніколи").tag(3)
+                        Text("Ask When Connecting").tag(0)
+                        Text("Current LAN Gateway").tag(1)
+                        Text("Fixed Gateway").tag(2)
+                        Text("Never").tag(3)
                     }
                     if case .gateway = model.prefs.settings(for: p).routeFix {
-                        TextField("Шлюз", text: $fixedGW, prompt: Text("192.168.0.1"))
+                        TextField("Gateway", text: $fixedGW, prompt: Text(verbatim: "192.168.0.1"))
                             .onSubmit { setMode(p, .gateway(fixedGW)) }
                             .onChange(of: fixedGW) { if Parse.ipv4(fixedGW) != nil { setMode(p, .gateway(fixedGW)) } }
                     }
                     if let last = model.prefs.settings(for: p).lastGateway {
-                        LabeledContent("Останній вибір шлюзу") { Mono(last.isEmpty ? "пропущено" : last, size: 12) }
+                        LabeledContent("Last Gateway Choice") { Mono(last.isEmpty ? String(localized: "skipped") : last, size: 12) }
                     }
                     if p.backend == .openvpn, let u = model.prefs.settings(for: p).lastUsername, !u.isEmpty {
-                        LabeledContent("Останній логін") {
+                        LabeledContent("Last Username") {
                             HStack {
                                 Mono(u, size: 12)
-                                Button("Забути") {
+                                Button("Forget") {
                                     var s = model.prefs.settings(for: p)
                                     s.lastUsername = nil
                                     model.prefs.setSettings(s, for: p)
@@ -338,8 +342,8 @@ struct ProfileDetail: View {
 
     private func routeFixHint(_ p: Profile) -> String {
         p.backend == .openvpn
-            ? "Host-маршрут до VPN-сервера через LAN-шлюз, коли macOS веде його не тим інтерфейсом. Сервери, досяжні через інший тунель (VPN-у-VPN), пропускаються автоматично."
-            : "Для WireGuard зазвичай не потрібен — wg-quick сам веде маршрут до Endpoint. Увімкни, якщо endpoint іде не тим інтерфейсом."
+            ? String(localized: "A host route to the VPN server via the LAN gateway, for when macOS sends it out the wrong interface. Servers reachable through another tunnel (VPN-in-VPN) are skipped automatically.")
+            : String(localized: "Usually not needed for WireGuard — wg-quick routes to the Endpoint itself. Turn it on if the endpoint goes out the wrong interface.")
     }
 
     private func routeFixBinding(_ p: Profile) -> Binding<Int> {
@@ -370,52 +374,52 @@ struct ProfileDetail: View {
 
     private var statusText: String {
         switch item.status {
-        case .up: "підключено"
-        case .off: "вимкнено"
+        case .up: String(localized: "connected")
+        case .off: String(localized: "off")
         case .busy(let t): t
-        case .connecting: "підключається"
-        case .retry: "повторює спроби"
-        case .unknown: "стан невідомий"
-        case .failed: "помилка"
-        case .stale: "сесія протухла"
+        case .connecting: String(localized: "connecting")
+        case .retry: String(localized: "retrying")
+        case .unknown: String(localized: "state unknown")
+        case .failed: String(localized: "error")
+        case .stale: String(localized: "session expired")
         }
     }
 
     private var rows: [(String, String)] {
         let p = item.profile, s = item.session
         var r: [(String, String)] = []
-        if let s, let i = s.iface { r.append(("Interface", [i, s.address].compactMap { $0 }.joined(separator: " · "))) }
-        if let e = s?.elapsed { r.append(("Час", e)) }
+        if let s, let i = s.iface { r.append((String(localized: "Interface"), [i, s.address].compactMap { $0 }.joined(separator: " · "))) }
+        if let e = s?.elapsed { r.append((String(localized: "Uptime"), e)) }
         if let pid = s?.pid { r.append(("PID", String(pid))) }
-        if let s, !s.routes.isEmpty { r.append(("Маршрути", s.routes.joined(separator: ", "))) }
-        if let s, !s.dnsServers.isEmpty { r.append(("DNS тунелю", s.dnsServers.joined(separator: " "))) }
+        if let s, !s.routes.isEmpty { r.append((String(localized: "Routes"), s.routes.joined(separator: ", "))) }
+        if let s, !s.dnsServers.isEmpty { r.append((String(localized: "Tunnel DNS"), s.dnsServers.joined(separator: " "))) }
         switch item.status {
-        case .retry(let e), .failed(let e): r.append(("Помилка", e))
+        case .retry(let e), .failed(let e): r.append((String(localized: "Error"), e))
         default: break
         }
         r += info
         switch p.backend {
         case .openvpn:
             if !p.remotes.isEmpty { r.append(("Remote", p.endpoint ?? p.remotes.joined(separator: ", "))) }
-            r.append(("Логін", p.needsAuth ? "auth-user-pass (логін + пароль/OTP)" : "без логіна"))
+            r.append((String(localized: "Login"), p.needsAuth ? String(localized: "auth-user-pass (username + password/OTP)") : String(localized: "no login")))
         case .defguard:
             if let e = p.endpoint { r.append(("Endpoint", e)) }
-            r.append(("Тип", p.dgKind ?? "—"))
-            r.append(("MFA", p.mfa ?? "ні"))
-            if let a = p.allTraffic { r.append(("Маршрути", a ? "весь трафік" : "split")) }
+            r.append((String(localized: "Type"), p.dgKind ?? "—"))
+            r.append(("MFA", p.mfa ?? String(localized: "no")))
+            if let a = p.allTraffic { r.append((String(localized: "Routes"), a ? String(localized: "all traffic") : "split")) }
         case .cisco:
             r.append(("Host", p.name))
         case .wireguard:
             break
         }
-        if let path = p.path { r.append(("Файл", path)) }
+        if let path = p.path { r.append((String(localized: "File"), path)) }
         return r
     }
 
     static func blockTitle(_ tag: String) -> String {
         switch tag {
-        case "cert": "Сертифікат <cert>…"
-        case "key": "Приватний ключ <key>…"
+        case "cert": String(localized: "Certificate <cert>…")
+        case "key": String(localized: "Private Key <key>…")
         case "ca": "CA <ca>…"
         default: "<\(tag)>…"
         }
@@ -433,9 +437,9 @@ struct ProfileDetail: View {
         guard p.backend == .wireguard, let path = p.path else { return }
         var text = try? String(contentsOfFile: path, encoding: .utf8)
         if text == nil { text = await model.helper.readIfAvailable(.readWGConf(path: path))?.output }
-        guard let text else { info = [("Endpoint", "конфіг root-only — встанови helper (Settings → Helper)")]; return }
+        guard let text else { info = [("Endpoint", String(localized: "root-only config — install the helper (Settings → Helper)"))]; return }
         let c = Parse.wgConf(text)
-        info = [("Endpoint", c.endpoint), ("Address", c.address), ("DNS", c.dns), ("AllowedIPs", c.allowedIPs)]
+        info = [("Endpoint", c.endpoint), (String(localized: "Address"), c.address), ("DNS", c.dns), ("AllowedIPs", c.allowedIPs)]
             .compactMap { k, v in v.map { (k, $0) } }
     }
 }

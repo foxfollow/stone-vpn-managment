@@ -150,6 +150,8 @@ final class CiscoOrphanTests: XCTestCase {
     func testCapabilityIsFailureWithHint() {
         let out = ">> error: Connect capability is unavailable. Another Cisco Secure Client application acquired it."
         XCTAssertNotNil(CiscoDriver.failure(out))
-        XCTAssertTrue(CiscoDriver.explain("x", out).contains("GUI Cisco"))
+        // Підказка локалізована — перевіряємо, що її додано, а не формулювання.
+        XCTAssertTrue(CiscoDriver.explain("x", out).hasSuffix(CiscoDriver.capabilityHint))
+        XCTAssertEqual(CiscoDriver.explain("x", "Login failed"), "x")
     }
 }

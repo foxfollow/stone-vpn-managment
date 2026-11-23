@@ -1,0 +1,523 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ is connected — disconnect it first" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ підключений — спершу відключи"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "extractionState" : "manual",
+      "shouldTranslate" : false
+    },
+    "%@: not a regular file" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: не звичайний файл"
+          }
+        }
+      }
+    },
+    "%@: not a valid wg-quick name (*.conf, [a-zA-Z0-9_=+.-], up to 15 characters)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: ім'я не підходить для wg-quick (*.conf, [a-zA-Z0-9_=+.-], до 15 символів)"
+          }
+        }
+      }
+    },
+    "%@: the config itself is a symlink; only the folder may be one" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: сам конфіг — симлінк; симлінком може бути лише тека"
+          }
+        }
+      }
+    },
+    "%@: the config must sit directly in one of the WireGuard folders (%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: конфіг має лежати прямо в одній із тек WireGuard (%2$@)"
+          }
+        }
+      }
+    },
+    "%@: the file has %lld hard links — refused" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: the file has %#@links@ — refused"
+          },
+          "substitutions" : {
+            "links" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg hard link"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg hard links"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: файл має %#@links@ — відмовлено"
+          },
+          "substitutions" : {
+            "links" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "few" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg жорсткі посилання"
+                    }
+                  },
+                  "many" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg жорстких посилань"
+                    }
+                  },
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg жорстке посилання"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg жорсткого посилання"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "OpenVPN PID %@ stopped" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenVPN PID %@ зупинено"
+          }
+        }
+      }
+    },
+    "PID %@ is not a VPN tunnel process" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PID %@ — не процес VPN-тунелю"
+          }
+        }
+      }
+    },
+    "PID %@ is not openvpn" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PID %@ — не openvpn"
+          }
+        }
+      }
+    },
+    "PID %@ stopped" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PID %@ зупинено"
+          }
+        }
+      }
+    },
+    "SCDynamicStore unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SCDynamicStore недоступний"
+          }
+        }
+      }
+    },
+    "cannot read: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не читається: %@"
+          }
+        }
+      }
+    },
+    "could not read the request" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не прочитав запит"
+          }
+        }
+      }
+    },
+    "could not write the primary DNS" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не вдалося записати основний DNS"
+          }
+        }
+      }
+    },
+    "deleted %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "видалено %@"
+          }
+        }
+      }
+    },
+    "displaced catch-all: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "витіснено catch-all: %@"
+          }
+        }
+      }
+    },
+    "invalid DNS: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "невірний DNS: %@"
+          }
+        }
+      }
+    },
+    "invalid address: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "невірна адреса: %@"
+          }
+        }
+      }
+    },
+    "invalid address: %@ / %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "невірна адреса: %1$@ / %2$@"
+          }
+        }
+      }
+    },
+    "invalid domain" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "невірний домен"
+          }
+        }
+      }
+    },
+    "invalid domain or server" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "невірний домен або сервер"
+          }
+        }
+      }
+    },
+    "invalid profile name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "недопустима назва профілю"
+          }
+        }
+      }
+    },
+    "log unavailable: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "лог недоступний: %@"
+          }
+        }
+      }
+    },
+    "no rule for %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "немає правила для %@"
+          }
+        }
+      }
+    },
+    "no such service: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "немає сервісу: %@"
+          }
+        }
+      }
+    },
+    "not deleted: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не видалено: %@"
+          }
+        }
+      }
+    },
+    "not removed %@: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не прибрано %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "openvpn did not start: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "openvpn не запустився: %@"
+          }
+        }
+      }
+    },
+    "openvpn not found (brew install openvpn)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "openvpn не знайдено (brew install openvpn)"
+          }
+        }
+      }
+    },
+    "primary DNS — chosen by the system" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "основний DNS — як вирішила система"
+          }
+        }
+      }
+    },
+    "primary DNS → %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "основний DNS → %@"
+          }
+        }
+      }
+    },
+    "profile unavailable: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "профіль недоступний: %@"
+          }
+        }
+      }
+    },
+    "removed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "прибрано %@"
+          }
+        }
+      }
+    },
+    "removed resolver %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "прибрано резолвер %@"
+          }
+        }
+      }
+    },
+    "the config changed during the check — try again" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "конфіг змінився під час перевірки — спробуй ще раз"
+          }
+        }
+      }
+    },
+    "the configs folder points to %@ (owner uid %@, file uid %@): outside the standard folders the helper only works with your own files in your own folder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "тека конфігів веде в %1$@ (власник uid %2$@, файл — uid %3$@): поза стандартними теками helper працює лише з твоїми файлами у твоїй теці"
+          }
+        }
+      }
+    },
+    "the full list of services is required" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "потрібен повний список сервісів"
+          }
+        }
+      }
+    },
+    "unknown request (update the helper)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "невідомий запит (оновіть helper)"
+          }
+        }
+      }
+    },
+    "wg-quick not found" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "wg-quick не знайдено"
+          }
+        }
+      }
+    },
+    "wg-quick not found (brew install wireguard-tools)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "wg-quick не знайдено (brew install wireguard-tools)"
+          }
+        }
+      }
+    },
+    "writing /etc/resolver/%@: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "запис /etc/resolver/%1$@: %2$@"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

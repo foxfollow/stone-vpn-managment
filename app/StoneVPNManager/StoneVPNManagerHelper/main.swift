@@ -20,16 +20,23 @@ func ownTeamID() -> String? {
     return dict[kSecCodeInfoTeamIdentifier as String] as? String
 }
 
+/// v6+: `PrivRequest` (операція + мова відповіді); старі клієнти шлють голий `PrivOp`.
+func decodeRequest(_ data: Data) -> (PrivOp, String?)? {
+    if let r = try? JSONDecoder().decode(PrivRequest.self, from: data) { return (r.op, r.lang) }
+    if let op = try? JSONDecoder().decode(PrivOp.self, from: data) { return (op, nil) }
+    return nil
+}
+
 final class Service: NSObject, HelperXPC {
     let caller: uid_t
     init(caller: uid_t) { self.caller = caller }
 
     func run(_ request: Data, withReply reply: @escaping (Data) -> Void) {
         let result: PrivResult
-        if let op = try? JSONDecoder().decode(PrivOp.self, from: request) {
-            result = Executor.execute(op, waitAuthCleanup: false, caller: caller)
+        if let (op, lang) = decodeRequest(request) {
+            result = HelperL10n.with(lang) { Executor.execute(op, waitAuthCleanup: false, caller: caller) }
         } else {
-            result = .fail("невідомий запит (оновіть helper)")
+            result = .fail(L("unknown request (update the helper)"))
         }
         reply((try? JSONEncoder().encode(result)) ?? Data())
     }
@@ -86,10 +93,10 @@ if args.count >= 3, args[1] == "--run-file" {
     let data = FileManager.default.contents(atPath: path)
     try? FileManager.default.removeItem(atPath: path)
     let result: PrivResult
-    if let data, let op = try? JSONDecoder().decode(PrivOp.self, from: data) {
-        result = Executor.execute(op, waitAuthCleanup: true, caller: caller)
+    if let data, let (op, lang) = decodeRequest(data) {
+        result = HelperL10n.with(lang) { Executor.execute(op, waitAuthCleanup: true, caller: caller) }
     } else {
-        result = .fail("не прочитав запит")
+        result = .fail(L("could not read the request"))
     }
     FileHandle.standardOutput.write((try? JSONEncoder().encode(result)) ?? Data())
     // Завжди 0: інакше `do shell script` кидає помилку і JSON-результат губиться.

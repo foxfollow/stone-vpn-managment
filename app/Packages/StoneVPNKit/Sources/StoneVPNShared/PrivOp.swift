@@ -35,6 +35,20 @@ public enum PrivOp: Codable, Sendable, Equatable {
     case batch([PrivOp])
 }
 
+/// Запит до helper-а (протокол v6+): операція + мова інтерфейсу застосунку. Демон живе з
+/// мовою системи (root), тому повідомлення локалізує мовою клієнта, а не своєю.
+/// Старі клієнти шлють голий `PrivOp` — helper приймає обидва формати.
+public struct PrivRequest: Codable, Sendable {
+    public var op: PrivOp
+    /// Код локалізації (`Bundle.main.preferredLocalizations.first`): "en", "uk"…
+    public var lang: String?
+
+    public init(op: PrivOp, lang: String?) {
+        self.op = op
+        self.lang = lang
+    }
+}
+
 public struct PrivResult: Codable, Sendable {
     public var ok: Bool
     public var output: String
@@ -53,7 +67,7 @@ public enum HelperConst {
     public static let appBundleID = "com.foxfollow.stonevpnmanager"
     public static let helperExecutable = "StoneVPNManagerHelper"
     /// Підняти при зміні PrivOp — застосунок запропонує перевстановити helper.
-    public static let version = 5   // 5: WGConfGuard (перевірка тек/власників WG-конфігів)
+    public static let version = 6   // 5: WGConfGuard; 6: PrivRequest (мова відповідей)
     /// State-ключ основного DNS, який публікує helper (service id не має Setup-запису, як і Cisco).
     public static let dnsOverrideService = "com.foxfollow.stonevpnmanager.dns"
     public static var dnsOverrideKey: String { "State:/Network/Service/\(dnsOverrideService)/DNS" }

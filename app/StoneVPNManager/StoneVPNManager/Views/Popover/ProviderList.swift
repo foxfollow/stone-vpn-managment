@@ -9,9 +9,9 @@ struct ProviderList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                SectionLabel(text: "Провайдери")
+                SectionLabel(text: "Providers")
                 Spacer()
-                Button(model.editingList ? "Готово" : "Змінити") {
+                Button(model.editingList ? "Done" : "Edit") {
                     withAnimation(.snappy(duration: 0.2)) { model.editingList.toggle() }
                 }
                 .buttonStyle(.borderless)
@@ -25,7 +25,7 @@ struct ProviderList: View {
                 }
                 let rows = model.rows
                 if rows.isEmpty {
-                    Text(model.loaded ? "Немає провайдерів. Увімкни бекенди в Settings → Бекенди." : "Завантаження…")
+                    Text(model.loaded ? "No providers. Turn backends on in Settings → Backends." : "Loading…")
                         .font(.system(size: 12)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 50)
                 }
@@ -38,7 +38,7 @@ struct ProviderList: View {
 
             if model.editingList, !model.hiddenBackends.isEmpty {
                 HStack(spacing: 6) {
-                    Text("Приховані:").foregroundStyle(.secondary)
+                    Text("Hidden:").foregroundStyle(.secondary)
                     ForEach(model.hiddenBackends) { b in
                         Button("+ \(b.title)") { model.prefs.hiddenProviders.removeAll { $0 == b.rawValue } }
                             .buttonStyle(.bordered).controlSize(.small)
@@ -60,11 +60,11 @@ struct ProviderCell: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 if let main = row.main {
-                    ProfileSwitch(status: main.status, label: "\(main.status.isActive ? "Відключити" : "Підключити") \(model.prefs.display(main.profile))") {
+                    ProfileSwitch(status: main.status, label: switchLabel(main)) {
                         model.toggle(main)
                     }
                 } else {
-                    ProfileSwitch(status: .off, label: "Немає профілів") {}.disabled(true).opacity(0.4)
+                    ProfileSwitch(status: .off, label: String(localized: "No profiles")) {}.disabled(true).opacity(0.4)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -75,7 +75,7 @@ struct ProviderCell: View {
                             Text(model.prefs.display(main.profile)).lineLimit(1).truncationMode(.middle)
                         }
                     }
-                    Text(row.main.map { subtitle($0, isMain: true) } ?? "немає профілів")
+                    Text(row.main.map { subtitle($0, isMain: true) } ?? String(localized: "no profiles"))
                         .font(.system(size: 11))
                         .foregroundStyle(row.main?.status.color ?? .secondary)
                         .lineLimit(1).truncationMode(.tail)
@@ -94,14 +94,14 @@ struct ProviderCell: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Усі профілі \(row.backend.title)")
+                .help("All \(row.backend.title) profiles")
             }
             .padding(.leading, 10).padding(.trailing, 6)
             .frame(minHeight: 52)
 
             ForEach(row.subs) { it in
                 HStack(spacing: 10) {
-                    ProfileSwitch(status: it.status, small: true, label: "\(it.status.isActive ? "Відключити" : "Підключити") \(model.prefs.display(it.profile))") {
+                    ProfileSwitch(status: it.status, small: true, label: switchLabel(it)) {
                         model.toggle(it)
                     }
                     Text(model.prefs.display(it.profile)).font(.system(size: 12.5)).lineLimit(1)
@@ -113,7 +113,7 @@ struct ProviderCell: View {
                         Image(systemName: fav ? "star.fill" : "star").foregroundStyle(fav ? .yellow : .secondary)
                     }
                     .buttonStyle(.borderless)
-                    .help(fav ? "Прибрати з обраних" : "Додати в обрані")
+                    .help(fav ? "Remove from Favourites" : "Add to Favourites")
                 }
                 .padding(.leading, 58).padding(.trailing, 10)
                 .frame(minHeight: 32)
@@ -121,7 +121,7 @@ struct ProviderCell: View {
 
             if model.editingList {
                 Button { model.openProfiles(row.backend) } label: {
-                    Label("Додати обраний профіль…", systemImage: "plus").font(.system(size: 12))
+                    Label("Add a Favourite Profile…", systemImage: "plus").font(.system(size: 12))
                 }
                 .buttonStyle(.borderless)
                 .padding(.leading, 58).padding(.bottom, 8)
@@ -130,9 +130,9 @@ struct ProviderCell: View {
     }
 
     private func renewButton(_ it: ProfileItem) -> some View {
-        Button("Оновити") { model.renewDefguard(it.profile.name) }
+        Button("Renew") { model.renewDefguard(it.profile.name) }
             .buttonStyle(.borderedProminent).tint(.red).controlSize(.small)
-            .help(it.profile.mfa != nil ? "Перепідключити з новим MFA-кодом" : "Перепідключити")
+            .help(it.profile.mfa != nil ? "Reconnect with a new MFA code" : "Reconnect")
     }
 
     private var editControls: some View {
@@ -142,7 +142,7 @@ struct ProviderCell: View {
             Button { model.prefs.hiddenProviders.append(row.backend.rawValue) } label: {
                 Image(systemName: "minus.circle.fill").foregroundStyle(.red)
             }
-            .help("Приховати \(row.backend.title)")
+            .help("Hide \(row.backend.title)")
         }
         .buttonStyle(.borderless)
     }
@@ -157,26 +157,32 @@ struct ProviderCell: View {
         withAnimation(.snappy(duration: 0.2)) { model.prefs.providerOrder = order.map(\.rawValue) }
     }
 
+    /// Підпис перемикача для VoiceOver: дія + профіль.
+    private func switchLabel(_ it: ProfileItem) -> String {
+        let name = model.prefs.display(it.profile)
+        return it.status.isActive ? String(localized: "Disconnect \(name)") : String(localized: "Connect \(name)")
+    }
+
     private func subtitle(_ it: ProfileItem, isMain: Bool) -> String {
         switch it.status {
         case .up:
             let s = it.session
             return [s?.iface, s?.address, s?.elapsed].compactMap { $0 }.joined(separator: " · ")
         case .busy(let t): return t
-        case .connecting: return "підключається…"
+        case .connecting: return String(localized: "connecting…")
         case .retry(let e): return e
-        case .unknown: return "стан невідомий — лог лише для root"
+        case .unknown: return String(localized: "state unknown — the log is root-only")
         case .failed(let e): return e
         case .stale:
-            return it.profile.mfa != nil ? "сесія протухла — потрібен новий MFA-код" : "gateway не відповідає на хендшейк"
+            return it.profile.mfa != nil ? String(localized: "session expired — a new MFA code is needed") : String(localized: "the gateway doesn't answer the handshake")
         case .off:
             let last = isMain && model.prefs.lastProfile[it.profile.backend.rawValue] == it.id
             var bits: [String] = []
-            if last { bits.append("останній") }
+            if last { bits.append(String(localized: "last used")) }
             if let e = it.profile.endpoint { bits.append(e) }
             if it.profile.mfa != nil { bits.append("MFA") }
             if it.profile.needsAuth { bits.append("OTP") }
-            return bits.isEmpty ? "вимкнено" : bits.joined(separator: " · ")
+            return bits.isEmpty ? String(localized: "off") : bits.joined(separator: " · ")
         }
     }
 }
@@ -193,13 +199,13 @@ struct ForeignRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text(session.name).fontWeight(.semibold)
-                    Text("· сторонній").foregroundStyle(.secondary)
+                    Text("· foreign").foregroundStyle(.secondary)
                 }
                 Text([session.iface, session.address, primary ? "default route + DNS" : nil].compactMap { $0 }.joined(separator: " · "))
                     .font(.system(size: 11)).foregroundStyle(.purple)
             }
             Spacer()
-            Button("Розірвати…") { Task { await model.offerTakeDown(session) } }
+            Button("Take Down…") { Task { await model.offerTakeDown(session) } }
                 .buttonStyle(.bordered).tint(.purple).controlSize(.small)
         }
         .padding(.horizontal, 10)

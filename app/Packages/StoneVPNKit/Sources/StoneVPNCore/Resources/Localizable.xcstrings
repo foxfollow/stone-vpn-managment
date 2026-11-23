@@ -1,0 +1,497 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ doesn't look like <%@> content" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ не схожий на вміст <%2$@>"
+          }
+        }
+      }
+    },
+    "%@ doesn't look like an OpenVPN profile (no remote / <ca>)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ не схожий на профіль OpenVPN (немає remote / <ca>)"
+          }
+        }
+      }
+    },
+    "%@ is reachable via %@ — no route-fix needed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ доступний через %2$@ — route-fix не потрібен"
+          }
+        }
+      }
+    },
+    "%@ · tunnel" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · тунель"
+          }
+        }
+      }
+    },
+    "%@d %@" : {
+      "comment" : "Elapsed time with days, e.g. 2d 03:04",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@д %2$@"
+          }
+        }
+      }
+    },
+    "Another Cisco client holds the connect capability: the Cisco Secure Client GUI or `vpn` in Terminal. Close it and try again." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Право підключення тримає інший клієнт Cisco: GUI Cisco Secure Client або `vpn` у Terminal. Закрий його і спробуй ще раз."
+          }
+        }
+      }
+    },
+    "Approve the sign-in in Duo on your phone…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підтверди вхід у Duo на телефоні…"
+          }
+        }
+      }
+    },
+    "Banner accepted" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Банер прийнято"
+          }
+        }
+      }
+    },
+    "Cisco CLI not found" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco CLI не знайдено"
+          }
+        }
+      }
+    },
+    "Cisco daemon (background)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco-демон (фоновий)"
+          }
+        }
+      }
+    },
+    "Cisco did not connect in time" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco не підключився вчасно"
+          }
+        }
+      }
+    },
+    "Cisco is already connected — not probing groups so the session isn't dropped" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco вже підключений — групи не перевіряю, щоб не розірвати сесію"
+          }
+        }
+      }
+    },
+    "Defguard.app stopped '%@' and asks for MFA in its own window" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defguard.app зупинив '%@' і просить MFA у своєму вікні"
+          }
+        }
+      }
+    },
+    "Duo: push sent to your phone" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duo: надіслано push на телефон"
+          }
+        }
+      }
+    },
+    "Group: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Група: %@"
+          }
+        }
+      }
+    },
+    "Group: (default)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Група: (за замовчуванням)"
+          }
+        }
+      }
+    },
+    "NE VPN tunnel" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NE VPN-тунель"
+          }
+        }
+      }
+    },
+    "NE WireGuard tunnel" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NE WireGuard-тунель"
+          }
+        }
+      }
+    },
+    "Password" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароль"
+          }
+        }
+      }
+    },
+    "Primary %@ has internet — nothing to change" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Первинний %@ має інтернет — нічого міняти"
+          }
+        }
+      }
+    },
+    "Second factor / OTP" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Другий фактор / OTP"
+          }
+        }
+      }
+    },
+    "Starting openvpn" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запуск openvpn"
+          }
+        }
+      }
+    },
+    "StoneVPN (chosen primary DNS)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StoneVPN (обраний основний DNS)"
+          }
+        }
+      }
+    },
+    "TLS handshake" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TLS handshake"
+          }
+        }
+      }
+    },
+    "Username: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Логін: %@"
+          }
+        }
+      }
+    },
+    "VPN service %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VPN-сервіс %@"
+          }
+        }
+      }
+    },
+    "Waiting for the server (Duo/MFA — approve on your phone)…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чекаю відповіді сервера (Duo/MFA — підтверди на телефоні)…"
+          }
+        }
+      }
+    },
+    "action not performed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "дію не виконано"
+          }
+        }
+      }
+    },
+    "cannot read: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не читається: %@"
+          }
+        }
+      }
+    },
+    "config %@.conf not found" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не знайдено конфіг %@.conf"
+          }
+        }
+      }
+    },
+    "defguard-client not found" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "defguard-client не знайдено"
+          }
+        }
+      }
+    },
+    "last used" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "останній"
+          }
+        }
+      }
+    },
+    "no other interface can reach the network either" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "жоден інший інтерфейс теж не бачить мережу"
+          }
+        }
+      }
+    },
+    "no primary interface — the network is down" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "первинного інтерфейсу немає — мережа не піднята"
+          }
+        }
+      }
+    },
+    "no such service: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "немає сервісу %@"
+          }
+        }
+      }
+    },
+    "profile unavailable" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "профіль недоступний"
+          }
+        }
+      }
+    },
+    "removed dead route %@ → %@ (gateway not on the current network)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "прибрано мертвий маршрут %1$@ → %2$@ (шлюз не в поточній мережі)"
+          }
+        }
+      }
+    },
+    "route-fix skipped" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "route-fix пропущено"
+          }
+        }
+      }
+    },
+    "session '%@' did not come up (state: %@)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сесія '%1$@' не піднялась (стан: %2$@)"
+          }
+        }
+      }
+    },
+    "session '%@' did not disconnect (state: %@)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сесія '%1$@' не відключилась (стан: %2$@)"
+          }
+        }
+      }
+    },
+    "the default route is held by VPN tunnel %@ — not a service order issue (see DNS Fix)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "default тримає VPN-тунель %@ — це не порядок сервісів (див. DNS Fix)"
+          }
+        }
+      }
+    },
+    "the profile has no embedded <%@> — replace the whole profile" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "у профілі немає вбудованого <%@> — заміни профіль цілком"
+          }
+        }
+      }
+    },
+    "the server asks for the password again — wrong username or password:" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сервер повторно питає пароль — невірний логін або пароль:"
+          }
+        }
+      }
+    },
+    "the server asks for the second factor again:" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сервер повторно питає другий фактор:"
+          }
+        }
+      }
+    },
+    "the server sent no login form within %lld s" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сервер не надіслав форму входу за %lld с"
+          }
+        }
+      }
+    },
+    "the tunnel did not come up within %lld s (log: %@)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "тунель не піднявся за %1$lld с (лог: %2$@)"
+          }
+        }
+      }
+    },
+    "tunnel %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "тунель %@"
+          }
+        }
+      }
+    },
+    "vpn exited without connecting" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vpn завершився без підключення"
+          }
+        }
+      }
+    },
+    "“%@” moved to the top of the service order" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» піднято на верх порядку сервісів"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

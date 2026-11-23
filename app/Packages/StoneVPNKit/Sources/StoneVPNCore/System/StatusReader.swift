@@ -168,9 +168,9 @@ public final class StatusReader: @unchecked Sendable {
         // Власник глобального резолвера людською мовою (dns_owner_hint).
         func label(_ o: String) -> String? {
             if o == "com.cisco.anyconnect" { return "Cisco Secure Client" }
-            if o == HelperConst.dnsOverrideService { return "StoneVPN (обраний основний DNS)" }
+            if o == HelperConst.dnsOverrideService { return String(localized: "StoneVPN (chosen primary DNS)", bundle: .module) }
             if Parse.isUUID(o) {
-                if let i = store.dnsInterface(uuid: o), i.hasPrefix("utun") { return owners[i] ?? "тунель \(i)" }
+                if let i = store.dnsInterface(uuid: o), i.hasPrefix("utun") { return owners[i] ?? String(localized: "tunnel \(i)", bundle: .module) }
                 return store.serviceName(o)
             }
             return o
@@ -259,7 +259,7 @@ public final class StatusReader: @unchecked Sendable {
     static func since(_ d: Date) -> String {
         let t = Int(Date().timeIntervalSince(d))
         let h = t / 3600, m = (t % 3600) / 60, sec = t % 60
-        if h >= 24 { return "\(h / 24)д \(String(format: "%02d:%02d", h % 24, m))" }
+        if h >= 24 { return Parse.withDays(String(h / 24), String(format: "%02d:%02d", h % 24, m)) }
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%d:%02d", m, sec)
     }
 }

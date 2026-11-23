@@ -233,7 +233,7 @@ final class AppModel {
         dnsProbes = await actions.probeAll(servers)
         dnsHealthy = dnsProbes.values.contains(true)
         if wasHealthy == true, dnsHealthy == false, prefs.notifyDNS, !prefs.autoDNSFix, guardTask == nil, busy.isEmpty, dgStale.isEmpty {
-            notify("DNS не відповідає", "Резолвер \(servers.joined(separator: ", ")) мовчить. Відкрий StoneVPN → DNS → Fix.")
+            notify(String(localized: "DNS is not responding"), String(localized: "Resolver \(servers.joined(separator: ", ")) is silent. Open StoneVPN → DNS → Fix."))
         }
         if dnsHealthy == false { await autoFixDNSIfIdle() }
     }
@@ -247,12 +247,12 @@ final class AppModel {
               Date().timeIntervalSince(lastAutoFix) > 120 else { return }
         lastAutoFix = Date()
         guard helper.isEnabled else {
-            notify("Auto DNS fix пропущено", "DNS не відповідає, але для ремонту без пароля потрібен helper (Settings → Helper).")
+            notify(String(localized: "Auto DNS fix skipped"), String(localized: "DNS is not responding, but repairing it without a password needs the helper (Settings → Helper)."))
             return
         }
         await runDNSFix()
         if prefs.notifyDNS {
-            notify(dnsHealthy == true ? "DNS відремонтовано автоматично" : "Auto DNS fix не допоміг",
+            notify(dnsHealthy == true ? String(localized: "DNS repaired automatically") : String(localized: "Auto DNS fix did not help"),
                    doctorLog.last ?? "")
         }
     }
@@ -261,7 +261,7 @@ final class AppModel {
         guard let p = snap.network.primaryIface, !p.hasPrefix("utun") else { primaryOnline = nil; return }
         primaryOnline = await actions.ifaceOnline(p)
         if primaryOnline == false, prefs.netAutoFix, helper.isEnabled {
-            if let msg = try? await actions.netAuto(primaryIface: p) { notify("Мережа", msg) }
+            if let msg = try? await actions.netAuto(primaryIface: p) { notify(String(localized: "Network"), msg) }
         }
     }
 
@@ -280,14 +280,15 @@ final class AppModel {
 
     var headline: String {
         let up = snap.upCount, conn = snap.connectingCount + busy.count
-        if tone == .foreign { return "Мережу тримає сторонній VPN" }
-        if dnsGuardActive, busy.isEmpty { return "Повертаю DNS після VPN…" }
-        if let n = dgStale.sorted().first, busy.isEmpty { return "Defguard «\(n)»: сесія протухла" }
-        if dnsHealthy == false, busy.isEmpty { return "Проблема з DNS" }
-        if primaryOnline == false { return "Немає інтернету" }
-        if up == 0 && conn == 0 { return "Немає активних тунелів" }
-        let tunnels = up == 1 ? "1 тунель активний" : "\(up) тунелі активні"
-        return conn > 0 ? (up > 0 ? "\(tunnels) · \(conn) підключається" : "Підключення…") : tunnels
+        if tone == .foreign { return String(localized: "A foreign VPN owns the network") }
+        if dnsGuardActive, busy.isEmpty { return String(localized: "Restoring DNS after VPN…") }
+        if let n = dgStale.sorted().first, busy.isEmpty { return String(localized: "Defguard “\(n)”: session expired") }
+        if dnsHealthy == false, busy.isEmpty { return String(localized: "DNS problem") }
+        if primaryOnline == false { return String(localized: "No internet") }
+        if up == 0 && conn == 0 { return String(localized: "No active tunnels") }
+        let tunnels = String(localized: "\(up) tunnels up", locale: .app)
+        if conn == 0 { return tunnels }
+        return up > 0 ? String(localized: "\(tunnels) · \(conn) connecting", locale: .app) : String(localized: "Connecting…")
     }
 
     func items(for b: Backend) -> [ProfileItem] {
@@ -347,9 +348,9 @@ final class AppModel {
 
     func connect(_ p: Profile) async {
         errors[p.key] = nil
-        busy[p.key] = "перевірка DNS…"
+        busy[p.key] = String(localized: "checking DNS…")
         await prepareDNS(for: p)
-        busy[p.key] = "перевірка маршруту…"
+        busy[p.key] = String(localized: "checking the route…")
         await purgeDeadRoutes(await endpointHosts(p))
         await checkEndpointResolves(p)
         busy[p.key] = nil
@@ -357,7 +358,7 @@ final class AppModel {
         let s = prefs.settings(for: p)
         switch p.backend {
         case .wireguard, .openvpn:
-            busy[p.key] = "перевірка маршруту…"
+            busy[p.key] = String(localized: "checking the route…")
             var hosts = p.remotes
             if p.backend == .wireguard, s.routeFix != .off, let h = await actions.wgEndpointHost(p) { hosts = [h] }
             if s.routeFix != .off, !hosts.isEmpty {
@@ -416,13 +417,13 @@ final class AppModel {
         do {
             let log = try await actions.purgeDeadHostRoutes(hosts)
             if !log.isEmpty { toast = log.joined(separator: "\n") }
-        } catch { toast = "Не вдалося прибрати мертвий маршрут: \(error.localizedDescription)" }
+        } catch { toast = String(localized: "Could not remove a dead route: \(error.localizedDescription)") }
     }
 
     /// Власне підключення (з панелі або напряму). true = успіх.
     func perform(_ r: ConnectRequest) async -> Bool {
         let p = r.profile
-        busy[p.key] = "підключається…"
+        busy[p.key] = String(localized: "connecting…")
         defer { busy[p.key] = nil }
         func step(_ s: String) { busy[p.key] = s; connect?.steps.append(s) }
         do {
@@ -433,7 +434,7 @@ final class AppModel {
                     var s = prefs.settings(for: p)
                     if prefs.rememberGateway || r.rememberGateway { s.lastGateway = r.gateway }
                     if r.askGateway, r.rememberGateway {
-                        let lan = plan.candidates.contains { $0.gw == r.gateway && $0.label.hasSuffix("LAN") }
+                        let lan = plan.candidates.contains { $0.gw == r.gateway && $0.kind == .lan }
                         s.routeFix = r.gateway.isEmpty ? .off : (lan ? .lanDefault : .gateway(r.gateway))
                     }
                     prefs.setSettings(s, for: p)
@@ -459,7 +460,7 @@ final class AppModel {
                     }
                 }
             case .defguard:
-                if r.guiRunning, p.mfa != nil { step("Закриваю Defguard.app"); await actions.dgQuitGUI() }
+                if r.guiRunning, p.mfa != nil { step(String(localized: "Closing Defguard.app")); await actions.dgQuitGUI() }
                 // Повтор після невдалого коду: сесія вже відключена — лише up.
                 if r.reconnect, let st = await actions.dgSessionState(p.name), st != "Disconnected" {
                     step("defguard-client disconnect")
@@ -474,9 +475,9 @@ final class AppModel {
                 stopping.remove(p.key)
             case .cisco:
                 await cancelGroupsProbe()
-                if r.guiRunning { step("Закриваю GUI Cisco"); await actions.ciscoQuitGUI() }
+                if r.guiRunning { step(String(localized: "Closing the Cisco GUI")); await actions.ciscoQuitGUI() }
                 let host = r.hostKey
-                guard !host.isEmpty else { throw ActionError("вкажи хост") }
+                guard !host.isEmpty else { throw ActionError(String(localized: "enter a host")) }
                 for l in try await actions.purgeDeadHostRoutes([host]) { step(l) }
                 let creds = CiscoCredentials(host: host, group: r.group, user: r.username, password: r.password, secondPassword: r.secondPassword)
                 try await actions.ciscoConnect(creds) { ev in
@@ -495,13 +496,13 @@ final class AppModel {
                 }
                 prefs.lastProfile[p.backend.rawValue] = "cisco:\(host)"
                 await refresh()
-                if prefs.notifyConnected { notify("Підключено", "Cisco · \(host)") }
+                if prefs.notifyConnected { notify(String(localized: "Connected"), "Cisco · \(host)") }
                 return true
             }
             prefs.lastProfile[p.backend.rawValue] = p.key
             reloadConfig()
             await refresh()
-            if prefs.notifyConnected { notify("Підключено", "\(p.backend.title) · \(prefs.display(p))") }
+            if prefs.notifyConnected { notify(String(localized: "Connected"), "\(p.backend.title) · \(prefs.display(p))") }
             return true
         } catch {
             if r.reconnect { stopping.remove(p.key) }
@@ -576,20 +577,22 @@ final class AppModel {
             let id = try OvpnFiles.importProfile(from: url, into: config.ovpnProfilesDir)
             await refresh(forceSlow: true)
             profilesSelection = "openvpn:\(id)"
-            toast = "Додано профіль \(url.lastPathComponent)"
+            toast = String(localized: "Added profile \(url.lastPathComponent)")
         } catch { toast = error.localizedDescription }
     }
 
     /// Замінити саме цей профіль (весь .ovpn або один блок) — ID, alias і налаштування лишаються.
     func ovpnReplace(_ p: Profile, with url: URL, block tag: String? = nil) async {
-        guard let path = p.path else { toast = "Файл профілю невідомий"; return }
+        guard let path = p.path else { toast = String(localized: "Profile file unknown"); return }
         do {
             if let tag { try OvpnFiles.replaceBlock(at: path, tag: tag, pemFile: url) }
             else { try OvpnFiles.replaceProfile(at: path, with: url) }
             errors[p.key] = nil
             let active = items(for: .openvpn).first { $0.id == p.key }?.status.isActive == true
-            toast = (tag.map { "<\($0)> оновлено" } ?? "Профіль замінено") + (active ? " — перепідключись, щоб застосувати" : "")
-                + " (стара версія: \((path as NSString).lastPathComponent).bak)"
+            let what = tag.map { String(localized: "<\($0)> updated") } ?? String(localized: "Profile replaced")
+            let backup = "\((path as NSString).lastPathComponent).bak"
+            toast = active ? String(localized: "\(what) — reconnect to apply (old version: \(backup))")
+                           : String(localized: "\(what) (old version: \(backup))")
         } catch { toast = error.localizedDescription }
         await refresh(forceSlow: true)
     }
@@ -597,12 +600,12 @@ final class AppModel {
     /// Видалити профіль: OpenVPN — у Кошик; WireGuard — через helper (конфіги root-only).
     func deleteProfile(_ p: Profile) async {
         if items(for: p.backend).first(where: { $0.id == p.key })?.status.isActive == true {
-            toast = "Спершу відключи \(prefs.display(p))"; return
+            toast = String(localized: "Disconnect \(prefs.display(p)) first"); return
         }
         do {
             switch p.backend {
             case .openvpn:
-                guard let path = p.path else { throw ActionError("файл профілю невідомий") }
+                guard let path = p.path else { throw ActionError(String(localized: "profile file unknown")) }
                 try OvpnFiles.delete(at: path)
             case .wireguard:
                 var prof = p
@@ -617,7 +620,7 @@ final class AppModel {
             if prefs.lastProfile[p.backend.rawValue] == p.key { prefs.lastProfile.removeValue(forKey: p.backend.rawValue) }
             errors[p.key] = nil
             if profilesSelection == p.key { profilesSelection = nil }
-            toast = p.backend == .openvpn ? "Профіль переміщено в Кошик" : "Конфіг видалено"
+            toast = p.backend == .openvpn ? String(localized: "Profile moved to the Trash") : String(localized: "Config deleted")
         } catch { toast = error.localizedDescription }
         await refresh(forceSlow: true)
     }
@@ -650,7 +653,7 @@ final class AppModel {
     private func runGroupsProbe(id: Int, host: String, closeGUI: Bool) async {
         func latest() -> Bool { groupsProbeSeq == id && !Task.isCancelled }
         if connect?.guiRunning == true {
-            guard closeGUI else { connect?.groupsNote = "GUI Cisco відкритий — CLI не може отримати групи"; return }
+            guard closeGUI else { connect?.groupsNote = String(localized: "The Cisco GUI is open — the CLI can't fetch groups"); return }
             await actions.ciscoQuitGUI()
             connect?.guiRunning = false
         }
@@ -667,7 +670,7 @@ final class AppModel {
             connect?.groups = r.groups
             if !r.asksGroup {
                 connect?.group = ""
-                connect?.groupsNote = "Сервер не пропонує вибору групи"
+                connect?.groupsNote = String(localized: "The server offers no group choice")
             } else if let cur = connect?.group, r.groups.contains(cur) {
                 // залишаємо обрану (з минулого разу)
             } else {
@@ -705,7 +708,7 @@ final class AppModel {
 
     func disconnect(_ p: Profile, session: Session?) async {
         stopping.insert(p.key)
-        busy[p.key] = "відключається…"
+        busy[p.key] = String(localized: "disconnecting…")
         errors[p.key] = nil
         do {
             switch p.backend {
@@ -714,7 +717,7 @@ final class AppModel {
                 if prof.path == nil, let d = snap.wgDir { prof.path = "\(d)/\(p.name).conf" }
                 try await actions.wgDown(prof)
             case .openvpn:
-                guard let pid = session?.pid else { throw ActionError("PID невідомий") }
+                guard let pid = session?.pid else { throw ActionError(String(localized: "PID unknown")) }
                 try await actions.ovpnDown(pid: pid)
             case .defguard:
                 try await actions.dgDown(p.name, kind: p.dgKind, cliPath: config.defguardCLI)
@@ -732,7 +735,7 @@ final class AppModel {
             } else if prefs.autoRestoreDNS, !config.restoreDNS.isEmpty {
                 try? await actions.restoreDNS(config, orphans: reader.store.network().orphanDNS)
             }
-            if prefs.notifyDisconnected { notify("Відключено", "\(p.backend.title) · \(prefs.display(p))") }
+            if prefs.notifyDisconnected { notify(String(localized: "Disconnected"), "\(p.backend.title) · \(prefs.display(p))") }
         } catch {
             errors[p.key] = error.localizedDescription
             stopping.remove(p.key)
@@ -790,8 +793,8 @@ final class AppModel {
         dgStale = stale
         if prefs.notifyDropped {
             for n in added.sorted() {
-                notify("Defguard «\(n)»: сесія протухла",
-                       "Gateway більше не приймає тунель (сон довший за поріг). DNS переключено на інший резолвер; StoneVPN → Оновити.")
+                notify(String(localized: "Defguard “\(n)”: session expired"),
+                       String(localized: "The gateway no longer accepts the tunnel (slept longer than the threshold). DNS switched to another resolver; StoneVPN → Renew."))
             }
         }
     }
@@ -806,7 +809,7 @@ final class AppModel {
         guard helper.isEnabled, (helperVersion ?? 0) >= HelperConst.version else {
             if !failoverNoHelperNotified {
                 failoverNoHelperNotified = true
-                notify("DNS протухлої сесії Defguard", "Переключити DNS на інший резолвер без пароля може лише актуальний helper (Settings → Helper). Або натисни «Оновити».")
+                notify(String(localized: "DNS of an expired Defguard session"), String(localized: "Only an up-to-date helper can switch DNS to another resolver without a password (Settings → Helper). Or press “Renew”."))
             }
             return
         }
@@ -818,7 +821,7 @@ final class AppModel {
         do { try await actions.setPrimaryDNS(servers) } catch { toast = "DNS failover: \(error.localizedDescription)"; return }
         dnsFailover = servers
         try? await actions.dnsFlush()
-        toast = "DNS тимчасово на \(servers.joined(separator: " ")) — резолвер протухлої сесії Defguard мовчить"
+        toast = String(localized: "DNS temporarily on \(servers.joined(separator: " ")) — the resolver of the expired Defguard session is silent")
         scheduleRefresh()
     }
 
@@ -843,10 +846,10 @@ final class AppModel {
         doctorPrompt = nil
         defer { doctorRunning = false }
         if !dgStale.isEmpty {
-            let names = dgStale.sorted().map { "«\($0)»" }.joined(separator: ", ")
-            doctorLog.append("Defguard \(names): тунель «Connected», але gateway не відповідає на хендшейк — сесію (MFA) скинуто на сервері. Правки DNS тут не допоможуть: потрібне «Оновити» з новим кодом.")
+            let names = dgStale.sorted().map { String(localized: "“\($0)”") }.joined(separator: ", ")
+            doctorLog.append(String(localized: "Defguard \(names): the tunnel says “Connected”, but the gateway doesn't answer the handshake — the (MFA) session was dropped on the server. DNS edits won't help: press “Renew” with a new code."))
             await applyDNSFailover()
-            if let f = dnsFailover { doctorLog.append("DNS тимчасово переключено на \(f.joined(separator: " ")).") }
+            if let f = dnsFailover { doctorLog.append(String(localized: "DNS temporarily switched to \(f.joined(separator: " ")).")) }
             await probeDNS()
             return
         }
@@ -854,11 +857,12 @@ final class AppModel {
         let probes = await actions.probeAll(net.dnsServers)
         dnsProbes = probes
         let alive = probes.values.contains(true)
-        doctorLog.append("первинний: \(net.primaryIface ?? "немає") · резолвер: " +
-                         (net.dnsServers.isEmpty ? "(порожньо)" : net.dnsServers.map { "\($0) \(probes[$0] == true ? "✓" : "✗")" }.joined(separator: " ")))
+        let resolvers = net.dnsServers.isEmpty ? String(localized: "(empty)")
+            : net.dnsServers.map { "\($0) \(probes[$0] == true ? "✓" : "✗")" }.joined(separator: " ")
+        doctorLog.append(String(localized: "primary: \(net.primaryIface ?? String(localized: "none")) · resolver: \(resolvers)"))
         if let iface = net.primaryIface, net.primaryIsTunnel {
-            if alive { doctorLog.append("Первинний — VPN-тунель (\(iface)), і його DNS відповідає. Лагодити нічого."); return }
-            doctorLog.append("Первинний — VPN-тунель (\(iface)), але його резолвери не відповідають: чорна діра для всього трафіку. Правки DNS не допоможуть — тунель треба опустити.")
+            if alive { doctorLog.append(String(localized: "The primary is a VPN tunnel (\(iface)) and its DNS responds. Nothing to fix.")); return }
+            doctorLog.append(String(localized: "The primary is a VPN tunnel (\(iface)), but its resolvers don't respond: a black hole for all traffic. DNS edits won't help — the tunnel has to go down."))
             let owner = snap.routeGroups.first { $0.iface == iface }?.owner
             if let owner, owner.hasPrefix("Defguard ") {
                 doctorPrompt = .defguard(name: String(owner.dropFirst("Defguard ".count)), iface: iface)
@@ -868,7 +872,7 @@ final class AppModel {
             return
         }
         if alive, net.orphanDNS.isEmpty {
-            doctorLog.append("Все здорове: резолвер відповідає, осиротілих записів немає.")
+            doctorLog.append(String(localized: "All healthy: the resolver responds, no orphaned entries."))
             dnsHealthy = true
             return
         }
@@ -878,7 +882,7 @@ final class AppModel {
     /// «Розірвати…» на рядку стороннього VPN — показати процеси і чекати підтвердження.
     func offerTakeDown(_ s: Session) async {
         openTool = "dns"
-        doctorLog = ["\(s.name) (\(s.iface ?? "")) — сторонній тунель, керується своїм застосунком."]
+        doctorLog = [String(localized: "\(s.name) (\(s.iface ?? "")) — a foreign tunnel, managed by its own app.")]
         doctorPrompt = .kill(procs: await actions.tunnelProcs().filter { !$0.isDaemon }, iface: s.iface ?? "", owner: s.name)
     }
 
@@ -895,17 +899,17 @@ final class AppModel {
                 try await actions.killProcs(procs.map(\.pid))
             }
         } catch {
-            doctorLog.append("Не вдалося: \(error.localizedDescription)")
+            doctorLog.append(String(localized: "Failed: \(error.localizedDescription)"))
             return
         }
         // macOS відпускає маршрут+DNS тунелю асинхронно — чекаємо, а не фіксовану паузу.
-        doctorLog.append("чекаю, поки тунель відпустить мережу…")
+        doctorLog.append(String(localized: "waiting for the tunnel to release the network…"))
         for _ in 0..<20 {
             if !reader.store.network().primaryIsTunnel { break }
             try? await Task.sleep(for: .seconds(1))
         }
         if reader.store.network().primaryIsTunnel {
-            doctorLog.append("Тунель досі первинний — розширення, схоже, перезапустилось. Відключи VPN у його застосунку і повтори.")
+            doctorLog.append(String(localized: "The tunnel is still primary — the extension seems to have restarted. Disconnect the VPN in its app and try again."))
             return
         }
         await repairDNS()
@@ -916,7 +920,7 @@ final class AppModel {
         let svcs = await actions.services()
         var svc = svcs.first { !$0.device.isEmpty && $0.device == net.primaryIface }?.name
         if svc == nil { svc = config.dnsServices.first { n in svcs.contains { $0.name == n } } }
-        guard let svc else { doctorLog.append("Не знайшов реального сервісу для ремонту (DNS_SERVICES у config.env)."); return }
+        guard let svc else { doctorLog.append(String(localized: "No real service found to repair (DNS_SERVICES in config.env).")); return }
         // Еталон > RESTORE_DNS > поточний (якщо це не DNS тунелю) > 1.1.1.1.
         let tun = await tunnelDNS()
         var servers = want ?? []
@@ -924,12 +928,12 @@ final class AppModel {
         if servers.isEmpty { servers = config.restoreServers }
         if servers.isEmpty { servers = await actions.serviceDNS(svc).filter { !tun.contains($0) } }
         if servers.isEmpty { servers = ["1.1.1.1"] }
-        doctorLog.append("ремонтую через «\(svc)»: \(servers.joined(separator: " "))")
+        doctorLog.append(String(localized: "repairing via “\(svc)”: \(servers.joined(separator: " "))"))
         do {
             let out = try await actions.repairDNS(service: svc, servers: servers, orphans: net.orphanDNS)
             if !out.isEmpty { doctorLog.append(out) }
         } catch {
-            doctorLog.append("Не вдалося: \(error.localizedDescription)")
+            doctorLog.append(String(localized: "Failed: \(error.localizedDescription)"))
             return
         }
         // Чесна перевірка: правильна конфігурація ще не означає робочий DNS.
@@ -938,17 +942,19 @@ final class AppModel {
         dnsProbes = await actions.probeAll(after.dnsServers)
         dnsHealthy = dnsProbes.values.contains(true)
         if dnsHealthy == true {
-            doctorLog.append("Готово — DNS відповідає.")
+            doctorLog.append(String(localized: "Done — DNS responds."))
         } else {
-            doctorLog.append("Резолвер досі не відповідає. Конфігурацію виправлено, тож проблема нижче — маршрути/мережа." +
-                             (after.primaryIsTunnel ? " Первинний досі \(after.primaryIface ?? "") — VPN не відпустив мережу." : ""))
+            doctorLog.append(String(localized: "The resolver still doesn't respond. The configuration is fixed, so the problem is lower — routes/network."))
+            if after.primaryIsTunnel {
+                doctorLog.append(String(localized: "The primary is still \(after.primaryIface ?? "") — the VPN did not release the network."))
+            }
         }
         await refresh()
     }
 
     func flushDNS() {
         Task {
-            do { try await actions.dnsFlush(); toast = "DNS-кеш очищено" } catch { toast = error.localizedDescription }
+            do { try await actions.dnsFlush(); toast = String(localized: "DNS cache flushed") } catch { toast = error.localizedDescription }
         }
     }
 
@@ -1010,7 +1016,7 @@ final class AppModel {
         if background, !helper.isEnabled {
             if !guardNoHelperNotified {
                 guardNoHelperNotified = true
-                notify("На сервісах лишився DNS тунелю", "\(plan.keys.sorted().joined(separator: ", ")). Повернути без пароля може лише helper (Settings → Helper); або відкрий DNS → Fix.")
+                notify(String(localized: "Tunnel DNS left on services"), String(localized: "\(plan.keys.sorted().joined(separator: ", ")). Only the helper can restore them without a password (Settings → Helper); or open DNS → Fix."))
             }
             return false
         }
@@ -1018,11 +1024,11 @@ final class AppModel {
         do {
             try await actions.restoreServiceDNS(plan, orphans: orphans)
         } catch {
-            toast = "Повернення DNS: \(error.localizedDescription)"
+            toast = String(localized: "DNS restore: \(error.localizedDescription)")
             return false
         }
         let what = plan.keys.sorted().map { "\($0) → \(plan[$0]!.isEmpty ? "DHCP" : plan[$0]!.joined(separator: " "))" }
-        toast = "DNS повернуто після VPN: " + what.joined(separator: ", ")
+        toast = String(localized: "DNS restored after VPN: \(what.joined(separator: ", "))")
         loadServicesDNSIfShown()
         return true
     }
@@ -1070,7 +1076,7 @@ final class AppModel {
             try? await Task.sleep(for: .seconds(2))
         }
         if dnsHealthy == false, prefs.notifyDNS {
-            notify("DNS не відновився після VPN", "Резолвер \(snap.network.dnsServers.joined(separator: ", ")) мовчить. Відкрий StoneVPN → DNS → Fix.")
+            notify(String(localized: "DNS did not recover after VPN"), String(localized: "Resolver \(snap.network.dnsServers.joined(separator: ", ")) is silent. Open StoneVPN → DNS → Fix."))
         }
     }
 
@@ -1089,7 +1095,7 @@ final class AppModel {
         let probes = await actions.probeAll(net.dnsServers)
         dnsProbes = probes
         guard !net.dnsServers.isEmpty, !probes.values.contains(true) else { dnsHealthy = net.dnsServers.isEmpty ? nil : true; return }
-        busy[p.key] = "ремонт DNS перед підключенням…"
+        busy[p.key] = String(localized: "repairing DNS before connecting…")
         openTool = "dns"
         await runDNSFix()
     }
@@ -1107,7 +1113,7 @@ final class AppModel {
         guard !hosts.isEmpty else { return }
         let ok = await Task.detached { hosts.contains { Interfaces.resolve($0) != nil } }.value
         if !ok {
-            toast = "\(hosts.joined(separator: ", ")) не резолвиться (DNS: \(snap.network.dnsServers.joined(separator: " "))) — підключення, найімовірніше, не вдасться. DNS → Fix або split-правило."
+            toast = String(localized: "\(hosts.joined(separator: ", ")) does not resolve (DNS: \(snap.network.dnsServers.joined(separator: " "))) — the connection will most likely fail. DNS → Fix or a split rule.")
         }
     }
 
@@ -1162,23 +1168,25 @@ final class AppModel {
         failoverPrev = nil
         reassertTimes = []
         reassertNotified = false
-        runAction("Основний DNS") {
+        runAction(String(localized: "Primary DNS")) {
             try await self.actions.setPrimaryDNS(c?.servers)
             try? await Task.sleep(for: .milliseconds(700))
             await self.refresh()
             await self.probeDNS()
             let n = self.snap.network
-            guard let c else { return "Основний DNS: як вирішила система (\(n.dnsOwnerLabel ?? "—"))" }
+            guard let c else { return String(localized: "Primary DNS: chosen by the system (\(n.dnsOwnerLabel ?? "—"))") }
             if n.dnsOwner != HelperConst.dnsOverrideService {
                 if self.helperVersion.map({ $0 < HelperConst.version }) ?? false {
-                    return "Helper застарий (v\(self.helperVersion ?? 0), треба v\(HelperConst.version)) — Settings → Helper → Перевстановити"
+                    return String(localized: "The helper is outdated (v\(self.helperVersion ?? 0), needs v\(HelperConst.version)) — Settings → Helper → Reinstall")
                 }
-                return "Записано, але першим лишився \(n.dnsOwnerLabel ?? "інший резолвер")" +
-                    (n.catchAllOthers.isEmpty ? "" : " — його клієнт одразу повернув свій запис")
+                let first = n.dnsOwnerLabel ?? String(localized: "another resolver")
+                return n.catchAllOthers.isEmpty
+                    ? String(localized: "Written, but \(first) stayed first")
+                    : String(localized: "Written, but \(first) stayed first — its client put its entry back right away")
             }
             let moved = n.displacedDNS.map { n.dnsServiceLabels[$0] ?? $0 }
-            return "Основний DNS: \(c.label) (\(c.servers.joined(separator: " ")))" +
-                (moved.isEmpty ? "" : ". Тимчасово відсунуто: \(moved.joined(separator: ", "))")
+            let set = String(localized: "Primary DNS: \(c.label) (\(c.servers.joined(separator: " ")))")
+            return moved.isEmpty ? set : String(localized: "\(set). Temporarily displaced: \(moved.joined(separator: ", "))")
         }
     }
 
@@ -1191,7 +1199,7 @@ final class AppModel {
         guard helper.isEnabled, (helperVersion ?? 0) >= HelperConst.version else {
             if !reassertNotified {
                 reassertNotified = true
-                notify("Основний DNS перебито", "\(n.catchAllOthers.map { n.dnsServiceLabels[$0] ?? $0 }.joined(separator: ", ")) повернув свій DNS. Тримати вибір без пароля може лише актуальний helper (Settings → Helper).")
+                notify(String(localized: "Primary DNS overridden"), String(localized: "\(n.catchAllOthers.map { n.dnsServiceLabels[$0] ?? $0 }.joined(separator: ", ")) put its DNS back. Only an up-to-date helper can hold your choice without a password (Settings → Helper)."))
             }
             return
         }
@@ -1200,7 +1208,7 @@ final class AppModel {
         guard reassertTimes.count < 6 else {
             if !reassertNotified {
                 reassertNotified = true
-                notify("Основний DNS не втримати", "Клієнт VPN постійно повертає свій DNS. Для його внутрішніх доменів — split DNS.")
+                notify(String(localized: "Can't hold the primary DNS"), String(localized: "The VPN client keeps putting its DNS back. Use split DNS for its internal domains."))
             }
             return
         }
@@ -1216,7 +1224,7 @@ final class AppModel {
         guard helper.isEnabled else { return }          // без helper не питати пароль у фоні
         try? await actions.setPrimaryDNS(nil)
         prefs.primaryDNSChoice = nil
-        notify("Основний DNS скинуто", "Тунель із DNS \(ov.joined(separator: " ")) більше не активний — DNS знову обирає система.")
+        notify(String(localized: "Primary DNS reset"), String(localized: "The tunnel with DNS \(ov.joined(separator: " ")) is no longer active — the system picks DNS again."))
     }
 
     /// Типові помилки split-правила (адреса інтерфейсу замість DNS, «домен» = назва інтерфейсу).
@@ -1224,16 +1232,17 @@ final class AppModel {
         var w: [String] = []
         let ifs = Interfaces.ipv4()
         for s in servers {
-            if Parse.ipv4(s) == nil && !s.contains(":") { w.append("«\(s)» — не IP-адреса"); continue }
+            if Parse.ipv4(s) == nil && !s.contains(":") { w.append(String(localized: "“\(s)” is not an IP address")); continue }
             if let i = ifs.first(where: { $0.value == s })?.key {
-                let hint = dnsCandidates.first { $0.iface == i }.map { " DNS цього тунелю: \($0.servers.joined(separator: ", "))." } ?? ""
-                w.append("\(s) — адреса інтерфейсу \(i), а не DNS-сервер.\(hint)")
+                w.append(String(localized: "\(s) is the address of interface \(i), not a DNS server."))
+                if let c = dnsCandidates.first(where: { $0.iface == i }) {
+                    w.append(String(localized: "This tunnel's DNS: \(c.servers.joined(separator: ", ")).")) }
             }
         }
         if !domain.contains(".") {
             w.append(domain.range(of: #"^(utun|en|bridge|lo|awdl|llw|anpi|gif|stf)\d+$"#, options: .regularExpression) != nil
-                     ? "«\(domain)» — назва інтерфейсу, а не домен: правило ловить лише імена *.\(domain)"
-                     : "домен без крапки — правило ловить лише імена *.\(domain)")
+                     ? String(localized: "“\(domain)” is an interface name, not a domain: the rule only catches names *.\(domain)")
+                     : String(localized: "a domain without a dot — the rule only catches names *.\(domain)"))
         }
         return w
     }
@@ -1248,7 +1257,7 @@ final class AppModel {
     }
 
     func removeSplit(_ domain: String) {
-        runAction("Split") { try await self.actions.splitRemove(domain); self.loadSplit(); return "Прибрано \(domain)" }
+        runAction("Split") { try await self.actions.splitRemove(domain); self.loadSplit(); return String(localized: "Removed \(domain)") }
     }
 
     // MARK: мережа
@@ -1267,7 +1276,7 @@ final class AppModel {
 
     func runAction(_ label: String, _ f: @escaping () async throws -> String?) {
         Task {
-            do { toast = try await f() ?? "\(label): готово" } catch { toast = "\(label): \(error.localizedDescription)" }
+            do { toast = try await f() ?? String(localized: "\(label): done") } catch { toast = "\(label): \(error.localizedDescription)" }
             await refresh()
         }
     }
@@ -1322,13 +1331,13 @@ final class AppModel {
         let newUp = Set(new.sessions.filter { $0.state == .up }.map(\.id))
         for id in oldUp.subtracting(newUp) {
             if stopping.remove(id) == nil, prefs.notifyDropped {
-                notify("Тунель упав", id.replacingOccurrences(of: ":", with: " · "))
+                notify(String(localized: "Tunnel dropped"), id.replacingOccurrences(of: ":", with: " · "))
             }
         }
         let oldF = Set(old.foreign.map(\.id)), newF = Set(new.foreign.map(\.id))
         if prefs.notifyForeign, new.network.primaryIsTunnel, !newF.subtracting(oldF).isEmpty,
            let f = new.foreign.first(where: { $0.iface == new.network.primaryIface }) {
-            notify("Сторонній VPN тримає мережу", "\(f.name) (\(f.iface ?? "")) став первинним")
+            notify(String(localized: "A foreign VPN holds the network"), String(localized: "\(f.name) (\(f.iface ?? "")) became primary"))
         }
     }
 

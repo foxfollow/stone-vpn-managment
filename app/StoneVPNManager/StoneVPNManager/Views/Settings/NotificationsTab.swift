@@ -5,12 +5,12 @@ struct NotificationsTab: View {
     @Bindable var model: AppModel
     var body: some View {
         Form {
-            Section("Показувати") {
-                Toggle("Тунель підключено", isOn: $model.prefs.notifyConnected)
-                Toggle("Тунель відключено", isOn: $model.prefs.notifyDisconnected)
-                Toggle("Тунель упав неочікувано", isOn: $model.prefs.notifyDropped)
-                Toggle("DNS не відповідає", isOn: $model.prefs.notifyDNS)
-                Toggle("Сторонній VPN захопив маршрут", isOn: $model.prefs.notifyForeign)
+            Section("Show") {
+                Toggle("Tunnel Connected", isOn: $model.prefs.notifyConnected)
+                Toggle("Tunnel Disconnected", isOn: $model.prefs.notifyDisconnected)
+                Toggle("Tunnel Dropped Unexpectedly", isOn: $model.prefs.notifyDropped)
+                Toggle("DNS Not Responding", isOn: $model.prefs.notifyDNS)
+                Toggle("A Foreign VPN Took Over the Route", isOn: $model.prefs.notifyForeign)
             }
         }
         .formStyle(.grouped)

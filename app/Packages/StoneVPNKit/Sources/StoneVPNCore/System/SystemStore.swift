@@ -66,7 +66,7 @@ public final class SystemStore: @unchecked Sendable {
             guard (value(key)?["InterfaceName"] as? String) == utun else { continue }
             let svc = key.replacingOccurrences(of: "State:/Network/Service/", with: "").replacingOccurrences(of: "/IPv4", with: "")
             if svc == "com.cisco.anyconnect" { return "Cisco Secure Client" }
-            return serviceName(svc) ?? "VPN-сервіс \(svc)"
+            return serviceName(svc) ?? String(localized: "VPN service \(svc)", bundle: .module)
         }
         return nil
     }

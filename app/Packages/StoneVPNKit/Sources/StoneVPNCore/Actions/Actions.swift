@@ -29,12 +29,15 @@ public struct ProfileSettings: Codable, Hashable, Sendable {
     public init() {}
 }
 
+public enum GatewayKind: Sendable { case lan, tunnel, last }
+
 public struct RouteFixPlan: Sendable {
     public struct Target: Sendable, Hashable { public var host: String; public var ip: String }
     public var need: [Target] = []                       // потребують host-маршруту
     public var viaTunnel: [(target: Target, iface: String)] = []
     public var staleDeletes: [String] = []               // старі -host повз тунель
-    public var candidates: [(label: String, gw: String)] = []
+    /// Шлюзи на вибір. `kind` — для логіки (не розбирати локалізовану підпис `label`).
+    public var candidates: [(label: String, gw: String, kind: GatewayKind)] = []
     public var isEmpty: Bool { need.isEmpty }
 }
 
@@ -49,7 +52,7 @@ public final class Actions: @unchecked Sendable {
 
     func priv(_ op: PrivOp) async throws -> String {
         let r = await runner.run(op)
-        if !r.ok { throw ActionError(r.output.isEmpty ? "дію не виконано" : r.output) }
+        if !r.ok { throw ActionError(r.output.isEmpty ? String(localized: "action not performed", bundle: .module) : r.output) }
         return r.output
     }
 
@@ -72,10 +75,10 @@ public final class Actions: @unchecked Sendable {
             }
         }
         let own = Interfaces.liveUtuns()
-        plan.candidates = Parse.lanGateways(rows).map { ("\($0.iface) · LAN", $0.gw) }
-            + Parse.tunnelGateways(rows, ownAddresses: own).map { ("\($0.iface) · тунель", $0.gw) }
+        plan.candidates = Parse.lanGateways(rows).map { ("\($0.iface) · LAN", $0.gw, .lan) }
+            + Parse.tunnelGateways(rows, ownAddresses: own).map { (String(localized: "\($0.iface) · tunnel", bundle: .module), $0.gw, .tunnel) }
         if !lastGateway.isEmpty, !plan.candidates.contains(where: { $0.gw == lastGateway }) {
-            plan.candidates.append(("останній", lastGateway))
+            plan.candidates.append((String(localized: "last used", bundle: .module), lastGateway, .last))
         }
         return plan
     }
@@ -104,7 +107,7 @@ public final class Actions: @unchecked Sendable {
         let dead = await deadHostRoutes(hosts)
         guard !dead.isEmpty else { return [] }
         _ = try await priv(.batch(dead.map { .routeHostDelete(ip: $0.ip) }))
-        return dead.map { "прибрано мертвий маршрут \($0.ip) → \($0.gw) (шлюз не в поточній мережі)" }
+        return dead.map { String(localized: "removed dead route \($0.ip) → \($0.gw) (gateway not on the current network)", bundle: .module) }
     }
 
     /// Шлюз за політикою профілю, без питань. nil + .ask = треба спитати.
@@ -113,14 +116,14 @@ public final class Actions: @unchecked Sendable {
         switch mode {
         case .off: return (nil, false)
         case .gateway(let g): return (g, false)
-        case .lanDefault: return (plan.candidates.first { $0.label.hasSuffix("LAN") }?.gw, false)
+        case .lanDefault: return (plan.candidates.first { $0.kind == .lan }?.gw, false)
         case .ask: return (nil, true)
         }
     }
 
     public func applyRouteFix(_ plan: RouteFixPlan, gateway: String?) async throws -> [String] {
         var ops: [PrivOp] = plan.staleDeletes.map { .routeHostDelete(ip: $0) }
-        var log = plan.viaTunnel.map { "\($0.target.host) доступний через \($0.iface) — route-fix не потрібен" }
+        var log = plan.viaTunnel.map { String(localized: "\($0.target.host) is reachable via \($0.iface) — no route-fix needed", bundle: .module) }
         if let gw = gateway, !gw.isEmpty {
             for t in plan.need {
                 let cur = Parse.firstMatch(#"gateway: (\S+)"#, await Shell.run("/sbin/route", ["-n", "get", t.ip]).out)
@@ -128,7 +131,7 @@ public final class Actions: @unchecked Sendable {
                 log.append("route-fix: \(t.host) (\(t.ip)) → \(gw)")
             }
         } else if !plan.need.isEmpty {
-            log.append("route-fix пропущено")
+            log.append(String(localized: "route-fix skipped", bundle: .module))
         }
         if !ops.isEmpty { _ = try await priv(.batch(ops)) }
         return log
@@ -147,12 +150,12 @@ public final class Actions: @unchecked Sendable {
     }
 
     public func wgUp(_ p: Profile) async throws {
-        guard let path = p.path else { throw ActionError("не знайдено конфіг \(p.name).conf") }
+        guard let path = p.path else { throw ActionError(String(localized: "config \(p.name).conf not found", bundle: .module)) }
         _ = try await priv(.wgUp(confPath: path))
     }
 
     public func wgDown(_ p: Profile) async throws {
-        guard let path = p.path else { throw ActionError("не знайдено конфіг \(p.name).conf") }
+        guard let path = p.path else { throw ActionError(String(localized: "config \(p.name).conf not found", bundle: .module)) }
         _ = try await priv(.wgDown(confPath: path))
     }
 
@@ -161,14 +164,14 @@ public final class Actions: @unchecked Sendable {
     public func ovpnUp(_ p: Profile, username: String?, password: String?, timeout: Int,
                        progress: @escaping @Sendable (String) -> Void) async throws -> String? {
         guard let path = p.path, let text = try? String(contentsOfFile: path, encoding: .utf8) else {
-            throw ActionError("профіль недоступний")
+            throw ActionError(String(localized: "profile unavailable", bundle: .module))
         }
         let info = Parse.ovpnProfile(text)
-        progress("Запуск openvpn")
+        progress(String(localized: "Starting openvpn", bundle: .module))
         let logPath = try await priv(.ovpnStart(profilePath: path, username: info.needsAuth ? username : nil,
                                                 password: info.needsAuth ? password : nil, addDev: !info.hasDev))
         let log = logPath.hasPrefix("/tmp/") ? logPath : "/tmp/openvpn-\(p.name).log"
-        progress("TLS handshake")
+        progress(String(localized: "TLS handshake", bundle: .module))
         let fail = try NSRegularExpression(pattern: Parse.ovpnFailPattern)
         for _ in 0..<timeout {
             try await Task.sleep(for: .seconds(1))
@@ -187,7 +190,7 @@ public final class Actions: @unchecked Sendable {
                 throw ActionError(lines.joined(separator: "\n"))
             }
         }
-        throw ActionError("тунель не піднявся за \(timeout) с (лог: \(log))")
+        throw ActionError(String(localized: "the tunnel did not come up within \(timeout) s (log: \(log))", bundle: .module))
     }
 
     func ovpnPid(_ id: String) -> Int32? {
@@ -196,7 +199,7 @@ public final class Actions: @unchecked Sendable {
     }
 
     public func wgDelete(_ p: Profile) async throws {
-        guard let path = p.path else { throw ActionError("не знайдено конфіг \(p.name).conf") }
+        guard let path = p.path else { throw ActionError(String(localized: "config \(p.name).conf not found", bundle: .module)) }
         _ = try await priv(.wgDelete(confPath: path))
     }
 
@@ -245,11 +248,12 @@ public final class Actions: @unchecked Sendable {
             if await dgSessionState(name) ?? "Disconnected" == "Disconnected" { return }
             try await Task.sleep(for: .seconds(1))
         }
-        throw ActionError("сесія '\(name)' не відключилась (стан: \(await dgSessionState(name) ?? "?"))")
+        let state = await dgSessionState(name) ?? "?"
+        throw ActionError(String(localized: "session '\(name)' did not disconnect (state: \(state))", bundle: .module))
     }
 
     public func dgUp(_ p: Profile, code: String?, cliPath: String) async throws {
-        guard let cli = Paths.defguardCLI(cliPath) else { throw ActionError("defguard-client не знайдено") }
+        guard let cli = Paths.defguardCLI(cliPath) else { throw ActionError(String(localized: "defguard-client not found", bundle: .module)) }
         if await dgSessionState(p.name) == "Connected" { return }
         var args = ["connect", p.name]
         if p.dgKind == "tunnel" { args.append("--tunnel") }
@@ -265,12 +269,15 @@ public final class Actions: @unchecked Sendable {
             if st == "Disconnected" { idle += 1; if idle >= 3 { break } } else { idle = 0 }
             try await Task.sleep(for: .seconds(1))
         }
-        guard ok else { throw ActionError("сесія '\(p.name)' не піднялась (стан: \(await dgSessionState(p.name) ?? "?"))") }
+        guard ok else {
+            let state = await dgSessionState(p.name) ?? "?"
+            throw ActionError(String(localized: "session '\(p.name)' did not come up (state: \(state))", bundle: .module))
+        }
         // GUI зупиняє CLI-MFA-сесію за мить після Connected.
         if p.mfa != nil, await dgGUIRunning() {
             try await Task.sleep(for: .seconds(2))
             if await dgSessionState(p.name) != "Connected" {
-                throw ActionError("Defguard.app зупинив '\(p.name)' і просить MFA у своєму вікні")
+                throw ActionError(String(localized: "Defguard.app stopped '\(p.name)' and asks for MFA in its own window", bundle: .module))
             }
         }
     }
@@ -303,16 +310,16 @@ public final class Actions: @unchecked Sendable {
 
     /// Підключення в застосунку: `vpn -s` + відповіді на його запити.
     public func ciscoConnect(_ c: CiscoCredentials, onEvent: @escaping @Sendable (CiscoDriver.Event) -> Void) async throws {
-        guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError("Cisco CLI не знайдено") }
+        guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError(String(localized: "Cisco CLI not found", bundle: .module)) }
         try await CiscoDriver.connect(cli: cli, c, onEvent: onEvent)
     }
 
     /// Групи з сервера до автентифікації. Після обриву скидаємо агент із «connecting»,
     /// але ніколи не чіпаємо живу сесію.
     public func ciscoProbeGroups(_ host: String) async throws -> CiscoDriver.GroupProbe {
-        guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError("Cisco CLI не знайдено") }
+        guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError(String(localized: "Cisco CLI not found", bundle: .module)) }
         if Parse.ciscoConnectedHost(await Shell.run(cli, ["-s", "state"], timeout: 8).out) != nil {
-            throw ActionError("Cisco вже підключений — групи не перевіряю, щоб не розірвати сесію")
+            throw ActionError(String(localized: "Cisco is already connected — not probing groups so the session isn't dropped", bundle: .module))
         }
         // Прибирання — синхронно, до повернення: відкладений `disconnect` прилітав посеред наступної
         // перевірки або справжнього connect і обривав її («Отримую групи…» до таймауту).
@@ -334,7 +341,7 @@ public final class Actions: @unchecked Sendable {
 
     /// Запасний шлях: інтерактивно в Terminal (vpn сам питає group/user/password/banner).
     public func ciscoConnectInTerminal(_ host: String) async throws {
-        guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError("Cisco CLI не знайдено") }
+        guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError(String(localized: "Cisco CLI not found", bundle: .module)) }
         let cmd = "\(shq(cli)) connect \(shq(host))"
         let script = "tell application \"Terminal\"\nactivate\ndo script \"\(cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\"\nend tell"
         let r = await Shell.run("/usr/bin/osascript", ["-e", script])
@@ -342,7 +349,7 @@ public final class Actions: @unchecked Sendable {
     }
 
     public func ciscoDisconnect() async throws {
-        guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError("Cisco CLI не знайдено") }
+        guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError(String(localized: "Cisco CLI not found", bundle: .module)) }
         let r = await Shell.run(cli, ["disconnect"], timeout: 30)
         if !r.ok { throw ActionError(r.out + r.err) }
     }
@@ -413,11 +420,11 @@ public final class Actions: @unchecked Sendable {
         }.map { r in
             let c = r.command.lowercased()
             let (label, daemon): (String, Bool) =
-                c.contains("vpnagentd") || c.contains("acsockext") || c.contains("anyconnect") ? ("Cisco-демон (фоновий)", true)
+                c.contains("vpnagentd") || c.contains("acsockext") || c.contains("anyconnect") ? (String(localized: "Cisco daemon (background)", bundle: .module), true)
                 : c.contains("clearvpn") ? ("ClearVPN", false)
-                : c.contains("wireguard") ? ("NE WireGuard-тунель", false)
+                : c.contains("wireguard") ? (String(localized: "NE WireGuard tunnel", bundle: .module), false)
                 : c.contains("forti") ? ("FortiClient", false)
-                : ("NE VPN-тунель", false)
+                : (String(localized: "NE VPN tunnel", bundle: .module), false)
             return TunnelProc(pid: r.pid, command: r.command, label: label, isDaemon: daemon)
         }
     }
@@ -474,23 +481,23 @@ public final class Actions: @unchecked Sendable {
 
     public func moveToTop(_ name: String) async throws {
         let all = await services().map(\.name)
-        guard all.contains(name) else { throw ActionError("немає сервісу \(name)") }
+        guard all.contains(name) else { throw ActionError(String(localized: "no such service: \(name)", bundle: .module)) }
         _ = try await priv(.orderServices(names: [name] + all.filter { $0 != name }))
     }
 
     /// net_auto. Повертає текст результату.
     public func netAuto(primaryIface: String?) async throws -> String {
-        guard let primary = primaryIface else { throw ActionError("первинного інтерфейсу немає — мережа не піднята") }
-        if primary.hasPrefix("utun") { throw ActionError("default тримає VPN-тунель \(primary) — це не порядок сервісів (див. DNS Fix)") }
-        if await ifaceOnline(primary) { return "Первинний \(primary) має інтернет — нічого міняти" }
+        guard let primary = primaryIface else { throw ActionError(String(localized: "no primary interface — the network is down", bundle: .module)) }
+        if primary.hasPrefix("utun") { throw ActionError(String(localized: "the default route is held by VPN tunnel \(primary) — not a service order issue (see DNS Fix)", bundle: .module)) }
+        if await ifaceOnline(primary) { return String(localized: "Primary \(primary) has internet — nothing to change", bundle: .module) }
         let ips = Interfaces.ipv4()
         for s in await services() where s.enabled && !s.device.isEmpty && s.device != primary && ips[s.device] != nil {
             if await ifaceOnline(s.device) {
                 try await moveToTop(s.name)
-                return "«\(s.name)» піднято на верх порядку сервісів"
+                return String(localized: "“\(s.name)” moved to the top of the service order", bundle: .module)
             }
         }
-        throw ActionError("жоден інший інтерфейс теж не бачить мережу")
+        throw ActionError(String(localized: "no other interface can reach the network either", bundle: .module))
     }
 
     func shq(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }

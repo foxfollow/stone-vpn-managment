@@ -6,14 +6,14 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
-            Tab("Загальні", systemImage: "gearshape") { GeneralTab(model: model) }
-            Tab("Бекенди", systemImage: "square.stack.3d.up") { BackendsTab(model: model) }
+            Tab("General", systemImage: "gearshape") { GeneralTab(model: model) }
+            Tab("Backends", systemImage: "square.stack.3d.up") { BackendsTab(model: model) }
             Tab("OpenVPN", systemImage: "lock.shield") { OpenVPNTab(model: model) }
             Tab("DNS", systemImage: "globe") { DNSTab(model: model) }
-            Tab("Мережа", systemImage: "wifi") { NetworkTab(model: model) }
-            Tab("Сповіщення", systemImage: "bell") { NotificationsTab(model: model) }
+            Tab("Network", systemImage: "wifi") { NetworkTab(model: model) }
+            Tab("Notifications", systemImage: "bell") { NotificationsTab(model: model) }
             Tab("Helper", systemImage: "checkmark.shield") { HelperTab(model: model) }
-            Tab("Додатково", systemImage: "slider.horizontal.3") { AdvancedTab(model: model) }
+            Tab("Advanced", systemImage: "slider.horizontal.3") { AdvancedTab(model: model) }
         }
         .frame(width: 640, height: 520)
     }
@@ -26,7 +26,7 @@ struct ConfigField: View {
     var key: String
     var value: String
     var prompt = ""
-    var hint: String?
+    var hint: LocalizedStringKey?
     @State private var text = ""
     @FocusState private var focused: Bool
 
@@ -52,7 +52,7 @@ struct RepoWarning: View {
     @Bindable var model: AppModel
     var body: some View {
         if !model.config.sharedWithCLI {
-            Label("Окремий режим: налаштування в теці застосунку, CLI їх не бачить (Додатково).", systemImage: "info.circle")
+            Label("Standalone mode: settings live in the app folder; the CLI doesn’t see them (Advanced).", systemImage: "info.circle")
                 .foregroundStyle(.secondary).font(.system(size: 12))
         }
     }
