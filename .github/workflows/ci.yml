@@ -1,5 +1,5 @@
-# Checks on every push / PR: bash scripts (syntax + shellcheck) and the app
-# (StoneVPNKit unit tests + unsigned Release build with the runner's Xcode).
+# Checks on every push / PR: StoneVPNKit unit tests + unsigned Release build of the app with
+# the runner's Xcode. Bash scripts: shellcheck.yml; security: codeql.yml; quality: sonar.yml.
 name: CI
 
 on:
@@ -22,16 +22,6 @@ defaults:
     shell: bash
 
 jobs:
-  scripts:
-    name: Bash scripts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Syntax
-        run: for f in main-vpn-manager.sh scripts/*.sh; do bash -n "$f"; done
-      - name: shellcheck (errors)
-        run: shellcheck -S error main-vpn-manager.sh scripts/*.sh
-
   app:
     name: App (test + build)
     runs-on: macos-26

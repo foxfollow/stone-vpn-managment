@@ -1,0 +1,60 @@
+# CodeQL: Swift (app, helper, StoneVPNKit), the website's JavaScript and the workflows themselves.
+name: CodeQL Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { language: swift, os: macos-26, build-mode: manual }
+          - { language: javascript-typescript, os: ubuntu-latest, build-mode: none }
+          - { language: actions, os: ubuntu-latest, build-mode: none }
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode
+        if: matrix.language == 'swift'
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)
+          [[ -n "$LATEST_XCODE" ]] && sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Build (Swift)
+        if: matrix.build-mode == 'manual'
+        run: |
+          xcodebuild build \
+            -project app/StoneVPNManager/StoneVPNManager.xcodeproj \
+            -scheme StoneVPNManager -configuration Release \
+            -derivedDataPath build/DerivedData -destination "generic/platform=macOS" \
+            ONLY_ACTIVE_ARCH=YES CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            STONEVPN_REPO_PATH= -quiet
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

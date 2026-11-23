@@ -2,6 +2,11 @@
 
 <div align="leading">
 
+[![CI](https://github.com/foxfollow/stone-vpn-managment/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/foxfollow/stone-vpn-managment/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/foxfollow/stone-vpn-managment/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/foxfollow/stone-vpn-managment/actions/workflows/codeql.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=foxfollow_stone-vpn-managment&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=foxfollow_stone-vpn-managment)
+[![ShellCheck](https://github.com/foxfollow/stone-vpn-managment/actions/workflows/shellcheck.yml/badge.svg?branch=main)](https://github.com/foxfollow/stone-vpn-managment/actions/workflows/shellcheck.yml)
+
 [![Release](https://img.shields.io/github/v/release/foxfollow/stone-vpn-managment?label=release)](https://github.com/foxfollow/stone-vpn-managment/releases/latest)
 ![macOS 26+](https://img.shields.io/badge/macOS-26%20Tahoe+-blue.svg)
 [![Homebrew cask](https://img.shields.io/badge/brew-foxfollow%2Fstone-orange)](https://github.com/foxfollow/homebrew-stone)

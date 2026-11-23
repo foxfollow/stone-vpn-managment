@@ -63,6 +63,18 @@ Settings → Actions → General → Workflow permissions: **Read and write** (t
 and pushes the appcast to `main`). If `main` is protected, allow `github-actions[bot]` to push or the
 appcast commit step fails.
 
+### 5. Code quality (SonarCloud)
+
+`shellcheck.yml` and `codeql.yml` need nothing. For `sonar.yml`:
+
+1. sonarcloud.io → **+ → Analyze new project** → organization `foxfollow` → `stone-vpn-managment`
+   (key `foxfollow_stone-vpn-managment`, as in `sonar-project.properties`).
+2. Administration → Analysis Method: turn **Automatic Analysis off** (the workflow uploads coverage).
+3. My Account → Security → generate a token → `gh secret set SONAR_TOKEN -R foxfollow/stone-vpn-managment`.
+
+Until the secret exists the Sonar job only prints a warning. Coverage = StoneVPNKit unit tests
+(`tools/coverage-to-sonar.sh` turns `swift test --enable-code-coverage` into Sonar's generic format).
+
 ## Cutting a release
 
 1. Bump **both** versions in `app/StoneVPNManager/StoneVPNManager.xcodeproj/project.pbxproj` (all four
