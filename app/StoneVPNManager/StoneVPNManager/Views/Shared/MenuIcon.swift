@@ -11,6 +11,7 @@ enum MenuIcon {
         case .busy: .systemOrange
         case .problem: .systemRed
         case .foreign: .systemPurple
+        case .question: .systemYellow
         }
         let filled = tone != .idle
         let text = [showCount && count > 0 ? "\(count)" : nil, label].compactMap { $0 }.joined(separator: " ")
@@ -39,7 +40,7 @@ enum MenuIcon {
             }
             p.stroke()
 
-            // Вирізаний знак усередині: «!» = проблема, крапка = сторонній VPN.
+            // Вирізаний знак усередині: «!» = проблема, крапка = сторонній VPN, «?» = маршрут.
             NSGraphicsContext.current?.compositingOperation = .destinationOut
             NSColor.black.set()
             if tone == .problem {
@@ -48,6 +49,15 @@ enum MenuIcon {
                 NSBezierPath(ovalIn: NSRect(x: 10.9 * s, y: 15.2 * s, width: 2.2 * s, height: 2.2 * s)).fill()
             } else if tone == .foreign {
                 NSBezierPath(ovalIn: NSRect(x: 9.6 * s, y: 9.1 * s, width: 4.8 * s, height: 4.8 * s)).fill()
+            } else if tone == .question {
+                // «?» = маршрут під питанням (сервер VPN іде через чужий тунель).
+                let q = NSBezierPath()
+                q.appendArc(withCenter: NSPoint(x: 12 * s, y: 9.6 * s), radius: 2.4 * s, startAngle: 180, endAngle: 90, clockwise: false)
+                q.line(to: NSPoint(x: 12 * s, y: 13.4 * s))
+                q.lineWidth = 2 * s
+                q.lineCapStyle = .round
+                q.stroke()
+                NSBezierPath(ovalIn: NSRect(x: 10.9 * s, y: 15.4 * s, width: 2.2 * s, height: 2.2 * s)).fill()
             }
             NSGraphicsContext.current?.compositingOperation = .sourceOver
 

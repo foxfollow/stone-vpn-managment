@@ -153,24 +153,28 @@ public final class StatusReader: @unchecked Sendable {
         }
 
         // ── Сторонні тунелі та таблиця маршрутів ──
+        let appHint = Self.foreignVPNApp(procs)
         for (u, ip) in utuns.sorted(by: { $0.key < $1.key }) {
-            if owners[u] == nil, let f = store.foreignOwner(of: u) {
+            if owners[u] == nil, let svc = store.foreignService(of: u) {
+                let f = store.foreignLabel(svc, appHint: appHint)
                 owners[u] = f
                 var ses = Session(backend: nil, name: f, state: .up, iface: u, address: ip)
                 ses.routes = Parse.ifaceRoutes(rows, iface: u, own: ip).map(\.dest)
+                ses.dnsServers = store.serviceDNS(svc)
                 s.foreign.append(ses)
             }
             s.routeGroups.append(RouteGroup(iface: u, address: ip, owner: owners[u],
                                             routes: Parse.ifaceRoutes(rows, iface: u, own: ip)))
         }
         s.routeFixRoutes = Parse.routeFixRows(rows)
+        s.routes = rows
 
         // Власник глобального резолвера людською мовою (dns_owner_hint).
         func label(_ o: String) -> String? {
             if o == "com.cisco.anyconnect" { return "Cisco Secure Client" }
             if o == HelperConst.dnsOverrideService { return "StoneVPN (обраний основний DNS)" }
             if Parse.isUUID(o) {
-                if let i = store.dnsInterface(uuid: o), i.hasPrefix("utun") { return owners[i] ?? "тунель \(i)" }
+                if let i = store.dnsInterface(uuid: o), Parse.isTunnelIface(i) { return owners[i] ?? "тунель \(i)" }
                 return store.serviceName(o)
             }
             return o
@@ -179,6 +183,15 @@ public final class StatusReader: @unchecked Sendable {
         for o in s.network.catchAllOthers + s.network.displacedDNS { s.network.dnsServiceLabels[o] = label(o) ?? o }
         s.updated = Date()
         return s
+    }
+
+    /// Відомий VPN-застосунок, якщо запущений рівно один — назва для безіменного сервісу
+    /// (персональний IKEv2-VPN не має Setup-запису, лише UUID).
+    static func foreignVPNApp(_ procs: [Parse.PSRow]) -> String? {
+        let known = [("clearvpn", "ClearVPN"), ("forticlient", "FortiClient"), ("protonvpn", "Proton VPN"),
+                     ("nordvpn", "NordVPN"), ("expressvpn", "ExpressVPN"), ("surfshark", "Surfshark")]
+        let seen = Set(known.compactMap { k, title in procs.contains { $0.command.lowercased().contains(k) } ? title : nil })
+        return seen.count == 1 ? seen.first : nil
     }
 
     // MARK: WireGuard

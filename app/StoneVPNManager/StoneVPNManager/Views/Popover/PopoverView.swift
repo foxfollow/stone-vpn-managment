@@ -100,6 +100,7 @@ struct PopoverView: View {
         case .busy: .orange
         case .problem: .red
         case .foreign: .purple
+        case .question: .yellow
         }
     }
 
@@ -134,10 +135,12 @@ struct PopoverView: View {
 
     @ViewBuilder private var banner: some View {
         let n = model.snap.network
-        if model.tone == .foreign, let f = model.snap.foreign.first(where: { $0.iface == n.primaryIface }) {
+        if model.tone == .foreign, let f = model.primaryForeign {
             Banner(color: .purple,
                    text: "\(f.name) (\(f.iface ?? "")) тримає default route і DNS" + (model.dnsHealthy == false ? ", але не пропускає трафік. Правки DNS не допоможуть." : "."),
-                   action: "Розірвати…") { model.openTool = "dns"; Task { await model.runDNSFix() } }
+                   action: "Розірвати…", secondary: model.dnsHealthy == false ? nil : ("Дозволити", { model.allowForeign(f.name) })) {
+                model.openTool = "dns"; Task { await model.runDNSFix() }
+            }
         } else if let name = model.dgStale.sorted().first, model.busy.isEmpty {
             Banner(color: .red,
                    text: "Defguard «\(name)» показує «підключено», але gateway більше не приймає сесію (сон довший за поріг)." +
@@ -153,6 +156,14 @@ struct PopoverView: View {
         } else if model.primaryOnline == false {
             Banner(color: .red, text: "\(n.primaryService ?? n.primaryIface ?? "Первинний сервіс") без інтернету — macOS обирає за порядком сервісів, не за доступністю.",
                    action: "Auto") { model.runAction("Мережа") { try await model.actions.netAuto(primaryIface: n.primaryIface) } }
+        }
+        ForEach(model.routeIssues) { i in
+            Banner(color: .orange,
+                   text: "\(i.label): сервер \(i.host) іде через \(i.viaOwner) (\(i.via)) — тунель у тунелі. Працює, але повільніше, і перепідключення \(i.viaOwner) рве сесію.",
+                   action: i.gateway.map { "Напряму · \($0)" } ?? "Погодити",
+                   secondary: i.gateway == nil ? nil : ("Погодити", { model.keepRoute(i) })) {
+                if i.gateway != nil { model.directRoute(i) } else { model.keepRoute(i) }
+            }
         }
         if let t = model.toast {
             HStack(alignment: .top) {
@@ -221,13 +232,17 @@ struct Banner: View {
     var color: Color
     var text: String
     var action: String
+    var secondary: (String, () -> Void)? = nil
     var perform: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
             Text(text).font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            Button(action, action: perform).buttonStyle(.borderedProminent).tint(color).controlSize(.small)
+            VStack(alignment: .trailing, spacing: 4) {
+                Button(action, action: perform).buttonStyle(.borderedProminent).tint(color).controlSize(.small)
+                if let sec = secondary { Button(sec.0, action: sec.1).buttonStyle(.bordered).controlSize(.small) }
+            }
         }
         .foregroundStyle(color)
         .padding(10)

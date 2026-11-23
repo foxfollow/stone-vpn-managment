@@ -19,6 +19,10 @@ public enum Parse {
         Array(Set(rows.filter { $0.dest == "0/1" || $0.dest == "128.0/1" }.map(\.iface))).sorted()
     }
 
+    /// Тунельний інтерфейс: utun (WireGuard, OpenVPN, NE packet tunnel) або ipsec (IKEv2/IPSec —
+    /// так виглядає, напр., ClearVPN у режимі IKEv2). Решта — фізичні/службові.
+    public static func isTunnelIface(_ name: String) -> Bool { name.hasPrefix("utun") || name.hasPrefix("ipsec") }
+
     static func isNoise(_ dest: String) -> Bool {
         dest.range(of: #"^22[4-9]|^23[0-9]|^255\.255\.255\.255"#, options: .regularExpression) != nil
     }
@@ -30,7 +34,7 @@ public enum Parse {
             .map { r in
                 let d = (r.dest == "default" && r.flags.contains("I")) ? "default (scoped)" : r.dest
                 let g = r.gateway
-                let via: String? = (g.hasPrefix("link#") || g.hasPrefix("utun") || g == own) ? nil : g
+                let via: String? = (g.hasPrefix("link#") || isTunnelIface(g) || g == own) ? nil : g
                 return (d, via)
             }
     }
@@ -39,21 +43,21 @@ public enum Parse {
     public static func routeFixRows(_ rows: [RouteRow]) -> [RouteRow] {
         rows.filter { r in
             (r.dest.hasSuffix("/32") || r.flags.contains("H")) && r.flags.contains("G") && r.flags.contains("S")
-                && !r.iface.hasPrefix("utun") && !r.iface.hasPrefix("lo")
+                && !isTunnelIface(r.iface) && !r.iface.hasPrefix("lo")
         }
     }
 
     /// LAN default-шлюзи (не utun) — кандидати для route-fix.
     public static func lanGateways(_ rows: [RouteRow]) -> [(iface: String, gw: String)] {
         var seen = Set<String>()
-        return rows.filter { $0.dest == "default" && ipv4($0.gateway) != nil && !$0.iface.hasPrefix("utun") }
+        return rows.filter { $0.dest == "default" && ipv4($0.gateway) != nil && !isTunnelIface($0.iface) }
             .compactMap { seen.insert($0.gateway).inserted ? ($0.iface, $0.gateway) : nil }
     }
 
     /// Шлюзи активних тунелів (сервер сидить за тунелем, але маршруту до нього немає).
     public static func tunnelGateways(_ rows: [RouteRow], ownAddresses: [String: String]) -> [(iface: String, gw: String)] {
         var seen = Set<String>()
-        return rows.filter { $0.iface.hasPrefix("utun") && ipv4($0.gateway) != nil && $0.flags.contains("G") }
+        return rows.filter { isTunnelIface($0.iface) && ipv4($0.gateway) != nil && $0.flags.contains("G") }
             .filter { ownAddresses[$0.iface] != $0.gateway }
             .compactMap { seen.insert("\($0.iface) \($0.gateway)").inserted ? ($0.iface, $0.gateway) : nil }
     }
@@ -68,10 +72,27 @@ public enum Parse {
             guard let (net, plen) = network(r.dest) else { continue }
             let mask: UInt32 = plen == 0 ? 0 : ~UInt32(0) << UInt32(32 - plen)
             guard target & mask == net & mask else { continue }
-            if r.flags.contains("H") && r.flags.contains("S") && !r.iface.hasPrefix("utun") { continue }
+            if r.flags.contains("H") && r.flags.contains("S") && !isTunnelIface(r.iface) { continue }
             if best == nil || plen > best!.plen { best = (plen, r.iface) }
         }
-        guard let b = best, b.plen > 1, b.iface.hasPrefix("utun") else { return nil }
+        guard let b = best, b.plen > 1, isTunnelIface(b.iface) else { return nil }
+        return b.iface
+    }
+
+    /// Чий *повний* тунель (default / 0/1 + 128.0/1) забирає трафік до IP — сервера іншого VPN.
+    /// nil, якщо до IP веде точніший маршрут (route-fix, VPN-in-VPN за підмережею — це навмисно),
+    /// фізичний default або власний тунель `own`. Scoped (I) і клоновані (W) записи — не вибір
+    /// ядра для звичайного сокета, тож не рахуються.
+    public static func fullTunnelCapture(of ip: String, rows: [RouteRow], own: String?) -> String? {
+        guard let target = ipv4(ip) else { return nil }
+        var best: (plen: Int, iface: String)?
+        for r in rows where !r.flags.contains("I") && !r.flags.contains("W") {
+            guard let (net, plen) = network(r.dest) else { continue }
+            let mask: UInt32 = plen == 0 ? 0 : ~UInt32(0) << UInt32(32 - plen)
+            guard target & mask == net & mask else { continue }
+            if best == nil || plen > best!.plen { best = (plen, r.iface) }
+        }
+        guard let b = best, b.plen <= 1, isTunnelIface(b.iface), b.iface != own else { return nil }
         return b.iface
     }
 
