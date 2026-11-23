@@ -187,20 +187,21 @@ struct ForeignRow: View {
 
     var body: some View {
         let primary = model.snap.network.primaryIface == session.iface
+        let allowed = model.isAllowedForeign(session)
         HStack(spacing: 10) {
             BackendBadge(backend: nil, size: 26)
                 .frame(width: 38)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text(session.name).fontWeight(.semibold)
-                    Text("· сторонній").foregroundStyle(.secondary)
+                    Text(allowed ? "· сторонній, дозволено" : "· сторонній").foregroundStyle(.secondary)
                 }
                 Text([session.iface, session.address, primary ? "default route + DNS" : nil].compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: 11)).foregroundStyle(.purple)
+                    .font(.system(size: 11)).foregroundStyle(allowed ? Color.secondary : .purple)
             }
             Spacer()
             Button("Розірвати…") { Task { await model.offerTakeDown(session) } }
-                .buttonStyle(.bordered).tint(.purple).controlSize(.small)
+                .buttonStyle(.bordered).tint(allowed ? nil : .purple).controlSize(.small)
         }
         .padding(.horizontal, 10)
         .frame(minHeight: 52)

@@ -138,7 +138,8 @@ struct PopoverView: View {
         if model.tone == .foreign, let f = model.primaryForeign {
             Banner(color: .purple,
                    text: "\(f.name) (\(f.iface ?? "")) тримає default route і DNS" + (model.dnsHealthy == false ? ", але не пропускає трафік. Правки DNS не допоможуть." : "."),
-                   action: "Розірвати…", secondary: model.dnsHealthy == false ? nil : ("Дозволити", { model.allowForeign(f.name) })) {
+                   action: "Розірвати…", secondary: model.dnsHealthy == false ? nil : ("Дозволити", { model.allowForeign(f.name) }),
+                   close: { model.foreignDismissed.insert(f.id) }) {
                 model.openTool = "dns"; Task { await model.runDNSFix() }
             }
         } else if let name = model.dgStale.sorted().first, model.busy.isEmpty {
@@ -233,6 +234,8 @@ struct Banner: View {
     var text: String
     var action: String
     var secondary: (String, () -> Void)? = nil
+    /// × у куті — сховати банер (що саме це означає, вирішує викликач).
+    var close: (() -> Void)? = nil
     var perform: () -> Void
 
     /// Підпис на заливці кольору банера: на світлих (жовтий/помаранчевий) — темний.
@@ -250,7 +253,15 @@ struct Banner: View {
             }
         }
         .padding(10)
+        .padding(.trailing, close == nil ? 0 : 8)
         .background(color.opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(alignment: .topTrailing) {
+            if let close {
+                Button(action: close) { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
+                    .buttonStyle(.borderless).foregroundStyle(.secondary).padding(6)
+                    .help("Сховати до перезапуску застосунку")
+            }
+        }
     }
 }
 

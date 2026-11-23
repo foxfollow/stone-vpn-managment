@@ -132,6 +132,8 @@ final class AppModel {
     var dnsFailover: [String]?
     /// Сервери наших VPN, які забрав повний тунель стороннього (AppModel+Routes).
     var routeIssues: [RouteIssue] = []
+    /// Сторонні VPN (Session.id), чий банер закрито хрестиком — до перезапуску.
+    var foreignDismissed: Set<String> = []
     @ObservationIgnored var lastRouteCheck = Date.distantPast
     @ObservationIgnored var wgEndpointCache: [String: String] = [:]
     @ObservationIgnored var resolveCache: [String: (ip: String, at: Date)] = [:]
@@ -280,7 +282,7 @@ final class AppModel {
 
     var tone: IconTone {
         let n = snap.network
-        if let f = primaryForeign, !isAllowedForeign(f) { return .foreign }
+        if let f = primaryForeign, !isQuietForeign(f) { return .foreign }
         // Під час підключення/повернення DNS мертвий резолвер — очікуваний проміжний стан.
         if !busy.isEmpty || dnsGuardActive { return .busy }
         if !dgStale.isEmpty { return .problem }
@@ -309,7 +311,14 @@ final class AppModel {
         return n.primaryIsTunnel ? snap.foreign.first { $0.iface == n.primaryIface } : nil
     }
 
-    func isAllowedForeign(_ s: Session) -> Bool { prefs.allowedForeign.contains(s.name) }
+    /// Дозволено явно або неявно: рішення щодо маршруту повз цей VPN (погодити / напряму) —
+    /// уже свідомий вибір працювати поряд з ним.
+    func isAllowedForeign(_ s: Session) -> Bool {
+        prefs.allowedForeign.contains(s.name) || prefs.routeDecisions.keys.contains { $0.hasSuffix("|\(s.name)") }
+    }
+
+    /// Фіолетове попередження про цей сторонній VPN приховано (×) до перезапуску застосунку.
+    func isQuietForeign(_ s: Session) -> Bool { isAllowedForeign(s) || foreignDismissed.contains(s.id) }
 
     /// Дозволити сторонньому VPN (ClearVPN…) тримати мережу поряд з нашими тунелями.
     func allowForeign(_ name: String, _ on: Bool = true) {
@@ -1363,7 +1372,7 @@ final class AppModel {
         }
         let oldF = Set(old.foreign.map(\.id)), newF = Set(new.foreign.map(\.id))
         if prefs.notifyForeign, new.network.primaryIsTunnel, !newF.subtracting(oldF).isEmpty,
-           let f = new.foreign.first(where: { $0.iface == new.network.primaryIface }), !isAllowedForeign(f) {
+           let f = new.foreign.first(where: { $0.iface == new.network.primaryIface }), !isQuietForeign(f) {
             notify("Сторонній VPN тримає мережу", "\(f.name) (\(f.iface ?? "")) став первинним")
         }
     }
