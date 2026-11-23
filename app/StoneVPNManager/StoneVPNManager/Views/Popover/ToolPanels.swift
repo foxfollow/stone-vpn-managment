@@ -317,9 +317,10 @@ struct RoutesPanel: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Рішення").font(.system(size: 11.5, weight: .semibold))
                     ForEach(model.prefs.routeDecisions.sorted(by: { $0.key < $1.key }), id: \.key) { d in
-                        let parts = d.key.split(separator: "|", maxSplits: 1).map(String.init)
+                        let p = RouteIssue.parseDecisionKey(d.key)
+                        let net = p.network.map { " · мережа «\(model.prefs.networkNames[$0] ?? $0)»" } ?? " · усі мережі"
                         HStack(spacing: 4) {
-                            Text("\(parts.first?.replacingOccurrences(of: ":", with: " · ") ?? d.key) через \(parts.last ?? "?"): " +
+                            Text("\(p.profile.replacingOccurrences(of: ":", with: " · ")) через \(p.owner)\(net): " +
                                  (d.value == "keep" ? "погоджено" : "напряму через LAN"))
                                 .foregroundStyle(.secondary)
                             Spacer(minLength: 4)

@@ -160,7 +160,8 @@ struct PopoverView: View {
         }
         ForEach(model.routeIssues) { i in
             Banner(color: .orange,
-                   text: "\(i.label): сервер \(i.host) іде через \(i.viaOwner) (\(i.via)) — тунель у тунелі. Працює, але повільніше, і перепідключення \(i.viaOwner) рве сесію.",
+                   text: "\(i.label): сервер \(i.host) іде через \(i.viaOwner) (\(i.via)) — тунель у тунелі. Працює, але повільніше, і перепідключення \(i.viaOwner) рве сесію." +
+                         (i.networkLabel.map { " Рішення — для мережі «\($0)»." } ?? ""),
                    action: i.gateway.map { "Напряму · \($0)" } ?? "Погодити",
                    secondary: i.gateway == nil ? nil : ("Погодити", { model.keepRoute(i) })) {
                 if i.gateway != nil { model.directRoute(i) } else { model.keepRoute(i) }
