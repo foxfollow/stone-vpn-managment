@@ -20,22 +20,35 @@ extension AppModel {
     func checkRoutes() async {
         await dropDeadDirectRoutes()
         let rows = snap.routes
-        let gw = Parse.lanGateways(rows).first?.gw
+        let lan = Parse.lanGateways(rows).first
+        let gw = lan?.gw
+        let lanNet = lan.flatMap { reader.store.lanNetwork(iface: $0.iface) }
+        let net = lanNet?.id
+        var netLabel: String?
+        if let net, let lan {
+            netLabel = prefs.networkNames[net] ?? "\(lanNet?.service ?? lan.iface) · \(lan.gw)"
+            if prefs.networkNames[net] == nil { prefs.networkNames[net] = netLabel }
+            migrateGlobalDecisions(to: net)
+        }
         var found: [RouteIssue] = []
         for s in snap.sessions where s.state == .up {
             guard let b = s.backend, let key = s.profileKey else { continue }
             let prof = snap.profiles[b]?.first { $0.key == key }
             for host in await serverHosts(b, session: s, profile: prof) {
-                guard let ip = await resolveCached(host),
-                      let via = Parse.fullTunnelCapture(of: ip, rows: rows, own: s.iface) else { continue }
+                guard let ip = await resolveCached(host) else { continue }
+                guard let via = Parse.fullTunnelCapture(of: ip, rows: rows, own: s.iface) else {
+                    adoptDirectRoute(ip: ip, profileKey: key, network: net, rows: rows)
+                    continue
+                }
                 let owner = snap.routeGroups.first { $0.iface == via }?.owner ?? via
                 found.append(RouteIssue(profileKey: key, label: "\(b.title) · \(prof.map(prefs.display) ?? s.name)",
-                                        host: host, ip: ip, via: via, viaOwner: owner, gateway: gw))
+                                        host: host, ip: ip, via: via, viaOwner: owner, gateway: gw,
+                                        network: net, networkLabel: netLabel))
             }
         }
         var pending: [RouteIssue] = []
         for i in found {
-            switch prefs.routeDecisions[i.decisionKey] {
+            switch prefs.routeDecisions[i.decisionKey] ?? prefs.routeDecisions[i.globalKey] {
             case "keep": continue
             case "direct": if await !autoDirect(i) { pending.append(i) }
             default: pending.append(i)
@@ -46,6 +59,33 @@ extension AppModel {
         routeIssues = pending
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: gone.map { "route:\($0.id)" })
         if prefs.notifyRoutes { for i in fresh { notifyRouteIssue(i) } }
+    }
+
+    /// Рішення зі старих версій (без мережі) належать мережі, в якій їх прийняли, — тобто поточній:
+    /// у нових мережах апка знову спитає.
+    private func migrateGlobalDecisions(to net: String) {
+        for (k, v) in prefs.routeDecisions where RouteIssue.parseDecisionKey(k).network == nil {
+            let p = RouteIssue.parseDecisionKey(k)
+            let nk = RouteIssue.decisionKey(p.profile, p.owner, net)
+            prefs.routeDecisions[k] = nil
+            if prefs.routeDecisions[nk] == nil { prefs.routeDecisions[nk] = v }
+            for (ip, val) in prefs.directRoutes where val.hasSuffix("|" + k) {
+                prefs.directRoutes[ip] = String(val.dropLast(k.count)) + nk
+            }
+        }
+    }
+
+    /// Маршрут напряму вже стоїть (поставлений раніше, облік загубився), а для профілю в цій мережі
+    /// обрано «напряму» — взяти на облік, щоб прибрати його, коли шлюз зникне з мережі.
+    private func adoptDirectRoute(ip: String, profileKey: String, network: String?, rows: [RouteRow]) {
+        guard prefs.directRoutes[ip] == nil,
+              let row = rows.first(where: { $0.dest == ip && $0.flags.contains("H") && $0.flags.contains("S") && $0.flags.contains("G")
+                                            && !Parse.isTunnelIface($0.iface) }),
+              let key = prefs.routeDecisions.first(where: { k, v in
+                  let p = RouteIssue.parseDecisionKey(k)
+                  return v == "direct" && p.profile == profileKey && p.network == network
+              })?.key else { return }
+        prefs.directRoutes[ip] = "\(row.gateway)|\(key)"
     }
 
     /// Хости серверів сесії (як у конфігу/профілі).
@@ -96,15 +136,17 @@ extension AppModel {
     /// вбиває той самий VPN — прибрати. Зник сам — забути.
     private func dropDeadDirectRoutes() async {
         guard !prefs.directRoutes.isEmpty else { return }
+        // Таблиця, а не `route get`: той для такого IP віддає клонований scoped-запис без STATIC.
         for ip in prefs.directRoutes.keys.sorted() {
-            let r = await Shell.run("/sbin/route", ["-n", "get", ip]).out
-            guard r.contains("HOST"), r.contains("STATIC") else { prefs.directRoutes[ip] = nil; continue }
-        }
-        let dead = await actions.deadHostRoutes(Array(prefs.directRoutes.keys))
-        guard !dead.isEmpty, helper.isEnabled else { return }
-        for d in dead {
-            try? await actions.deleteDirectRoute(ip: d.ip)
-            prefs.directRoutes[d.ip] = nil
+            guard let row = snap.routes.first(where: { $0.dest == ip && $0.flags.contains("H") && $0.flags.contains("S") }) else {
+                prefs.directRoutes[ip] = nil
+                continue
+            }
+            // Шлюз сам досяжний лише через інший шлюз — він не в поточній мережі.
+            let g = await Shell.run("/sbin/route", ["-n", "get", row.gateway]).out
+            guard g.contains("GATEWAY"), helper.isEnabled else { continue }
+            try? await actions.deleteDirectRoute(ip: ip)
+            prefs.directRoutes[ip] = nil
         }
     }
 
@@ -115,7 +157,7 @@ extension AppModel {
         prefs.routeDecisions[i.decisionKey] = "keep"
         routeIssues.removeAll { $0.id == i.id }
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["route:\(i.id)"])
-        toast = "\(i.label) лишається через \(i.viaOwner). Скинути — Routes → Рішення."
+        toast = "\(i.label) лишається через \(i.viaOwner)\(i.networkLabel.map { " у мережі «\($0)»" } ?? ""). Скинути — Routes → Рішення."
     }
 
     /// «Відхилити»: сервер напряму через LAN-шлюз; надалі — автоматично.
@@ -157,7 +199,8 @@ extension AppModel {
     private func notifyRouteIssue(_ i: RouteIssue) {
         let c = UNMutableNotificationContent()
         c.title = "Маршрут під питанням: \(i.label)"
-        c.body = "Сервер \(i.host) іде через \(i.viaOwner) (\(i.via)) — тунель у тунелі." +
+        c.body = "Сервер \(i.host) іде через \(i.viaOwner) (\(i.via)) — тунель у тунелі" +
+            (i.networkLabel.map { " (мережа «\($0)»)." } ?? ".") +
             (i.gateway.map { " Погодити чи пустити напряму через \($0)?" } ?? " LAN-шлюзу для обходу немає.")
         c.categoryIdentifier = Self.routeCategory
         c.userInfo = ["issue": i.id]

@@ -93,6 +93,19 @@ public final class SystemStore: @unchecked Sendable {
         return out
     }
 
+    /// Відбиток локальної мережі інтерфейсу: MAC роутера, який IPConfiguration публікує в State IPv4
+    /// (`ARPResolvedHardwareAddress`), + назва сервісу. Без дозволів: ARP-рядки `netstat` дочірнім
+    /// процесам без Local Network не видно, а SSID без геолокації приховано.
+    public func lanNetwork(iface: String) -> (id: String, service: String?)? {
+        for key in keys("State:/Network/Service/.*/IPv4") {
+            guard let v = value(key), (v["InterfaceName"] as? String) == iface,
+                  let mac = v["ARPResolvedHardwareAddress"] as? String, !mac.isEmpty else { continue }
+            let svc = key.replacingOccurrences(of: "State:/Network/Service/", with: "").replacingOccurrences(of: "/IPv4", with: "")
+            return (mac.lowercased(), serviceName(svc))
+        }
+        return nil
+    }
+
     public var ciscoInterface: String? {
         value("State:/Network/Service/com.cisco.anyconnect/IPv4")?["InterfaceName"] as? String
     }

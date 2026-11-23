@@ -12,12 +12,29 @@ public struct RouteIssue: Identifiable, Hashable, Sendable {
     public var via: String            // ipsec0 / utunN
     public var viaOwner: String       // ClearVPN
     public var gateway: String?       // LAN-шлюз для маршруту напряму
+    /// Поточна локальна мережа (MAC роутера) і її підпис; nil — не визначено.
+    public var network: String?
+    public var networkLabel: String?
 
-    /// Рішення пам'ятаємо за профілем і власником тунелю (номери utun/ipsec змінюються).
-    public var decisionKey: String { "\(profileKey)|\(viaOwner)" }
+    /// Рішення пам'ятаємо за профілем, власником тунелю (номери utun/ipsec змінюються) і мережею:
+    /// вдома «напряму», у кафе «через ClearVPN». Без мережі — загальне (старий формат).
+    public var decisionKey: String { Self.decisionKey(profileKey, viaOwner, network) }
+    public var globalKey: String { Self.decisionKey(profileKey, viaOwner, nil) }
     public var id: String { "\(profileKey)|\(ip)" }
 
-    public init(profileKey: String, label: String, host: String, ip: String, via: String, viaOwner: String, gateway: String?) {
+    public static func decisionKey(_ profile: String, _ owner: String, _ network: String?) -> String {
+        "\(profile)|\(owner)" + (network.map { "|net:\($0)" } ?? "")
+    }
+
+    /// decisionKey → складові (власник/мережа без «|», MAC — з «:» усередині, тож ріжемо за «|»).
+    public static func parseDecisionKey(_ k: String) -> (profile: String, owner: String, network: String?) {
+        let p = k.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        let net = p.count > 2 && p[2].hasPrefix("net:") ? String(p[2].dropFirst(4)) : nil
+        return (p.first ?? k, p.count > 1 ? p[1] : "", net)
+    }
+
+    public init(profileKey: String, label: String, host: String, ip: String, via: String, viaOwner: String, gateway: String?,
+                network: String? = nil, networkLabel: String? = nil) {
         self.profileKey = profileKey
         self.label = label
         self.host = host
@@ -25,6 +42,8 @@ public struct RouteIssue: Identifiable, Hashable, Sendable {
         self.via = via
         self.viaOwner = viaOwner
         self.gateway = gateway
+        self.network = network
+        self.networkLabel = networkLabel
     }
 }
 

@@ -314,7 +314,7 @@ final class AppModel {
     /// Дозволено явно або неявно: рішення щодо маршруту повз цей VPN (погодити / напряму) —
     /// уже свідомий вибір працювати поряд з ним.
     func isAllowedForeign(_ s: Session) -> Bool {
-        prefs.allowedForeign.contains(s.name) || prefs.routeDecisions.keys.contains { $0.hasSuffix("|\(s.name)") }
+        prefs.allowedForeign.contains(s.name) || prefs.routeDecisions.keys.contains { RouteIssue.parseDecisionKey($0).owner == s.name }
     }
 
     /// Фіолетове попередження про цей сторонній VPN приховано (×) до перезапуску застосунку.
