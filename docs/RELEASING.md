@@ -5,8 +5,9 @@ Stone Clipboarder Tool: unsigned Release build → ad-hoc signature → `StoneVP
 Sparkle EdDSA signature → `docs/appcast.xml` item → GitHub Release → appcast committed to `main`
 (served by GitHub Pages) → cask `stone-vpn-manager` bumped in `foxfollow/homebrew-stone`.
 
-`.github/workflows/ci.yml` runs on every push/PR: bash syntax + shellcheck (errors), StoneVPNKit unit
-tests and an unsigned Release build with the runner's Xcode.
+`.github/workflows/ci.yml` runs on every push/PR: bash syntax + shellcheck (errors), the localization
+check (`tools/check-localization.py`), StoneVPNKit unit tests and an unsigned Release build with the
+runner's Xcode.
 
 ## One-time setup
 
@@ -68,7 +69,8 @@ appcast commit step fails.
 `shellcheck.yml` and `codeql.yml` need nothing. For `sonar.yml`:
 
 1. sonarcloud.io → **+ → Analyze new project** → organization `foxfollow` → `stone-vpn-managment`
-   (key `foxfollow_stone-vpn-managment`, as in `sonar-project.properties`).
+   (key `foxfollow_stone-vpn-managment`, as in `sonar-project.properties`). New code definition:
+   **Previous version** — the workflow sends `MARKETING_VERSION` as `sonar.projectVersion`.
 2. Administration → Analysis Method: turn **Automatic Analysis off** (the workflow uploads coverage).
 3. My Account → Security → generate a token → `gh secret set SONAR_TOKEN -R foxfollow/stone-vpn-managment`.
 
@@ -100,7 +102,14 @@ in Settings → Helper after updating.
   path baked into Info.plist). Local builds keep Sparkle off: a Team-signed build can't be updated by an
   ad-hoc release anyway.
 - Ad-hoc signing order: Sparkle.framework (deep) → `StoneVPNManagerHelper` with identifier
-  `com.foxfollow.stonevpnmanager.helper` → the app. In ad-hoc builds the helper accepts XPC only from the
-  cdhash of the bundle it lives in (`clientRequirement()` in `StoneVPNManagerHelper/main.swift`).
+  `com.foxfollow.stonevpnmanager.helper` → the app, all with the hardened runtime. In ad-hoc builds the
+  helper accepts XPC only from the cdhash of the bundle it lives in (`clientRequirement()` in
+  `StoneVPNManagerHelper/main.swift`); the hardened runtime keeps `DYLD_INSERT_LIBRARIES` out of the app,
+  so that pin can't be bypassed. The app is signed with `app/StoneVPNManager/Config/AdHocRelease.entitlements`
+  (`disable-library-validation` only): library validation would refuse the ad-hoc Sparkle.framework (no
+  Team ID). The workflow fails if either binary lacks the runtime flag or the signed app doesn't launch.
+- The appcast item is inserted into `main`'s current `docs/appcast.xml`, not copied over it, so notes
+  committed to `main` after the tag survive; `main`'s `<new>` block is removed only if it is the one the
+  release used.
 - Bumping Sparkle (Dependabot): update `SPARKLE_VERSION` and `SPARKLE_SHA256` in `release.yml` together
   (`shasum -a 256 Sparkle-X.Y.Z.tar.xz`, compare with the digest on the GitHub release).

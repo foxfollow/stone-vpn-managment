@@ -209,12 +209,28 @@ jobs:
           # Inside-out: Sparkle (framework + its XPC services/Updater.app), the
           # root helper (identifier = its bundle id, the client checks it), then
           # the app. The helper pins the app's cdhash for XPC in ad-hoc builds.
-          codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Sparkle.framework"
-          codesign --force --sign - --identifier com.foxfollow.stonevpnmanager.helper \
+          # Hardened runtime everywhere: without it DYLD_INSERT_LIBRARIES into the
+          # app would get past the helper's cdhash pin (the code is still ours).
+          # The app's entitlements only lift library validation, which rejects the
+          # ad-hoc Sparkle.framework (no Team ID); DYLD_* stays blocked.
+          codesign --force --deep --options runtime --sign - "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+          codesign --force --options runtime --sign - --identifier com.foxfollow.stonevpnmanager.helper \
             "$APP_PATH/Contents/MacOS/StoneVPNManagerHelper"
-          codesign --force --sign - "$APP_PATH"
+          codesign --force --options runtime --sign - \
+            --entitlements app/StoneVPNManager/Config/AdHocRelease.entitlements "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          codesign -dv "$APP_PATH" 2>&1 | grep -E "Identifier|Signature"
+          codesign -dv "$APP_PATH" 2>&1 | grep -E "Identifier|Signature|flags"
+          for b in "$APP_PATH" "$APP_PATH/Contents/MacOS/StoneVPNManagerHelper"; do
+            codesign -dv "$b" 2>&1 | grep -q 'flags=.*runtime' || { echo "❌ no hardened runtime: $b"; exit 1; }
+          done
+          # Sparkle is linked at launch: library validation must accept the ad-hoc
+          # framework, or dyld aborts. --dump-status prints the status and exits.
+          "$APP_PATH/Contents/MacOS/$APP_NAME" --dump-status > /dev/null & pid=$!
+          ( sleep 90; kill -9 "$pid" ) > /dev/null 2>&1 & guard=$!
+          rc=0; wait "$pid" || rc=$?
+          kill "$guard" 2>/dev/null || true
+          [[ $rc == 0 ]] || { echo "❌ the signed app does not launch (exit $rc)"; exit 1; }
+          echo "✅ hardened runtime, app launches with Sparkle"
           codesign -d -r- "$APP_PATH" 2>&1 | tail -1
 
       # =======================================================================
@@ -308,6 +324,9 @@ jobs:
               </item>
           EOF
 
+          # Kept for the merge into the default branch (next steps).
+          cp "$ITEM" "$RUNNER_TEMP/appcast-item.xml"
+          sed -n '/<new>/,/<\/new>/p' "$APPCAST" > "$RUNNER_TEMP/appcast-new-block.xml"
           sed -i '' '/<new>/,/<\/new>/d' "$APPCAST"
           awk -v item="$ITEM" '
             /<\/language>/ { print; while ((getline l < item) > 0) print l; close(item); next }
@@ -376,24 +395,40 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          cp "$APPCAST" "$RUNNER_TEMP/appcast.xml"
           git checkout -- "$APPCAST"
-          git fetch origin "$DEFAULT_BRANCH"
-          git checkout -B "$DEFAULT_BRANCH" "origin/$DEFAULT_BRANCH"
-          cp "$RUNNER_TEMP/appcast.xml" "$APPCAST"
-          if git diff --quiet -- "$APPCAST"; then
-            echo "ℹ️ appcast unchanged"
-            exit 0
-          fi
-          git add "$APPCAST"
-          git commit -m "ciflow: update appcast.xml for v$VERSION" -m "[skip ci]"
+          # Insert only the new item into the default branch's current appcast, so
+          # anything committed there after the tag (older items, the next <new>
+          # notes) survives. Its <new> block is dropped only if it is the one this
+          # release consumed.
+          merge_item() {
+            git checkout -B "$DEFAULT_BRANCH" "origin/$DEFAULT_BRANCH"
+            if grep -q "<sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>" "$APPCAST"; then
+              echo "ℹ️ appcast on $DEFAULT_BRANCH already has v$VERSION"
+              return 10
+            fi
+            if [[ -s "$RUNNER_TEMP/appcast-new-block.xml" ]] &&
+               sed -n '/<new>/,/<\/new>/p' "$APPCAST" | cmp -s - "$RUNNER_TEMP/appcast-new-block.xml"; then
+              sed -i '' '/<new>/,/<\/new>/d' "$APPCAST"
+            fi
+            awk -v item="$RUNNER_TEMP/appcast-item.xml" '
+              /<\/language>/ { print; while ((getline l < item) > 0) print l; close(item); next }
+              { print }
+            ' "$APPCAST" > "$APPCAST.new"
+            mv "$APPCAST.new" "$APPCAST"
+            # Called in a condition, where `set -e` is off: check every step.
+            xmllint --noout "$APPCAST" || return 1
+            git add "$APPCAST" && git commit -m "ciflow: update appcast.xml for v$VERSION" -m "[skip ci]" || return 1
+          }
           for i in 1 2 3; do
+            git fetch origin "$DEFAULT_BRANCH"
+            rc=0; merge_item || rc=$?
+            [[ $rc == 10 ]] && exit 0
+            [[ $rc != 0 ]] && { echo "❌ could not merge the appcast item"; exit 1; }
             if git push origin "$DEFAULT_BRANCH"; then
               echo "✅ appcast pushed to $DEFAULT_BRANCH"
               exit 0
             fi
             echo "⚠️ push failed, retrying ($i/3)…"
-            git pull --rebase origin "$DEFAULT_BRANCH"
             sleep 2
           done
           echo "❌ could not push the appcast"

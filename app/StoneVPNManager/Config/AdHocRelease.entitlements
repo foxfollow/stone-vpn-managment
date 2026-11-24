@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements of the ad-hoc signed release app (release.yml, codesign by hand).
+  Hardened runtime turns on library validation, which only loads frameworks with the
+  process's Team ID; ad-hoc code has none, so the embedded Sparkle.framework is refused
+  ("different Team IDs") and the app dies at launch. This lifts only that check.
+  DYLD_* variables stay blocked (that needs allow-dyld-environment-variables, which we
+  never set) — the reason the hardened runtime is on: the helper pins the app's cdhash.
+  Team-signed local builds don't use this file.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>
