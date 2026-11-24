@@ -92,7 +92,7 @@
     <p>Tunnel configs (<code>.conf</code>) live in the standard <code>wg-quick</code> dirs: <code>/opt/homebrew/etc/wireguard</code>, <code>/usr/local/etc/wireguard</code> or <code>/etc/wireguard</code>. They appear in the popover automatically.</p>
     <h3>OpenVPN</h3>
     <div class="cmd"><code>brew install openvpn</code><button class="copy" type="button" data-copy="brew install openvpn" data-done="✓">Copy</button></div>
-    <p>Profiles (<code>.ovpn</code>) are imported in the Profiles window and stored in <code>~/Library/Application Support/OpenVPN Connect/profiles/</code> (shared with OpenVPN Connect). The Homebrew binary is used because it writes routes into the kernel correctly. Login and OTP are asked per connect and never stored.</p>
+    <p>Profiles (<code>.ovpn</code>) are imported in the Profiles window and stored in <code>~/Library/Application Support/OpenVPN Connect/profiles/</code> (shared with OpenVPN Connect). The Homebrew binary is used because it writes routes into the kernel correctly. The password and OTP are asked per connect and never stored; the username can be remembered per profile (Settings → OpenVPN).</p>
     <h3>Defguard</h3>
     <p>Install the <a href="https://docs.defguard.net/">Defguard desktop client</a> and add your instance there once. StoneVPN drives it through <code>defguard-client</code> inside <code>Defguard.app</code>; MFA codes are asked in the app.</p>
     <h3>Cisco Secure Client</h3>

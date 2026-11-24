@@ -91,7 +91,7 @@
     <p>Конфіги тунелів (<code>.conf</code>) живуть у стандартних теках <code>wg-quick</code>: <code>/opt/homebrew/etc/wireguard</code>, <code>/usr/local/etc/wireguard</code> або <code>/etc/wireguard</code>. У поповері вони з'являються самі.</p>
     <h3>OpenVPN</h3>
     <div class="cmd"><code>brew install openvpn</code><button class="copy" type="button" data-copy="brew install openvpn" data-done="✓">Копіювати</button></div>
-    <p>Профілі (<code>.ovpn</code>) імпортуються у вікні «Профілі» і лежать у <code>~/Library/Application Support/OpenVPN Connect/profiles/</code> (спільно з OpenVPN Connect). Використовується Homebrew-бінарник, бо він правильно прописує маршрути в ядро. Логін і OTP питаються при кожному підключенні й не зберігаються.</p>
+    <p>Профілі (<code>.ovpn</code>) імпортуються у вікні «Профілі» і лежать у <code>~/Library/Application Support/OpenVPN Connect/profiles/</code> (спільно з OpenVPN Connect). Використовується Homebrew-бінарник, бо він правильно прописує маршрути в ядро. Пароль і OTP питаються при кожному підключенні й не зберігаються; логін можна запамʼятати для кожного профілю (Налаштування → OpenVPN).</p>
     <h3>Defguard</h3>
     <p>Встанови <a href="https://docs.defguard.net/">Defguard desktop client</a> і один раз додай там свій інстанс. StoneVPN керує ним через <code>defguard-client</code> усередині <code>Defguard.app</code>; MFA-коди питає сам застосунок.</p>
     <h3>Cisco Secure Client</h3>

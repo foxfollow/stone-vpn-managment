@@ -16,7 +16,8 @@ scripts have no build, no test framework, and no package — they run directly. 
 native menubar app (StoneVPN Manager), which has its own build and tests (see its section).
 GitHub repo: `foxfollow/stone-vpn-managment` ("StoneVPN Management"; the local folder still has the old
 name). `README.md` is English (main), `README.uk.md` Ukrainian, `OPENVPN_CLI.md` Ukrainian; the app UI
-and CLI output are Ukrainian. This file is the AI-facing reference.
+is English + Ukrainian (String Catalogs, see "Localization"), CLI output is Ukrainian. This file is the
+AI-facing reference.
 
 ## Project layout & purpose of each file
 
@@ -48,7 +49,11 @@ docs/                 GitHub Pages site (branch main, /docs): index.html (EN) / 
                       installation(-ua).html, resources/site.{css,js} (mock UI, motion), appcast.xml
                       (Sparkle feed), RELEASING.md (one-time setup + how to cut a release).
 tools/render-screens.sh   site mockups → docs/resources/screens/{en,uk}/*.png + og-image.png (headless Chrome).
-.github/workflows/    ci.yml (shellcheck, swift test, unsigned build) · release.yml (tag vX.Y.Z → release).
+tools/check-localization.py   catalogs complete + no hard-coded Cyrillic in Swift (CI).
+tools/coverage-to-sonar.sh    swift test coverage → Sonar generic XML.
+.github/workflows/    ci.yml (bash syntax, localization check, swift test, unsigned build) · shellcheck.yml
+                      · codeql.yml (swift, js, actions) · sonar.yml (SonarCloud; skips without SONAR_TOKEN,
+                      passes MARKETING_VERSION as sonar.projectVersion) · release.yml (tag vX.Y.Z → release).
 app/
   Makefile            build | install | test | status (xcodebuild / swift test).
   Packages/StoneVPNKit/  Local Swift package, no UI.
@@ -214,15 +219,38 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   only when its DefaultHostName is the same host.
 - **Releases & updates** (`docs/RELEASING.md`): tag `vX.Y.Z` → `release.yml` builds unsigned with
   `STONEVPN_UPDATES=YES`, empty `STONEVPN_REPO_PATH` and `SPARKLE_PUBLIC_KEY` from the repo variable,
-  ad-hoc signs (Sparkle.framework deep → helper with `--identifier com.foxfollow.stonevpnmanager.helper`
-  → app), zips, Sparkle-signs and verifies the signature against the built `SUPublicEDKey` (openssl),
+  ad-hoc signs with the hardened runtime (Sparkle.framework deep → helper with `--identifier
+  com.foxfollow.stonevpnmanager.helper` → app with `Config/AdHocRelease.entitlements`), checks the app
+  launches (`--dump-status`), zips, Sparkle-signs and verifies the signature against the built `SUPublicEDKey` (openssl),
   prepends an item to `docs/appcast.xml` (notes from its `<new>` block — never put a literal `<new>`
-  in a comment there, the sed range would start in it), creates the GitHub release, pushes the appcast
-  to `main`, bumps `version`/`sha256` of `Casks/stone-vpn-manager.rb` in `foxfollow/homebrew-stone`.
+  in a comment there, the sed range would start in it), creates the GitHub release, inserts that item
+  into `main`'s *current* appcast (never overwrites it; drops `main`'s `<new>` block only if it is the
+  one the tag consumed), bumps `version`/`sha256` of `Casks/stone-vpn-manager.rb` in
+  `foxfollow/homebrew-stone` (deploy key `HOMEBREW_TAP_DEPLOY_KEY`, PAT `HOMEBREW_TAP_TOKEN` fallback).
+  **Hardened runtime is required**: without it `DYLD_INSERT_LIBRARIES` runs code inside the app, past
+  the helper's cdhash pin. With it, library validation refuses the ad-hoc Sparkle.framework ("different
+  Team IDs" — ad-hoc code has none) and dyld aborts at launch; the entitlements file lifts only
+  `disable-library-validation`. Never add `allow-dyld-environment-variables`.
   Tag must equal `MARKETING_VERSION`; `CURRENT_PROJECT_VERSION` must exceed the newest appcast build.
   Sparkle (`Updater.swift`, SPM 2.10.x; the pinned `sign_update` checksum in release.yml must match)
   only starts when Info.plist `StoneVPNUpdates` = YES — local Team-signed builds keep it off, since an
   ad-hoc release can't replace them. Landing mockups use only RFC 5737 IPs / example.* hosts.
+- **Localization** (EN development language + uk): String Catalogs — app `Resources/Localizable.xcstrings`,
+  `InfoPlist.xcstrings`, `Helper.xcstrings` (manual entries: the helper target has no resources; the app
+  bundle carries the table and the helper reads `<lang>.lproj/Helper.strings` from it), StoneVPNCore
+  `Resources/Localizable.xcstrings` (`bundle: .module`). Source strings are English; Ukrainian plurals
+  need one/few/many/other, multi-argument plurals use substitutions. The language override
+  (`AppLanguage`) writes `AppleLanguages` in the app domain + relaunch. `Locale.current` ignores the
+  per-app language → views get `.environment(\.locale, .app)` and counted strings `locale: .app`.
+  The helper answers in the client's language: `PrivRequest{op, lang}` (helper protocol v6; the client
+  sends the envelope only to a daemon ≥ 6), thread-local language, PIDs/uids interpolated as `String`
+  (no digit grouping). No new UI text in Ukrainian: `python3 tools/check-localization.py` (CI) fails on
+  untranslated keys, mismatched specifiers/plural categories and hard-coded Cyrillic
+  (`// l10n-ignore`, `// l10n-ignore-file` for deliberate cases). `STRING_CATALOG_GENERATE_SYMBOLS = NO`.
+- **Settings** (`Views/Settings/`): `NavigationSplitView` with pages grouped App / VPN / Network / System
+  (`SettingsNavigation.swift`) and a sidebar search over `SettingsSearchIndex` (localized titles + English
+  and Ukrainian keywords, config.env keys). **A new setting needs an index entry and
+  `.settingsAnchor("<id>")` on its row** — the search opens the page, scrolls to the anchor, highlights it.
 - Debug parity check without UI: `make -C app status` (= `--dump-status`) vs
   `./main-vpn-manager.sh status`.
 - `NetService` clashes with Foundation's — the model type is `NetworkService`.

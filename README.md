@@ -50,6 +50,10 @@ brew trust --tap foxfollow/stone
 brew install --cask stone-vpn-manager
 ```
 
+The cask lives in the tap repository **[foxfollow/homebrew-stone](https://github.com/foxfollow/homebrew-stone)**
+(`Casks/stone-vpn-manager.rb`; every release bumps it automatically). The app then updates itself (Sparkle);
+`brew upgrade --cask --greedy stone-vpn-manager` works too.
+
 Requires **macOS 26 Tahoe** or later (universal: Apple silicon + Intel). Then install the backends you use:
 
 ```bash
