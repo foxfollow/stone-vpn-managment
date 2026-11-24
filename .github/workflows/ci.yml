@@ -32,6 +32,8 @@ jobs:
           LATEST_XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)
           [[ -n "$LATEST_XCODE" ]] && sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
           xcodebuild -version
+      - name: Localization (catalogs complete, no hard-coded strings)
+        run: python3 tools/check-localization.py
       - name: Unit tests
         run: swift test --package-path app/Packages/StoneVPNKit
       - name: Build (unsigned Release)

@@ -36,6 +36,13 @@ jobs:
         with:
           fetch-depth: 0   # blame data for new-code detection
 
+      - name: Project version (new code = since the previous version)
+        if: steps.token.outputs.skip != 'true'
+        id: ver
+        run: |
+          v=$(grep -m1 -oE 'MARKETING_VERSION = [0-9.]+' app/StoneVPNManager/StoneVPNManager.xcodeproj/project.pbxproj | awk '{print $3}')
+          echo "version=${v:-0.0.0}" >> "$GITHUB_OUTPUT"
+
       - name: Select Xcode
         if: steps.token.outputs.skip != 'true'
         run: |
@@ -57,3 +64,5 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: -Dsonar.projectVersion=${{ steps.ver.outputs.version }}

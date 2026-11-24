@@ -36,7 +36,7 @@ Underneath is the Bash toolkit it grew out of — `main-vpn-manager.sh` — whic
   &nbsp;
   <img src="docs/resources/screens/en/connect.png" width="380" alt="OpenVPN login with OTP and route-fix gateway (mockup)">
 </p>
-<p align="center"><sub>Mockups with made-up data. The app interface is currently in Ukrainian; labels are translated here for illustration.</sub></p>
+<p align="center"><sub>Mockups with made-up data. The app speaks English and Ukrainian (Settings → General → Interface Language).</sub></p>
 
 ---
 
@@ -90,6 +90,7 @@ EdDSA signature. Full walkthrough (first launch, helper, backends, uninstall):
 | **Network priority** | Real per-interface reachability; put the service that actually has internet on top (Auto). |
 | **Stale Defguard sessions** | Detects an MFA session the gateway dropped while macOS still says "Connected"; renews with a new code. |
 | **Privileged helper** | A root daemon that accepts only the app's own signature and a fixed set of validated operations. |
+| **English & Ukrainian** | Follows the system language; Settings → General overrides it. Settings have a sidebar and search. |
 | **CLI parity** | `main-vpn-manager.sh` does the same from the terminal; app and CLI share `config.env` / `state.env`, or the app runs standalone. |
 
 The menu bar icon shows state by colour: grey outline — no tunnels, green + number — tunnels up,
