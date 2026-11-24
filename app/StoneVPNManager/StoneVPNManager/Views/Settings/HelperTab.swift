@@ -15,12 +15,17 @@ struct HelperTab: View {
                 if let v = model.helperVersion {
                     LabeledContent("Version") { v != HelperConst.version ? Text("\(v) (outdated — reinstall)") : Text(verbatim: "\(v)") }
                 }
+                if let p = model.helperProblem {
+                    Label(p.message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                }
                 HStack {
                     Button(model.helperStatus == .enabled ? "Reinstall" : "Install") {
                         if model.helperStatus == .enabled {
-                            Task { try? await model.helper.unregister(); model.installHelper() }
+                            Task { await model.reinstallHelper() }
                         } else { model.installHelper() }
                     }
+                    .disabled(model.helperReinstalling)
                     Button("Login Items…") { SMAppService.openSystemSettingsLoginItems() }
                     Spacer()
                     Button("Remove", role: .destructive) { model.uninstallHelper() }.disabled(model.helperStatus != .enabled)

@@ -128,6 +128,10 @@ final class AppModel {
     var dnsCandidates: [DNSCandidate] = []
     var helperStatus: SMAppService.Status = .notRegistered
     var helperVersion: Int?
+    /// Helper зареєстровано, але він не працює як слід — банер + сповіщення (AppModel+Helper).
+    var helperProblem: HelperProblem?
+    var helperReinstalling = false
+    var helperNotified: HelperProblem?
     var launchAtLogin = SMAppService.mainApp.status == .enabled
     /// Після down WireGuard: вікно, в якому застосунок стежить за DNS і повертає еталон.
     var dnsGuardActive = false
@@ -178,7 +182,8 @@ final class AppModel {
         reader.store.watch { Task { @MainActor in AppModel.shared.scheduleRefresh() } }
         NotificationHandler.shared.install()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-        Task { await checkHelper() }
+        helper.onUnreachable = { Task { @MainActor in await AppModel.shared.helperDidNotRespond() } }
+        Task { await ensureHelperCurrent() }
         Task { await refresh(forceSlow: true) }
         Task {
             while true {
@@ -1369,6 +1374,7 @@ final class AppModel {
     func checkHelper() async {
         helperStatus = helper.status
         helperVersion = await helper.version()
+        updateHelperProblem()
     }
 
     func installHelper() {
@@ -1384,7 +1390,7 @@ final class AppModel {
 
     func uninstallHelper() {
         Task {
-            try? await helper.unregister()
+            try? await helper.remove()
             await checkHelper()
         }
     }
