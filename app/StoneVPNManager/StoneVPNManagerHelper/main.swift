@@ -44,13 +44,17 @@ final class Service: NSObject, HelperXPC {
     func version(withReply reply: @escaping (Int) -> Void) { reply(HelperConst.version) }
 }
 
-/// Designated requirement застосунку, в бандлі якого лежить цей helper
-/// (…/StoneVPNManager.app/Contents/MacOS/StoneVPNManagerHelper). Для ad-hoc підпису
-/// це `cdhash H"…"` — його не підробиш, на відміну від `identifier`.
-func enclosingAppRequirement() -> String? {
+/// Бандл застосунку, в якому лежить цей helper (…/StoneVPNManager.app/Contents/MacOS/StoneVPNManagerHelper).
+func enclosingApp() -> URL? {
     guard let exe = Bundle.main.executableURL?.resolvingSymlinksInPath() else { return nil }
     let app = exe.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    guard app.pathExtension == "app" else { return nil }
+    return app.pathExtension == "app" ? app.standardizedFileURL : nil
+}
+
+/// Designated requirement застосунку-власника. Для ad-hoc підпису це `cdhash H"…"` —
+/// його не підробиш, на відміну від `identifier`.
+func enclosingAppRequirement() -> String? {
+    guard let app = enclosingApp() else { return nil }
     var sc: SecStaticCode?
     guard SecStaticCodeCreateWithPath(app as CFURL, [], &sc) == errSecSuccess, let sc else { return nil }
     var req: SecRequirement?
@@ -72,10 +76,46 @@ func clientRequirement() -> String? {
     return enclosingAppRequirement().map { "identifier \"\(HelperConst.appBundleID)\" and (\($0))" }
 }
 
+/// Бандл, з якого запущено процес-клієнт — за audit token з'єднання. Без нього nil (відмова):
+/// pid можна перевикористати, тож відкату на нього немає.
+func peerBundle(_ c: NSXPCConnection) -> URL? {
+    // `auditToken` — приватна властивість NSXPCConnection; без responds(to:) KVC кинув би виняток.
+    guard c.responds(to: NSSelectorFromString("auditToken")),
+          let v = c.value(forKey: "auditToken") as? NSValue else { return nil }
+    var token = audit_token_t()
+    v.getValue(&token, size: MemoryLayout<audit_token_t>.size)
+    let attrs = [kSecGuestAttributeAudit as String: withUnsafeBytes(of: &token) { Data($0) }]
+    var code: SecCode?
+    guard SecCodeCopyGuestWithAttributes(nil, attrs as CFDictionary, [], &code) == errSecSuccess, let code else { return nil }
+    var sc: SecStaticCode?
+    guard SecCodeCopyStaticCode(code, [], &sc) == errSecSuccess, let sc else { return nil }
+    var url: CFURL?
+    guard SecCodeCopyPath(sc, [], &url) == errSecSuccess, let url else { return nil }
+    return (url as URL).resolvingSymlinksInPath().standardizedFileURL
+}
+
+/// Жорстке посилання на головний бінарник у чужу копію бандла могло б повернути з ядра
+/// шлях /Applications для процесу, що вантажить фреймворки з копії.
+func appExecutableHasOneLink(_ app: URL) -> Bool {
+    guard let exe = Bundle(url: app)?.executableURL else { return false }
+    var st = stat()
+    return lstat(exe.path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG && st.st_nlink == 1
+}
+
 final class Delegate: NSObject, NSXPCListenerDelegate {
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection c: NSXPCConnection) -> Bool {
         // Немає вимоги (helper не в бандлі застосунку / бандл без підпису) — нікого не приймаємо.
         guard let requirement = clientRequirement() else { return false }
+        // Ad-hoc реліз підписано з disable-library-validation (інакше не вантажиться Sparkle без
+        // Team ID). cdhash покриває лише головний бінарник: копія бандла деінде (інший користувач,
+        // ~/x/StoneVPNManager.app) з підміненим Sparkle.framework пройшла б вимогу. Тому клієнт
+        // мусить бути запущений саме з бандла, в якому лежить цей helper (/Applications — його
+        // може змінити лише власник, а той і так керує helper-ом). Team-збірки — з library
+        // validation, там підмінений фреймворк не завантажиться (і Debug із DerivedData працює).
+        if ownTeamID() == nil {
+            guard let app = enclosingApp(), let peer = peerBundle(c), peer.path == app.path,
+                  appExecutableHasOneLink(app) else { return false }
+        }
         c.setCodeSigningRequirement(requirement)
         c.exportedInterface = NSXPCInterface(with: HelperXPC.self)
         c.exportedObject = Service(caller: c.effectiveUserIdentifier)
