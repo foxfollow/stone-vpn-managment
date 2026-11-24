@@ -174,7 +174,7 @@ public final class StatusReader: @unchecked Sendable {
             if o == "com.cisco.anyconnect" { return "Cisco Secure Client" }
             if o == HelperConst.dnsOverrideService { return String(localized: "StoneVPN (chosen primary DNS)", bundle: .module) }
             if Parse.isUUID(o) {
-                if let i = store.dnsInterface(uuid: o), Parse.isTunnelIface(i) { return owners[i] ?? "тунель \(i)" }
+                if let i = store.dnsInterface(uuid: o), Parse.isTunnelIface(i) { return owners[i] ?? String(localized: "tunnel \(i)", bundle: .module) }
                 return store.serviceName(o)
             }
             return o

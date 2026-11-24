@@ -1,21 +1,131 @@
 import SwiftUI
 import StoneVPNCore
 
+/// Налаштування: бічна панель зі сторінками (за групами) і пошуком по всіх пунктах.
+/// Вибраний результат відкриває сторінку, прокручує до рядка й на мить підсвічує його.
 struct SettingsView: View {
     @Bindable var model: AppModel
+    @State private var section: SettingsSection = .general
+    @State private var searchText = ""
+    @State private var highlight = SettingsHighlight()
 
     var body: some View {
-        TabView {
-            Tab("General", systemImage: "gearshape") { GeneralTab(model: model) }
-            Tab("Backends", systemImage: "square.stack.3d.up") { BackendsTab(model: model) }
-            Tab("OpenVPN", systemImage: "lock.shield") { OpenVPNTab(model: model) }
-            Tab("DNS", systemImage: "globe") { DNSTab(model: model) }
-            Tab("Network", systemImage: "wifi") { NetworkTab(model: model) }
-            Tab("Notifications", systemImage: "bell") { NotificationsTab(model: model) }
-            Tab("Helper", systemImage: "checkmark.shield") { HelperTab(model: model) }
-            Tab("Advanced", systemImage: "slider.horizontal.3") { AdvancedTab(model: model) }
+        NavigationSplitView {
+            SettingsSidebar(section: $section, results: results, onPick: pick)
+                .toolbar(removing: .sidebarToggle)
+        } detail: {
+            SettingsPage(section: section, highlight: highlight) { page }
+                .navigationTitle(section.title)
+                .toolbar(removing: .sidebarToggle)
         }
-        .frame(width: 640, height: 520)
+        .navigationSplitViewStyle(.balanced)
+        .searchable(text: $searchText, placement: .sidebar, prompt: Text("Search settings"))
+        .onSubmit(of: .search) { if let first = results?.first { pick(first) } }
+        .frame(minWidth: 780, idealWidth: 820, minHeight: 540, idealHeight: 600)
+    }
+
+    @ViewBuilder private var page: some View {
+        switch section {
+        case .general: GeneralTab(model: model)
+        case .notifications: NotificationsTab(model: model)
+        case .backends: BackendsTab(model: model)
+        case .openvpn: OpenVPNTab(model: model)
+        case .dns: DNSTab(model: model)
+        case .network: NetworkTab(model: model)
+        case .helper: HelperTab(model: model)
+        case .advanced: AdvancedTab(model: model)
+        }
+    }
+
+    /// nil, поки поле пошуку порожнє: тоді в панелі — сторінки.
+    private var results: [SettingsSearchEntry]? {
+        searchText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : SettingsSearchIndex.search(searchText)
+    }
+
+    private func pick(_ entry: SettingsSearchEntry) {
+        section = entry.section
+        let picked = SettingsHighlight(anchors: [entry.id])
+        highlight = picked
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            if highlight.token == picked.token { highlight = SettingsHighlight() }
+        }
+    }
+}
+
+private struct SettingsSidebar: View {
+    @Binding var section: SettingsSection
+    /// Не nil під час пошуку — показується замість сторінок.
+    let results: [SettingsSearchEntry]?
+    let onPick: (SettingsSearchEntry) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let results {
+                SettingsSearchResults(results: results, onPick: onPick)
+            } else {
+                List(selection: $section) {
+                    ForEach(SettingsGroup.allCases) { group in
+                        Section(group.title) {
+                            ForEach(group.sections) { s in
+                                Label(s.title, systemImage: s.systemImage).tag(s)
+                            }
+                        }
+                    }
+                }
+                .listStyle(.sidebar)
+            }
+            Divider()
+            HStack {
+                Text(verbatim: "StoneVPN Manager \(Updater.shared.version)")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 16).padding(.vertical, 10)
+        }
+        .frame(minWidth: 210)
+        .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 280)
+    }
+}
+
+private struct SettingsSearchResults: View {
+    let results: [SettingsSearchEntry]
+    let onPick: (SettingsSearchEntry) -> Void
+
+    /// Сторінки в порядку панелі, у кожній — її результати за рангом.
+    private var groups: [(section: SettingsSection, entries: [SettingsSearchEntry])] {
+        SettingsSection.allCases.compactMap { s in
+            let e = results.filter { $0.section == s }
+            return e.isEmpty ? nil : (s, e)
+        }
+    }
+
+    var body: some View {
+        if results.isEmpty {
+            ContentUnavailableView("No settings found", systemImage: "magnifyingglass")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                ForEach(groups, id: \.section) { g in
+                    Section {
+                        ForEach(g.entries) { entry in
+                            Button { onPick(entry) } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.title).lineLimit(2)
+                                    Text(entry.group).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                                .padding(.vertical, 2)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } header: {
+                        Label(g.section.title, systemImage: g.section.systemImage)
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+        }
     }
 }
 

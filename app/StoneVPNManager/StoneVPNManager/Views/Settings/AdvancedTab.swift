@@ -17,6 +17,7 @@ struct AdvancedTab: View {
                         model.prefs.standalone = !shared
                         model.reloadConfig()
                     }))
+                    .settingsAnchor("advanced.shared")
                 if !model.prefs.standalone {
                     TextField("Repository Folder", text: $path, prompt: Text("auto"))
                         .onSubmit { model.prefs.repoPath = path; model.reloadConfig() }
@@ -24,6 +25,7 @@ struct AdvancedTab: View {
                 LabeledContent(model.config.sharedWithCLI ? "Repository" : "App Folder") {
                     Text(model.config.repo?.path ?? "—").font(.system(size: 11.5, design: .monospaced)).textSelection(.enabled)
                 }
+                .settingsAnchor("advanced.repoPath")
                 Group {
                     if model.config.sharedWithCLI {
                         Text("config.env, state.env and auth.txt are the same ones main-vpn-manager.sh reads.")
@@ -43,6 +45,7 @@ struct AdvancedTab: View {
                         }
                         Button("Show Folder") { NSWorkspace.shared.activateFileViewerSelecting([dir]) }
                     }
+                    .settingsAnchor("advanced.openConfig")
                 }
             }
             Section("Reset") {
@@ -50,6 +53,7 @@ struct AdvancedTab: View {
                     if let id = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: id) }
                     model.toast = String(localized: "Settings reset — restart StoneVPN")
                 }
+                .settingsAnchor("advanced.reset")
             }
         }
         .formStyle(.grouped)

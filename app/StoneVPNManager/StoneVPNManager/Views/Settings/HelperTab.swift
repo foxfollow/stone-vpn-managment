@@ -11,6 +11,7 @@ struct HelperTab: View {
                 LabeledContent("Status") {
                     HStack(spacing: 6) { StatusDot(color: statusColor); Text(statusText) }
                 }
+                .settingsAnchor("helper.status")
                 if let v = model.helperVersion {
                     LabeledContent("Version") { v != HelperConst.version ? Text("\(v) (outdated — reinstall)") : Text(verbatim: "\(v)") }
                 }
@@ -24,6 +25,7 @@ struct HelperTab: View {
                     Spacer()
                     Button("Remove", role: .destructive) { model.uninstallHelper() }.disabled(model.helperStatus != .enabled)
                 }
+                .settingsAnchor("helper.install")
             } header: { Text("Privileged helper") } footer: {
                 Text("A root daemon for wg-quick / openvpn / DNS / routes without asking for a password every time. It accepts connections only from StoneVPN with the same signature and runs a fixed set of checked actions. Without it, every such action asks for the administrator password.")
             }

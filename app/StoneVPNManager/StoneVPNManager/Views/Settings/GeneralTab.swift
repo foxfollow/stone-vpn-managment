@@ -18,6 +18,7 @@ struct GeneralTab: View {
                     AppLanguage.setOverride(language)
                     languageChanged = true
                 }
+                .settingsAnchor("general.language")
                 if languageChanged {
                     HStack {
                         Text("The new language applies after a restart.").font(.system(size: 11)).foregroundStyle(.secondary)
@@ -26,10 +27,12 @@ struct GeneralTab: View {
                     }
                 }
             }
-            Section("Version \(Updater.shared.version)") {
+            Section("Updates") {
+                LabeledContent("Version") { Text(verbatim: Updater.shared.version).textSelection(.enabled) }
                 if Updater.shared.enabled {
                     Toggle("Automatically Check for Updates", isOn: $autoUpdates)
                         .onChange(of: autoUpdates) { Updater.shared.automaticallyChecks = autoUpdates }
+                        .settingsAnchor("general.updates")
                     Button("Check for Updates…") { Updater.shared.checkForUpdates() }
                 } else {
                     Text("A build from source — update it with git pull and make -C app install. Automatic updates come with releases (Homebrew / GitHub Releases).")
@@ -38,16 +41,21 @@ struct GeneralTab: View {
             }
             Section("Startup") {
                 Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                    .settingsAnchor("general.launchAtLogin")
                 Toggle("Show in Cmd+Tab While a Window Is Open", isOn: $model.prefs.showInAppSwitcher)
+                    .settingsAnchor("general.cmdTab")
                 Text("Profiles, Settings, Connect. macOS only lists apps with a Dock icon in Cmd+Tab, so the icon appears meanwhile and goes away when you close the last window.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Section("Menu Bar Icon") {
                 Toggle("Coloured Icon", isOn: $model.prefs.iconColored)
+                    .settingsAnchor("general.iconColored")
                 Text("Off — a monochrome template; only the shape shows the state (outline / filled / “!” / dot).")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                 Toggle("Show the Number of Tunnels", isOn: $model.prefs.iconShowCount)
+                    .settingsAnchor("general.iconCount")
                 Toggle("Show the Active Tunnel’s Name", isOn: $model.prefs.iconShowName)
+                    .settingsAnchor("general.iconName")
             }
             Section("Status Updates") {
                 Picker("In the Background", selection: $model.prefs.backgroundInterval) {
@@ -56,6 +64,7 @@ struct GeneralTab: View {
                     Text("every minute").tag(60)
                     Text("every 5 min").tag(300)
                 }
+                .settingsAnchor("general.refresh")
                 Text("Network changes (SystemConfiguration) update the status instantly; while the popover is open — every 3 s.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }

@@ -54,6 +54,16 @@
         }
       }
     },
+    "%@ (%@) → %@ direct, around %@. If %@ has a Kill Switch on, it may still pull everything into its tunnel." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@) → %3$@ напряму, повз %4$@. Якщо в %5$@ увімкнено Kill Switch, він може й далі тягнути все в тунель."
+          }
+        }
+      }
+    },
     "%@ (old version: %@)" : {
       "localizations" : {
         "uk" : {
@@ -94,6 +104,16 @@
         }
       }
     },
+    "%@ may hold the network" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ може тримати мережу"
+          }
+        }
+      }
+    },
     "%@ no internet" : {
       "localizations" : {
         "uk" : {
@@ -110,6 +130,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ повернув свій DNS. Тримати вибір без пароля може лише актуальний helper (Settings → Helper)."
+          }
+        }
+      }
+    },
+    "%@ stays via %@. Reset it in Routes → Decisions." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ лишається через %2$@. Скинути — Routes → Рішення."
+          }
+        }
+      }
+    },
+    "%@ via %@: accepted" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ через %2$@: погоджено"
+          }
+        }
+      }
+    },
+    "%@ via %@: direct via LAN" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ через %2$@: напряму через LAN"
           }
         }
       }
@@ -195,6 +245,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@: готово"
+          }
+        }
+      }
+    },
+    "%@: server %@ goes direct via %@ again, around %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: сервер %2$@ знову напряму через %3$@, повз %4$@"
+          }
+        }
+      }
+    },
+    "%@: server %@ goes via %@ (%@) — a tunnel inside a tunnel. It works, but slower, and reconnecting %@ drops the session." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: сервер %2$@ іде через %3$@ (%4$@) — тунель у тунелі. Працює, але повільніше, і перепідключення %5$@ рве сесію."
           }
         }
       }
@@ -314,9 +384,6 @@
         }
       }
     },
-    "%lld. %@" : {
-      "shouldTranslate" : false
-    },
     "%lld/%lld" : {
       "shouldTranslate" : false
     },
@@ -399,6 +466,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Власний хост StoneVPN (не з профілю Cisco)."
+          }
+        }
+      }
+    },
+    "A VPN Server Goes Through Another Tunnel" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер VPN іде через чужий тунель"
           }
         }
       }
@@ -489,6 +566,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Root-демон для wg-quick / openvpn / DNS / маршрутів без запиту пароля щоразу. Приймає з'єднання лише від StoneVPN з тим самим підписом і виконує фіксований набір перевірених дій. Без нього кожна дія питає пароль адміністратора."
+          }
+        }
+      }
+    },
+    "Accept" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Погодити"
+          }
+        }
+      }
+    },
+    "Accept — keep it this way" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Погодити — лишити так"
           }
         }
       }
@@ -633,12 +730,42 @@
         }
       }
     },
+    "Allow" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дозволити"
+          }
+        }
+      }
+    },
+    "App" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Застосунок"
+          }
+        }
+      }
+    },
     "App Folder" : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Тека застосунку"
+          }
+        }
+      }
+    },
+    "Apply" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Застосувати"
           }
         }
       }
@@ -749,6 +876,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Бекенди"
+          }
+        }
+      }
+    },
+    "Baseline" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Еталон"
           }
         }
       }
@@ -943,6 +1080,16 @@
         }
       }
     },
+    "Connection timeout" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Таймаут підключення"
+          }
+        }
+      }
+    },
     "Could not remove a dead route: %@" : {
       "localizations" : {
         "uk" : {
@@ -959,6 +1106,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Поточний LAN-шлюз"
+          }
+        }
+      }
+    },
+    "Custom" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свій"
+          }
+        }
+      }
+    },
+    "Custom…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свій…"
           }
         }
       }
@@ -1133,6 +1300,46 @@
         }
       }
     },
+    "Decision reset" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рішення скинуто"
+          }
+        }
+      }
+    },
+    "Decision reset, direct route to %@ removed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рішення скинуто, маршрут напряму до %@ прибрано"
+          }
+        }
+      }
+    },
+    "Decisions" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рішення"
+          }
+        }
+      }
+    },
+    "Decline — go direct via LAN" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відхилити — напряму через LAN"
+          }
+        }
+      }
+    },
     "Default" : {
       "localizations" : {
         "uk" : {
@@ -1229,6 +1436,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Видалити…"
+          }
+        }
+      }
+    },
+    "Direct route to %@: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Маршрут напряму до %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "Direct · %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Напряму · %@"
           }
         }
       }
@@ -1563,16 +1790,6 @@
         }
       }
     },
-    "Helper" : {
-      "localizations" : {
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Helper"
-          }
-        }
-      }
-    },
     "Hidden:" : {
       "localizations" : {
         "uk" : {
@@ -1589,6 +1806,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Приховати %@"
+          }
+        }
+      }
+    },
+    "Hide until the app restarts" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сховати до перезапуску застосунку"
           }
         }
       }
@@ -1699,6 +1926,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Мова"
+          }
+        }
+      }
+    },
+    "Language, updates, startup and the menu bar icon." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мова, оновлення, запуск та іконка в menubar."
           }
         }
       }
@@ -1863,6 +2100,16 @@
         }
       }
     },
+    "Network service order and its automation." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порядок мережевих сервісів і автоматика."
+          }
+        }
+      }
+    },
     "Never" : {
       "localizations" : {
         "uk" : {
@@ -1899,6 +2146,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Новий профіль OpenVPN"
+          }
+        }
+      }
+    },
+    "No LAN gateway for a direct route" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає LAN-шлюзу для маршруту напряму"
           }
         }
       }
@@ -2013,6 +2270,26 @@
         }
       }
     },
+    "No settings found" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нічого не знайдено"
+          }
+        }
+      }
+    },
+    "Not an IP: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не IP: %@"
+          }
+        }
+      }
+    },
     "Not stored (the username is remembered for the profile). The temporary auth file is deleted after connecting." : {
       "localizations" : {
         "uk" : {
@@ -2099,16 +2376,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Відкрити в Terminal замість цього"
-          }
-        }
-      }
-    },
-    "OpenVPN" : {
-      "localizations" : {
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenVPN"
           }
         }
       }
@@ -2383,6 +2650,16 @@
         }
       }
     },
+    "Profiles, login and route-fix for OpenVPN." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Профілі, логін і route-fix для OpenVPN."
+          }
+        }
+      }
+    },
     "Profiles…" : {
       "localizations" : {
         "uk" : {
@@ -2613,6 +2890,16 @@
         }
       }
     },
+    "Reset — ask again" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скинути — знову питати"
+          }
+        }
+      }
+    },
     "Resolver" : {
       "localizations" : {
         "uk" : {
@@ -2693,6 +2980,36 @@
         }
       }
     },
+    "Restoring DNS after a VPN, the doctor and split DNS." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повернення DNS після VPN, doctor і split DNS."
+          }
+        }
+      }
+    },
+    "Route" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Маршрут"
+          }
+        }
+      }
+    },
+    "Route in question: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Маршрут під питанням: %@"
+          }
+        }
+      }
+    },
     "Route-fix" : {
       "localizations" : {
         "uk" : {
@@ -2719,6 +3036,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Route-fix шлюз для %@"
+          }
+        }
+      }
+    },
+    "Route-fix per profile" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route-fix для кожного профілю"
           }
         }
       }
@@ -2783,6 +3110,16 @@
         }
       }
     },
+    "Search settings" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пошук у налаштуваннях"
+          }
+        }
+      }
+    },
     "Second Factor (Duo / OTP)" : {
       "localizations" : {
         "uk" : {
@@ -2799,6 +3136,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Оберіть профіль"
+          }
+        }
+      }
+    },
+    "Server %@ goes via %@ (%@) — a tunnel inside a tunnel. Accept it, or send it direct via %@?" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер %1$@ іде через %2$@ (%3$@) — тунель у тунелі. Погодити чи пустити напряму через %4$@?"
+          }
+        }
+      }
+    },
+    "Server %@ goes via %@ (%@) — a tunnel inside a tunnel. There is no LAN gateway to go around it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер %1$@ іде через %2$@ (%3$@) — тунель у тунелі. LAN-шлюзу для обходу немає."
           }
         }
       }
@@ -2859,6 +3216,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Спільно з CLI-репозиторієм (main-vpn-manager.sh)"
+          }
+        }
+      }
+    },
+    "Sharing settings with the CLI repository and resetting the app." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Спільні з CLI-репозиторієм налаштування і скидання застосунку."
           }
         }
       }
@@ -3020,6 +3387,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Симлінки розгортаються: NetworkExtension шукає бандл за шляхом exec."
+          }
+        }
+      }
+    },
+    "System" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Система"
           }
         }
       }
@@ -3190,6 +3567,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Резолвер досі не відповідає. Конфігурацію виправлено, тож проблема нижче — маршрути/мережа."
+          }
+        }
+      }
+    },
+    "The root daemon that runs privileged actions without a password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Root-демон, що виконує привілейовані дії без пароля."
           }
         }
       }
@@ -3404,6 +3791,16 @@
         }
       }
     },
+    "Updates" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновлення"
+          }
+        }
+      }
+    },
     "Uptime" : {
       "localizations" : {
         "uk" : {
@@ -3464,22 +3861,42 @@
         }
       }
     },
-    "Version %@" : {
-      "localizations" : {
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Версія %@"
-          }
-        }
-      }
-    },
     "WG folder" : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "WG тека"
+          }
+        }
+      }
+    },
+    "Warn again" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Знову попереджати"
+          }
+        }
+      }
+    },
+    "Which VPNs StoneVPN manages and where their tools are." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Якими VPN керує StoneVPN і де лежать їхні інструменти."
+          }
+        }
+      }
+    },
+    "Which events show a notification." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Про які події показувати сповіщення."
           }
         }
       }
@@ -3494,12 +3911,12 @@
         }
       }
     },
-    "Whose DNS to ask first for all domains. Other VPNs’ catch-all entries are moved aside meanwhile and put back on reset. Resets by itself when the chosen tunnel goes down." : {
+    "Whose DNS to ask first for all domains. Other VPNs’ catch-all entries are moved aside meanwhile and put back on reset. A tunnel’s DNS resets by itself when the tunnel goes down." : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чий DNS питати першим для всіх доменів. Catch-all записи інших VPN на цей час відсуваються і повертаються при скиданні. Скидається сам, коли обраний тунель падає."
+            "value" : "Чий DNS питати першим для всіх доменів. Catch-all записи інших VPN на цей час відсуваються і повертаються при скиданні. DNS тунелю скидається сам, коли тунель падає."
           }
         }
       }
@@ -4234,16 +4651,6 @@
         }
       }
     },
-    "system (no tunnel DNS)" : {
-      "localizations" : {
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "система (немає DNS тунелів)"
-          }
-        }
-      }
-    },
     "the gateway doesn't answer the handshake" : {
       "localizations" : {
         "uk" : {
@@ -4313,6 +4720,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "· сторонній"
+          }
+        }
+      }
+    },
+    "· foreign, allowed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "· сторонній, дозволено"
           }
         }
       }

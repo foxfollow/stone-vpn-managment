@@ -294,15 +294,16 @@ final class AppModel {
 
     var headline: String {
         let up = snap.upCount, conn = snap.connectingCount + busy.count
-        if tone == .foreign { return "Мережу тримає сторонній VPN" }
-        if dnsGuardActive, busy.isEmpty { return "Повертаю DNS після VPN…" }
-        if let n = dgStale.sorted().first, busy.isEmpty { return "Defguard «\(n)»: сесія протухла" }
-        if dnsHealthy == false, busy.isEmpty { return "Проблема з DNS" }
-        if primaryOnline == false { return "Немає інтернету" }
-        if let i = routeIssues.first, busy.isEmpty { return "Маршрут під питанням: \(i.label)" }
-        if up == 0 && conn == 0 { return "Немає активних тунелів" }
-        let tunnels = up == 1 ? "1 тунель активний" : "\(up) тунелі активні"
-        return conn > 0 ? (up > 0 ? "\(tunnels) · \(conn) підключається" : "Підключення…") : tunnels
+        if tone == .foreign { return String(localized: "A foreign VPN owns the network") }
+        if dnsGuardActive, busy.isEmpty { return String(localized: "Restoring DNS after VPN…") }
+        if let n = dgStale.sorted().first, busy.isEmpty { return String(localized: "Defguard “\(n)”: session expired") }
+        if dnsHealthy == false, busy.isEmpty { return String(localized: "DNS problem") }
+        if primaryOnline == false { return String(localized: "No internet") }
+        if let i = routeIssues.first, busy.isEmpty { return String(localized: "Route in question: \(i.label)") }
+        if up == 0 && conn == 0 { return String(localized: "No active tunnels") }
+        let tunnels = String(localized: "\(up) tunnels up", locale: .app)
+        if conn == 0 { return tunnels }
+        return up > 0 ? String(localized: "\(tunnels) · \(conn) connecting", locale: .app) : String(localized: "Connecting…")
     }
 
     /// Сторонній VPN, що зараз первинний (тримає default route).
@@ -1182,7 +1183,7 @@ final class AppModel {
         }
         out.append(DNSCandidate(id: "public:cloudflare", label: "Cloudflare", servers: ["1.1.1.1", "1.0.0.1"], kind: .fixed))
         if !prefs.customDNS.isEmpty {
-            out.append(DNSCandidate(id: "custom", label: "Свій", servers: prefs.customDNS, kind: .fixed))
+            out.append(DNSCandidate(id: "custom", label: String(localized: "Custom"), servers: prefs.customDNS, kind: .fixed))
         }
         dnsCandidates = out
     }
@@ -1381,7 +1382,7 @@ final class AppModel {
         let oldF = Set(old.foreign.map(\.id)), newF = Set(new.foreign.map(\.id))
         if prefs.notifyForeign, new.network.primaryIsTunnel, !newF.subtracting(oldF).isEmpty,
            let f = new.foreign.first(where: { $0.iface == new.network.primaryIface }), !isQuietForeign(f) {
-            notify("Сторонній VPN тримає мережу", "\(f.name) (\(f.iface ?? "")) став первинним")
+            notify(String(localized: "A foreign VPN holds the network"), String(localized: "\(f.name) (\(f.iface ?? "")) became primary"))
         }
     }
 

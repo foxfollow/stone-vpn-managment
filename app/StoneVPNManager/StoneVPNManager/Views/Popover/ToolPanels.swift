@@ -115,7 +115,7 @@ struct DNSPanel: View {
                         }
                     }
                 }
-                Button("Свій…") {
+                Button("Custom…") {
                     customValue = model.prefs.customDNS.joined(separator: " ")
                     customOpen = true
                 }
@@ -124,7 +124,7 @@ struct DNSPanel: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .help("Чий DNS питати першим для всіх доменів. Catch-all записи інших VPN на цей час відсуваються і повертаються при скиданні. DNS тунелю скидається сам, коли тунель падає.")
+            .help("Whose DNS to ask first for all domains. Other VPNs’ catch-all entries are moved aside meanwhile and put back on reset. A tunnel’s DNS resets by itself when the tunnel goes down.")
         }
     }
 
@@ -134,9 +134,9 @@ struct DNSPanel: View {
         let bad = servers.filter { Parse.ipv4($0) == nil && !$0.contains(":") }
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                TextField("9.9.9.9 149.112.112.112", text: $customValue).textFieldStyle(.roundedBorder)
-                Button("Скасувати") { customOpen = false }
-                Button("Застосувати") {
+                TextField(String("9.9.9.9 149.112.112.112"), text: $customValue).textFieldStyle(.roundedBorder)
+                Button("Cancel") { customOpen = false }
+                Button("Apply") {
                     model.prefs.customDNS = servers
                     customOpen = false
                     Task {
@@ -148,7 +148,7 @@ struct DNSPanel: View {
                 .disabled(servers.isEmpty || !bad.isEmpty)
             }
             .controlSize(.small)
-            if !bad.isEmpty { Text("Не IP: \(bad.joined(separator: ", "))").font(.system(size: 10.5)).foregroundStyle(.orange) }
+            if !bad.isEmpty { Text("Not an IP: \(bad.joined(separator: ", "))").font(.system(size: 10.5)).foregroundStyle(.orange) }
         }
     }
 
@@ -158,7 +158,7 @@ struct DNSPanel: View {
 
     private var primaryLabel: String {
         switch model.primaryDNSChoice {
-        case nil: return "система"
+        case nil: return String(localized: "system")
         case "custom"?: return (model.snap.network.dnsOverride ?? []).joined(separator: ", ")
         case let id?: return model.dnsCandidates.first { $0.id == id }?.label ?? id
         }
@@ -209,12 +209,12 @@ struct DNSPanel: View {
         let warn = editDomain.isEmpty ? [] : model.splitWarnings(domain: editDomain, servers: servers)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                TextField("corp.internal", text: $editDomain).textFieldStyle(.roundedBorder)
-                TextField("10.8.0.1", text: $editServers).textFieldStyle(.roundedBorder).frame(width: 120)
+                TextField(String("corp.internal"), text: $editDomain).textFieldStyle(.roundedBorder)
+                TextField(String("10.8.0.1"), text: $editServers).textFieldStyle(.roundedBorder).frame(width: 120)
                 if model.dnsCandidates.contains(where: { $0.kind != .fixed }) {
                     Menu {
                         ForEach(model.dnsCandidates.filter { $0.kind != .fixed }) { c in
-                            Button("\(c.label) — \(c.servers.joined(separator: ", "))") { editServers = c.servers.first ?? "" }
+                            Button(String("\(c.label) — \(c.servers.joined(separator: ", "))")) { editServers = c.servers.first ?? "" }
                         }
                     } label: { Image(systemName: "network") }
                     .menuStyle(.borderlessButton).fixedSize()
@@ -317,24 +317,25 @@ struct RoutesPanel: View {
             }
             if !model.prefs.routeDecisions.isEmpty || !model.prefs.allowedForeign.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Рішення").font(.system(size: 11.5, weight: .semibold))
+                    Text("Decisions").font(.system(size: 11.5, weight: .semibold))
                     ForEach(model.prefs.routeDecisions.sorted(by: { $0.key < $1.key }), id: \.key) { d in
                         let parts = d.key.split(separator: "|", maxSplits: 1).map(String.init)
                         HStack(spacing: 4) {
-                            Text("\(parts.first?.replacingOccurrences(of: ":", with: " · ") ?? d.key) через \(parts.last ?? "?"): " +
-                                 (d.value == "keep" ? "погоджено" : "напряму через LAN"))
+                            let who = parts.first?.replacingOccurrences(of: ":", with: " · ") ?? d.key
+                            let via = parts.last ?? "?"
+                            Text(d.value == "keep" ? "\(who) via \(via): accepted" : "\(who) via \(via): direct via LAN")
                                 .foregroundStyle(.secondary)
                             Spacer(minLength: 4)
                             Button { model.resetRouteDecision(d.key) } label: { Image(systemName: "arrow.uturn.backward.circle") }
-                                .buttonStyle(.borderless).help("Скинути — знову питати")
+                                .buttonStyle(.borderless).help("Reset — ask again")
                         }
                     }
                     ForEach(model.prefs.allowedForeign, id: \.self) { name in
                         HStack(spacing: 4) {
-                            Text("\(name) може тримати мережу").foregroundStyle(.secondary)
+                            Text("\(name) may hold the network").foregroundStyle(.secondary)
                             Spacer(minLength: 4)
                             Button { model.allowForeign(name, false) } label: { Image(systemName: "arrow.uturn.backward.circle") }
-                                .buttonStyle(.borderless).help("Знову попереджати")
+                                .buttonStyle(.borderless).help("Warn again")
                         }
                     }
                 }

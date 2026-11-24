@@ -6,7 +6,7 @@ import AppKit
 /// зміни застосунок перезапускається.
 enum AppLanguage {
     /// Мови, для яких є переклад (код локалізації → власна назва мови).
-    static let available: [(code: String, name: String)] = [("en", "English"), ("uk", "Українська")]
+    static let available: [(code: String, name: String)] = [("en", "English"), ("uk", "Українська")]  // l10n-ignore: native names
 
     /// "" = як у системі.
     static var override: String {

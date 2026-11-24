@@ -200,13 +200,13 @@ struct ForeignRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text(session.name).fontWeight(.semibold)
-                    Text(allowed ? "· сторонній, дозволено" : "· сторонній").foregroundStyle(.secondary)
+                    Text(allowed ? "· foreign, allowed" : "· foreign").foregroundStyle(.secondary)
                 }
                 Text([session.iface, session.address, primary ? "default route + DNS" : nil].compactMap { $0 }.joined(separator: " · "))
                     .font(.system(size: 11)).foregroundStyle(allowed ? Color.secondary : .purple)
             }
             Spacer()
-            Button("Розірвати…") { Task { await model.offerTakeDown(session) } }
+            Button("Take Down…") { Task { await model.offerTakeDown(session) } }
                 .buttonStyle(.bordered).tint(allowed ? nil : .purple).controlSize(.small)
         }
         .padding(.horizontal, 10)

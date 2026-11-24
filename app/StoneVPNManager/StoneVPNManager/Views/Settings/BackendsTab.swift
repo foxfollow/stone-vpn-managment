@@ -15,6 +15,7 @@ struct BackendsTab: View {
                     })) {
                         HStack { BackendBadge(backend: b, size: 20); Text(b.title) }
                     }
+                    .settingsAnchor(b == Backend.allCases.first ? "backends.enabled" : "backends.\(b.rawValue)")
                 }
                 if !model.config.unknownDisabled.isEmpty {
                     Text("Unknown names in DISABLED_BACKENDS: \(model.config.unknownDisabled.joined(separator: ", "))").foregroundStyle(.orange)
@@ -24,6 +25,7 @@ struct BackendsTab: View {
             }
             Section("Found Tools") {
                 tool("wg-quick", Shell.which(["/opt/homebrew/bin/wg-quick", "/usr/local/bin/wg-quick"]))
+                    .settingsAnchor("backends.tools")
                 tool("openvpn", Shell.which(["/opt/homebrew/sbin/openvpn", "/usr/local/sbin/openvpn"]))
                 tool("defguard-client", Paths.defguardCLI(model.config.defguardCLI))
                 tool("Cisco vpn", Shell.which(Paths.ciscoCLI))
@@ -32,6 +34,7 @@ struct BackendsTab: View {
             Section("Paths") {
                 ConfigField(model: model, label: "DEFGUARD_CLI", key: "DEFGUARD_CLI", value: model.config.defguardCLI,
                             prompt: Paths.defguardBundleCLI, hint: "Symlinks are resolved: NetworkExtension finds the bundle by the exec path.")
+                    .settingsAnchor("backends.defguardCLI")
             }
         }
         .formStyle(.grouped)

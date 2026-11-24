@@ -137,8 +137,11 @@ struct PopoverView: View {
         let n = model.snap.network
         if model.tone == .foreign, let f = model.primaryForeign {
             Banner(color: .purple,
-                   text: "\(f.name) (\(f.iface ?? "")) тримає default route і DNS" + (model.dnsHealthy == false ? ", але не пропускає трафік. Правки DNS не допоможуть." : "."),
-                   action: "Розірвати…", secondary: model.dnsHealthy == false ? nil : ("Дозволити", { model.allowForeign(f.name) }),
+                   text: model.dnsHealthy == false
+                       ? String(localized: "\(f.name) (\(f.iface ?? "")) holds the default route and DNS, but passes no traffic. DNS edits won't help.")
+                       : String(localized: "\(f.name) (\(f.iface ?? "")) holds the default route and DNS."),
+                   action: String(localized: "Take Down…"),
+                   secondary: model.dnsHealthy == false ? nil : (String(localized: "Allow"), { model.allowForeign(f.name) }),
                    close: { model.foreignDismissed.insert(f.id) }) {
                 model.openTool = "dns"; Task { await model.runDNSFix() }
             }
@@ -162,9 +165,9 @@ struct PopoverView: View {
         }
         ForEach(model.routeIssues) { i in
             Banner(color: .orange,
-                   text: "\(i.label): сервер \(i.host) іде через \(i.viaOwner) (\(i.via)) — тунель у тунелі. Працює, але повільніше, і перепідключення \(i.viaOwner) рве сесію.",
-                   action: i.gateway.map { "Напряму · \($0)" } ?? "Погодити",
-                   secondary: i.gateway == nil ? nil : ("Погодити", { model.keepRoute(i) })) {
+                   text: String(localized: "\(i.label): server \(i.host) goes via \(i.viaOwner) (\(i.via)) — a tunnel inside a tunnel. It works, but slower, and reconnecting \(i.viaOwner) drops the session."),
+                   action: i.gateway.map { String(localized: "Direct · \($0)") } ?? String(localized: "Accept"),
+                   secondary: i.gateway == nil ? nil : (String(localized: "Accept"), { model.keepRoute(i) })) {
                 if i.gateway != nil { model.directRoute(i) } else { model.keepRoute(i) }
             }
         }
@@ -262,7 +265,7 @@ struct Banner: View {
             if let close {
                 Button(action: close) { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
                     .buttonStyle(.borderless).foregroundStyle(.secondary).padding(6)
-                    .help("Сховати до перезапуску застосунку")
+                    .help("Hide until the app restarts")
             }
         }
     }

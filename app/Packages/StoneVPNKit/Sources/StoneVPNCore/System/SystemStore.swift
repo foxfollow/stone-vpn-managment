@@ -72,7 +72,7 @@ public final class SystemStore: @unchecked Sendable {
     /// Setup-запису, тож назви немає — тоді `appHint` (єдиний запущений відомий VPN-застосунок).
     public func foreignLabel(_ svc: String, appHint: String? = nil) -> String {
         if svc == "com.cisco.anyconnect" { return "Cisco Secure Client" }
-        return serviceName(svc) ?? appHint ?? "VPN-сервіс \(svc)"
+        return serviceName(svc) ?? appHint ?? String(localized: "VPN service \(svc)", bundle: .module)
     }
 
     public func foreignOwner(of iface: String) -> String? { foreignService(of: iface).map { foreignLabel($0) } }
