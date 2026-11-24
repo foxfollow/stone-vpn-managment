@@ -177,9 +177,14 @@ which SMAppService needs for the helper; test = `swift test` in the package).
 - **Route issues (`AppModel+Routes`)**: a server of one of *our* up sessions whose best non-scoped
   route is another tunnel's full default (`Parse.fullTunnelCapture`, plen ≤ 1; specific routes =
   deliberate VPN-in-VPN, ignored) → `routeIssues`, yellow "?" icon, banner + notification with
-  actions (category `route`, `NotificationHandler`). "Погодити" = `routeDecisions[profileKey|owner]
+  actions (category `route`, `NotificationHandler`). "Погодити" = `routeDecisions[profileKey|owner|net:<router MAC>]
   = keep`; "напряму" = `direct`: `-host <server> <LAN gw>` now and automatically later (helper only),
-  tracked in `directRoutes` and removed once its gateway is not on-link. Allowed foreign VPNs
+  tracked in `directRoutes` and removed once its gateway is not on-link. Decisions are per local
+  network: the id is the router MAC from `ARPResolvedHardwareAddress` in the Wi-Fi service's State IPv4
+  (`SystemStore.lanNetwork`) — *not* netstat's ARP rows (hidden from child processes without Local
+  Network permission) and not the SSID (redacted without Location). Old keys without `net:` migrate to
+  the current network. Check host routes in the netstat table, not `route -n get <ip>` (it returns a
+  cloned IFSCOPE entry without STATIC). Allowed foreign VPNs
   (`allowedForeign`) don't turn the icon purple. DNS picker also offers the foreign VPN's DNS,
   Cloudflare and a custom list (`customDNS`), all via the same `dnsOverride`.
 - **Split rules are editable** (`splitReplace`: write new + remove old in one batch) and checked:

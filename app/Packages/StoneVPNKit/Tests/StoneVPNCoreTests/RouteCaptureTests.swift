@@ -65,4 +65,13 @@ default            link#29            UCSIg               utun4
         #expect(Actions.bareHost("vpn.example.com") == "vpn.example.com")
         #expect(Actions.bareHost("[2001:db8::1]:443") == "2001:db8::1")
     }
+
+    @Test func decisionKeys() {
+        let k = RouteIssue.decisionKey("defguard:core", "ClearVPN", "0:0:5e:0:53:1")
+        #expect(k == "defguard:core|ClearVPN|net:0:0:5e:0:53:1")
+        let p = RouteIssue.parseDecisionKey(k)
+        #expect(p.profile == "defguard:core" && p.owner == "ClearVPN" && p.network == "0:0:5e:0:53:1")
+        let g = RouteIssue.parseDecisionKey("defguard:core|ClearVPN")
+        #expect(g.owner == "ClearVPN" && g.network == nil)
+    }
 }

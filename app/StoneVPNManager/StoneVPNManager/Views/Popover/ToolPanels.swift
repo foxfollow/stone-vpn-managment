@@ -319,11 +319,12 @@ struct RoutesPanel: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Decisions").font(.system(size: 11.5, weight: .semibold))
                     ForEach(model.prefs.routeDecisions.sorted(by: { $0.key < $1.key }), id: \.key) { d in
-                        let parts = d.key.split(separator: "|", maxSplits: 1).map(String.init)
+                        let p = RouteIssue.parseDecisionKey(d.key)
                         HStack(spacing: 4) {
-                            let who = parts.first?.replacingOccurrences(of: ":", with: " · ") ?? d.key
-                            let via = parts.last ?? "?"
-                            Text(d.value == "keep" ? "\(who) via \(via): accepted" : "\(who) via \(via): direct via LAN")
+                            let scope = p.network.map { String(localized: "network “\(model.prefs.networkNames[$0] ?? $0)”") }
+                                ?? String(localized: "all networks")
+                            let verdict = d.value == "keep" ? String(localized: "accepted") : String(localized: "direct via LAN")
+                            Text("\(p.profile.replacingOccurrences(of: ":", with: " · ")) via \(p.owner) · \(scope): \(verdict)")
                                 .foregroundStyle(.secondary)
                             Spacer(minLength: 4)
                             Button { model.resetRouteDecision(d.key) } label: { Image(systemName: "arrow.uturn.backward.circle") }

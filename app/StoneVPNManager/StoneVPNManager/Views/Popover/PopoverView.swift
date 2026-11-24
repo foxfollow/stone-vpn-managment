@@ -165,7 +165,8 @@ struct PopoverView: View {
         }
         ForEach(model.routeIssues) { i in
             Banner(color: .orange,
-                   text: String(localized: "\(i.label): server \(i.host) goes via \(i.viaOwner) (\(i.via)) — a tunnel inside a tunnel. It works, but slower, and reconnecting \(i.viaOwner) drops the session."),
+                   text: String(localized: "\(i.label): server \(i.host) goes via \(i.viaOwner) (\(i.via)) — a tunnel inside a tunnel. It works, but slower, and reconnecting \(i.viaOwner) drops the session.")
+                         + (i.networkLabel.map { " " + String(localized: "The decision applies to the network “\($0)”.") } ?? ""),
                    action: i.gateway.map { String(localized: "Direct · \($0)") } ?? String(localized: "Accept"),
                    secondary: i.gateway == nil ? nil : (String(localized: "Accept"), { model.keepRoute(i) })) {
                 if i.gateway != nil { model.directRoute(i) } else { model.keepRoute(i) }

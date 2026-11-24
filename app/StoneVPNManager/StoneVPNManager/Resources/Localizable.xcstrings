@@ -134,6 +134,16 @@
         }
       }
     },
+    "%@ stays via %@ on the network “%@”. Reset it in Routes → Decisions." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ лишається через %2$@ у мережі «%3$@». Скинути — Routes → Рішення."
+          }
+        }
+      }
+    },
     "%@ stays via %@. Reset it in Routes → Decisions." : {
       "localizations" : {
         "uk" : {
@@ -144,22 +154,12 @@
         }
       }
     },
-    "%@ via %@: accepted" : {
+    "%@ via %@ · %@: %@" : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ через %2$@: погоджено"
-          }
-        }
-      }
-    },
-    "%@ via %@: direct via LAN" : {
-      "localizations" : {
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ через %2$@: напряму через LAN"
+            "value" : "%1$@ через %2$@ · %3$@: %4$@"
           }
         }
       }
@@ -576,6 +576,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Погодити"
+          }
+        }
+      }
+    },
+    "Accept it, or send it direct via %@?" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Погодити чи пустити напряму через %@?"
           }
         }
       }
@@ -3140,22 +3150,22 @@
         }
       }
     },
-    "Server %@ goes via %@ (%@) — a tunnel inside a tunnel. Accept it, or send it direct via %@?" : {
+    "Server %@ goes via %@ (%@) on the network “%@” — a tunnel inside a tunnel." : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сервер %1$@ іде через %2$@ (%3$@) — тунель у тунелі. Погодити чи пустити напряму через %4$@?"
+            "value" : "Сервер %1$@ іде через %2$@ (%3$@) у мережі «%4$@» — тунель у тунелі."
           }
         }
       }
     },
-    "Server %@ goes via %@ (%@) — a tunnel inside a tunnel. There is no LAN gateway to go around it." : {
+    "Server %@ goes via %@ (%@) — a tunnel inside a tunnel." : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сервер %1$@ іде через %2$@ (%3$@) — тунель у тунелі. LAN-шлюзу для обходу немає."
+            "value" : "Сервер %1$@ іде через %2$@ (%3$@) — тунель у тунелі."
           }
         }
       }
@@ -3461,6 +3471,16 @@
         }
       }
     },
+    "The decision applies to the network “%@”." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рішення — для мережі «%@»."
+          }
+        }
+      }
+    },
     "The default gateway for host routes to the VPN server." : {
       "localizations" : {
         "uk" : {
@@ -3627,6 +3647,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Тунель із DNS %@ більше не активний — DNS знову обирає система."
+          }
+        }
+      }
+    },
+    "There is no LAN gateway to go around it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LAN-шлюзу для обходу немає."
           }
         }
       }
@@ -3961,12 +3991,32 @@
         }
       }
     },
+    "accepted" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "погоджено"
+          }
+        }
+      }
+    },
     "action" : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "дія"
+          }
+        }
+      }
+    },
+    "all networks" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "усі мережі"
           }
         }
       }
@@ -4161,6 +4211,16 @@
         }
       }
     },
+    "direct via LAN" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "напряму через LAN"
+          }
+        }
+      }
+    },
     "disabled" : {
       "localizations" : {
         "uk" : {
@@ -4287,6 +4347,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "останній"
+          }
+        }
+      }
+    },
+    "network “%@”" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "мережа «%@»"
           }
         }
       }

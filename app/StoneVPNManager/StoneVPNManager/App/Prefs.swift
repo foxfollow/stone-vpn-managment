@@ -56,6 +56,8 @@ final class Prefs {
     /// Сторонні VPN (за назвою), які дозволено тримати мережу поряд з нашими: без фіолетового
     /// «тримає мережу» і без пропозиції розірвати.
     var allowedForeign: [String] { didSet { d.set(allowedForeign, forKey: "allowedForeign") } }
+    /// Підписи локальних мереж для рішень щодо маршрутів: MAC роутера → «Wi-Fi Home» / «en0 · 192.168.1.1».
+    var networkNames: [String: String] { didSet { d.set(networkNames, forKey: "networkNames") } }
     // Cisco: власні хости (з портом) — профіль head-end перезаписує, тож тримаємо свої
     var ciscoHosts: [String] { didSet { d.set(ciscoHosts, forKey: "ciscoHosts") } }
     /// Логін і група — окремо для кожного хоста (ключ — ciscoKey(host)), не один на всіх.
@@ -106,6 +108,7 @@ final class Prefs {
         routeDecisions = d.dictionary(forKey: "routeDecisions") as? [String: String] ?? [:]
         directRoutes = d.dictionary(forKey: "directRoutes") as? [String: String] ?? [:]
         allowedForeign = d.stringArray(forKey: "allowedForeign") ?? []
+        networkNames = d.dictionary(forKey: "networkNames") as? [String: String] ?? [:]
         ciscoHosts = d.stringArray(forKey: "ciscoHosts") ?? []
         ciscoUsers = d.dictionary(forKey: "ciscoUsers") as? [String: String] ?? [:]
         ciscoGroups = d.dictionary(forKey: "ciscoGroups") as? [String: String] ?? [:]
