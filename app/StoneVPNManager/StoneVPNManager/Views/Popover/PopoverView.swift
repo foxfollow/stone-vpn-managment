@@ -163,6 +163,15 @@ struct PopoverView: View {
             Banner(color: .red, text: String(localized: "\(svc) has no internet — macOS picks by service order, not by reachability."),
                    action: String(localized: "Auto")) { model.runAction(String(localized: "Network")) { try await model.actions.netAuto(primaryIface: n.primaryIface) } }
         }
+        if let p = model.helperProblem {
+            Banner(color: .orange, text: p.message,
+                   action: model.helperReinstalling ? String(localized: "Reinstalling…")
+                       : p == .needsApproval ? String(localized: "Login Items…")
+                       : p == .notInstalled ? String(localized: "Install Helper") : String(localized: "Reinstall Helper"),
+                   close: p == .notInstalled ? { model.dismissHelperOffer() } : nil) {
+                model.fixHelper()
+            }
+        }
         ForEach(model.routeIssues) { i in
             Banner(color: .orange,
                    text: String(localized: "\(i.label): server \(i.host) goes via \(i.viaOwner) (\(i.via)) — a tunnel inside a tunnel. It works, but slower, and reconnecting \(i.viaOwner) drops the session.")

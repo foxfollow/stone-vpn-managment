@@ -90,7 +90,11 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   validates every argument (WG paths inside WG dirs, IPs via inet_pton, service names against
   networksetup, kill only tunnel-proc PIDs) and accepts XPC only from the same Team ID — or, in
   ad-hoc builds (CI releases have no Team ID), only from the designated requirement (= cdhash) of the
-  app bundle it lives in, re-read per connection (`clientRequirement()` in helper `main.swift`). Never
+  app bundle it lives in, re-read per connection (`clientRequirement()` in helper `main.swift`) **and**
+  only from a process running from that very bundle (`peerBundle()`: audit token → `SecCodeCopyPath`).
+  The path check matters because ad-hoc releases carry `disable-library-validation`: the cdhash covers
+  only the main executable, so a copy of the bundle elsewhere (another user's home) with a patched
+  Sparkle.framework would pass the requirement. Never
   fall back to a bare `identifier "…"`: anyone can `codesign -s - -i com.foxfollow.stonevpnmanager`, and
   `ovpnStart` runs openvpn with `--script-security 2` as root. Without
   the daemon, the same binary runs once as root via `osascript … with administrator privileges`
@@ -105,6 +109,14 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   resolved path. Don't "simplify" back to a realpath-prefix check: `realpath(wgDir)` of a swapped
   dir matches whatever it points at. This does not make a user-owned conf safe from its own
   `PostUp` (root) — same-user code can also replace brew's wg-quick; that is the accepted model.
+- **Helper registration is per binary**: after the app is updated or rebuilt, launchd keeps the old
+  registration and refuses to start the new helper binary (taskgated: "no eligible provisioning profiles"),
+  XPC silently fails and every action falls back to the password prompt. The app stores the helper's cdhash
+  at `register()` (UserDefaults `helperRegisteredHash`); on launch from `/Applications` with a different
+  binary it re-registers by itself (`ensureHelperCurrent`, AppModel+Helper). A registered daemon that is
+  outdated, unreachable or awaiting approval → `helperProblem`: popover banner + notification with
+  "Reinstall Helper" (category `helper`). `HelperClient.onUnreachable` fires when XPC to an enabled
+  daemon fails. The helper allowlists the client's `lang` (no paths into `<lang>.lproj`).
 - **Status never prompts**: root-only reads go through `PrivilegedReader.readIfAvailable`,
   which returns nil unless the daemon is installed.
 - **Interop with the CLI is deliberate**: OpenVPN is launched with exactly vpn-up.sh's flags and

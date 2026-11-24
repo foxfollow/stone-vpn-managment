@@ -16,19 +16,81 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
 
     var helperPath: String { Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/\(HelperConst.helperExecutable)").path }
 
-    func register() throws { try service.register() }
-    func unregister() async throws { try await service.unregister() }
+    /// Викликається, коли зареєстрований демон не відповідає по XPC (дія тоді питає пароль).
+    var onUnreachable: (@Sendable () -> Void)? {
+        get { lock.withLock { unreachableHandler } }
+        set { lock.withLock { unreachableHandler = newValue } }
+    }
+    private var unreachableHandler: (@Sendable () -> Void)?
+
+    private static let registeredHashKey = "helperRegisteredHash"
+    private static let wantedKey = "helperWanted"
+
+    /// Чи хоче користувач helper: true після встановлення, false після «Remove», nil — ще не вирішив.
+    /// Заміна бандла (`make install`, оновлення) скидає реєстрацію в launchd — тоді за цим
+    /// прапорцем застосунок реєструє демона знову сам.
+    var wanted: Bool? {
+        get { UserDefaults.standard.object(forKey: Self.wantedKey) as? Bool }
+        set { UserDefaults.standard.set(newValue, forKey: Self.wantedKey) }
+    }
+
+    /// Реєстрація launchd належить конкретному бінарнику helper-а: після оновлення чи перезбирання
+    /// застосунку новий бінарник не запускається (taskgated: «Disallowing … no eligible provisioning
+    /// profiles»), доки демона не перереєструвати, а XPC мовчки падає — і все питає пароль.
+    /// Тому пам'ятаємо cdhash бінарника, з яким реєстрували.
+    var registeredForThisBuild: Bool {
+        guard let current = Self.cdhash(atPath: helperPath) else { return true }  // непідписана збірка — не знаємо
+        return UserDefaults.standard.string(forKey: Self.registeredHashKey) == current
+    }
+
+    func register() throws {
+        try service.register()
+        UserDefaults.standard.set(Self.cdhash(atPath: helperPath), forKey: Self.registeredHashKey)
+        wanted = true
+    }
+
+    /// «Remove» у налаштуваннях: більше не ставити самому.
+    func remove() async throws {
+        wanted = false
+        try await unregister()
+    }
+
+    func unregister() async throws {
+        try await service.unregister()
+        UserDefaults.standard.removeObject(forKey: Self.registeredHashKey)
+    }
+
+    /// Перереєструвати демона з бінарником цього бандла (без пароля, якщо його вже схвалено).
+    func reinstall() async throws {
+        if service.status != .notRegistered { try? await service.unregister() }
+        lock.withLock { daemonVersion = nil }
+        try register()
+    }
+
+    static func cdhash(atPath path: String) -> String? {
+        var sc: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(URL(fileURLWithPath: path) as CFURL, [], &sc) == errSecSuccess, let sc else { return nil }
+        var info: CFDictionary?
+        guard SecCodeCopySigningInformation(sc, [], &info) == errSecSuccess,
+              let d = info as? [String: Any], let h = d[kSecCodeInfoUnique as String] as? Data else { return nil }
+        return h.map { String(format: "%02x", $0) }.joined()
+    }
 
     // MARK: PrivilegedRunner / Reader
 
     func run(_ op: PrivOp) async -> PrivResult {
-        if isEnabled, let r = await xpc(op) { return r }
+        if isEnabled {
+            if let r = await xpc(op) { return r }
+            onUnreachable?()
+        }
         return await viaAppleScript(op)
     }
 
     func readIfAvailable(_ op: PrivOp) async -> PrivResult? {
         guard isEnabled else { return nil }
-        return await xpc(op)
+        let r = await xpc(op)
+        if r == nil { onUnreachable?() }
+        return r
     }
 
     func version() async -> Int? {

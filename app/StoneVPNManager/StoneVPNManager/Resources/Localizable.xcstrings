@@ -1800,6 +1800,16 @@
         }
       }
     },
+    "Helper reinstalled." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper перевстановлено."
+          }
+        }
+      }
+    },
     "Hidden:" : {
       "localizations" : {
         "uk" : {
@@ -1896,6 +1906,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Встановити"
+          }
+        }
+      }
+    },
+    "Install Helper" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Встановити helper"
+          }
+        }
+      }
+    },
+    "Install the helper so connecting, DNS fixes and routes stop asking for the administrator password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Встанови helper, щоб підключення, ремонт DNS і маршрути не питали пароль адміністратора."
           }
         }
       }
@@ -2740,6 +2770,26 @@
         }
       }
     },
+    "Reinstall Helper" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевстановити helper"
+          }
+        }
+      }
+    },
+    "Reinstalling…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевстановлення…"
+          }
+        }
+      }
+    },
     "Remember for this profile and don't ask again" : {
       "localizations" : {
         "uk" : {
@@ -3380,6 +3430,16 @@
         }
       }
     },
+    "StoneVPN helper needs attention" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper StoneVPN потребує уваги"
+          }
+        }
+      }
+    },
     "StoneVPN: %@" : {
       "comment" : "Administrator password prompt; the argument is the action, e.g. “connect WireGuard”",
       "localizations" : {
@@ -3511,12 +3571,52 @@
         }
       }
     },
+    "The helper doesn't respond (usually after the app was updated), so every privileged action asks for the password. Reinstall it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper не відповідає (зазвичай після оновлення застосунку), тож кожна привілейована дія питає пароль. Перевстанови його."
+          }
+        }
+      }
+    },
     "The helper is outdated (v%lld, needs v%lld) — Settings → Helper → Reinstall" : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Helper застарий (v%1$lld, треба v%2$lld) — Settings → Helper → Перевстановити"
+          }
+        }
+      }
+    },
+    "The helper is outdated (v%lld, the app needs v%lld), so every privileged action asks for the password. Reinstall it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper застарий (v%1$lld, застосунку потрібна v%2$lld), тож кожна привілейована дія питає пароль. Перевстанови його."
+          }
+        }
+      }
+    },
+    "The helper waits for your approval in System Settings → Login Items; until then every privileged action asks for the password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper чекає схвалення в System Settings → Login Items; доти кожна привілейована дія питає пароль."
+          }
+        }
+      }
+    },
+    "The helper was re-registered for this version of the app." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper перереєстровано для цієї версії застосунку."
           }
         }
       }
