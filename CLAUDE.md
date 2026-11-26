@@ -100,6 +100,19 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   the daemon, the same binary runs once as root via `osascript … with administrator privileges`
   (`--run-file`, request in a 600 temp file — passwords never in argv; always exits 0 so
   `do shell script` returns the JSON).
+- **The code check says *what* connected, `Access` (helper, protocol v7) says *who***: any local user
+  can launch the genuine /Applications bundle, and `ovpnStart` (root, `--script-security 2`) would run
+  their profile's `up` script as root. So the daemon serves only its **owner** — a uid in root-owned
+  `/Library/Application Support/StoneVPNManager/helper-access.json` — unless the owner chose
+  `HelperAccessPolicy` admins/everyone (Settings → Helper → Access). The owner is recorded on the first
+  XPC request from the uid that owns the enclosing bundle (brew cask / drag-install = the installing
+  user; a root-owned bundle assigns nobody); `accessClaim` (take over) works only via `--run-file`, i.e.
+  with the administrator password, which is never gated. A refused request returns `PrivResult.denied`:
+  `HelperClient.isEnabled` turns false (background helper-only work stops, status reads return nil) and
+  user actions fall back to the password prompt. `ovpnStart` also requires the profile to belong to the
+  caller and hands openvpn a root copy (`/var/run/stonevpn/<id>.ovpn`, read via O_NOFOLLOW + fstat,
+  `--cd` = original dir for relative files) so the path can't be swapped after the check; `<id>` = the
+  profile basename, which is all `--config` parsing (app, CLI, vpn-down.sh) uses.
 - **WG config paths in the helper go through `WGConfGuard`** (StoneVPNShared, helper protocol v5):
   path directly inside one of `WGPaths.dirs`, no `.`/`..`; the dir may be a symlink, but if it
   resolves outside `WGPaths.canonical` both dir and file must belong to the requesting uid (XPC
@@ -112,10 +125,12 @@ which SMAppService needs for the helper; test = `swift test` in the package).
 - **Helper registration is per binary**: after the app is updated or rebuilt, launchd keeps the old
   registration and refuses to start the new helper binary (taskgated: "no eligible provisioning profiles"),
   XPC silently fails and every action falls back to the password prompt. The app stores the helper's cdhash
-  at `register()` (UserDefaults `helperRegisteredHash`); on launch from `/Applications` with a different
-  binary it re-registers by itself (`ensureHelperCurrent`, AppModel+Helper). A registered daemon that is
-  outdated, unreachable or awaiting approval → `helperProblem`: popover banner + notification with
-  "Reinstall Helper" (category `helper`). `HelperClient.onUnreachable` fires when XPC to an enabled
+  at `register()` (UserDefaults `helperRegisteredHash`). It **never re-registers by itself**: registering
+  starts whatever helper binary is in the (user-owned) bundle as root, so a swapped binary would become
+  root silently — re-registration is always the user's "Reinstall Helper". A registered daemon that is
+  outdated, unreachable, lost after an update (`helperWanted` but not registered) or awaiting approval →
+  `helperProblem`: popover banner + notification with "Reinstall Helper" (category `helper`); a daemon
+  owned by another user → `.notAllowed`, dismissable banner with "Take Over…", no notification. `HelperClient.onUnreachable` fires when XPC to an enabled
   daemon fails. The helper allowlists the client's `lang` (no paths into `<lang>.lproj`).
 - **Status never prompts**: root-only reads go through `PrivilegedReader.readIfAvailable`,
   which returns nil unless the daemon is installed.

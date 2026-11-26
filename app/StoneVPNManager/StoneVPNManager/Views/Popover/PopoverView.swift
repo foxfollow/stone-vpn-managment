@@ -167,8 +167,9 @@ struct PopoverView: View {
             Banner(color: .orange, text: p.message,
                    action: model.helperReinstalling ? String(localized: "Reinstalling…")
                        : p == .needsApproval ? String(localized: "Login Items…")
-                       : p == .notInstalled ? String(localized: "Install Helper") : String(localized: "Reinstall Helper"),
-                   close: p == .notInstalled ? { model.dismissHelperOffer() } : nil) {
+                       : p == .notInstalled ? String(localized: "Install Helper")
+                       : p.isNotAllowed ? String(localized: "Take Over…") : String(localized: "Reinstall Helper"),
+                   close: p == .notInstalled || p.isNotAllowed ? { model.dismissHelperOffer() } : nil) {
                 model.fixHelper()
             }
         }

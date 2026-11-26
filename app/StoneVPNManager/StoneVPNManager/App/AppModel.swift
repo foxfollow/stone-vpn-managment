@@ -128,6 +128,8 @@ final class AppModel {
     var dnsCandidates: [DNSCandidate] = []
     var helperStatus: SMAppService.Status = .notRegistered
     var helperVersion: Int?
+    /// v7: власник демона і чи обслуговує він цього користувача.
+    var helperAccess: HelperAccessInfo?
     /// Helper зареєстровано, але він не працює як слід — банер + сповіщення (AppModel+Helper).
     var helperProblem: HelperProblem?
     var helperReinstalling = false
@@ -1374,6 +1376,7 @@ final class AppModel {
     func checkHelper() async {
         helperStatus = helper.status
         helperVersion = await helper.version()
+        helperAccess = await helper.accessInfo()
         updateHelperProblem()
     }
 

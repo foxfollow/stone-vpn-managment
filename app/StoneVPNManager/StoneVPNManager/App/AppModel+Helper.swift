@@ -14,6 +14,10 @@ enum HelperProblem: Equatable {
     case needsApproval
     /// Не встановлено, і користувач ще не вирішував (банер без сповіщення, закривається).
     case notInstalled
+    /// Демон належить іншому користувачу Mac і не обслуговує цього (HelperAccessPolicy) — дії з паролем.
+    case notAllowed(owner: String?)
+
+    var isNotAllowed: Bool { if case .notAllowed = self { true } else { false } }
 
     var message: String {
         switch self {
@@ -25,33 +29,31 @@ enum HelperProblem: Equatable {
             String(localized: "The helper waits for your approval in System Settings → Login Items; until then every privileged action asks for the password.")
         case .notInstalled:
             String(localized: "Install the helper so connecting, DNS fixes and routes stop asking for the administrator password.")
+        case .notAllowed(let owner?):
+            String(localized: "The helper belongs to \(owner), so privileged actions ask for the administrator password. \(owner) can allow administrators or everyone in Settings → Helper.")
+        case .notAllowed(nil):
+            String(localized: "The helper has no owner yet, so privileged actions ask for the administrator password. Take it over in Settings → Helper.")
         }
     }
 }
 
 extension AppModel {
     static let helperCategory = "helper"
+    static let notAllowedDismissedKey = "helperNotAllowedDismissed"
 
     /// На старті після оновлення/перезбирання застосунку: заміна бандла скидає реєстрацію демона
     /// (статус «не встановлено»), а якщо ні — launchd не запускає новий бінарник helper-а.
-    /// В обох випадках перереєструвати одразу, поки ніщо не почало питати пароль.
+    /// Сам не перереєструємо: реєстрація запускає бінарник із бандла від root, а бандл у
+    /// /Applications належить користувачу — підмінений helper став би root без його відома.
+    /// Тож лише банер + сповіщення з «Reinstall Helper» (updateHelperProblem).
     func ensureHelperCurrent() async {
         helperStatus = helper.status
-        // Лише копія з /Applications: Debug-збірка з DerivedData не має перереєстровувати демона на себе.
-        if Bundle.main.bundleURL.path.hasPrefix("/Applications/") {
-            if helper.wanted == nil, helperStatus == .enabled { helper.wanted = true }  // встановлено до цієї версії
-            let stale = helperStatus == .enabled && !helper.registeredForThisBuild
-            let lost = helperStatus == .notRegistered && helper.wanted == true
-            if stale || lost {
-                await reinstallHelper(auto: true)
-                return
-            }
-        }
+        if helper.wanted == nil, helperStatus == .enabled { helper.wanted = true }  // встановлено до цієї версії
         await checkHelper()
     }
 
-    /// Кнопка «Reinstall» (налаштування, банер, сповіщення) і авто-перевстановлення після оновлення.
-    func reinstallHelper(auto: Bool = false) async {
+    /// Кнопка «Reinstall» (налаштування, банер, сповіщення) — завжди дія користувача.
+    func reinstallHelper() async {
         guard !helperReinstalling else { return }
         helperReinstalling = true
         defer { helperReinstalling = false }
@@ -63,10 +65,9 @@ extension AppModel {
             await checkHelper()
             if helperVersion != nil || helperStatus != .enabled { break }
         }
-        if helperStatus == .requiresApproval, !auto { SMAppService.openSystemSettingsLoginItems() }
+        if helperStatus == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
         if helperProblem == nil {
-            toast = auto ? String(localized: "The helper was re-registered for this version of the app.")
-                         : String(localized: "Helper reinstalled.")
+            toast = String(localized: "Helper reinstalled.")
         } else if let failure {
             toast = "Helper: \(failure)"
         }
@@ -82,8 +83,13 @@ extension AppModel {
         let problem: HelperProblem? = switch helperStatus {
         case .requiresApproval: .needsApproval
         case .enabled:
-            if let v = helperVersion { v < HelperConst.version ? .outdated(v) : nil } else { .unreachable }
-        case .notRegistered: helper.wanted == false ? nil : .notInstalled
+            if let v = helperVersion {
+                v < HelperConst.version ? .outdated(v)
+                    : helperAccess?.callerAllowed == false && !UserDefaults.standard.bool(forKey: Self.notAllowedDismissedKey)
+                        ? .notAllowed(owner: helperAccess?.ownerName) : nil
+            } else { .unreachable }
+        // Хотів helper, а реєстрації немає — бандл замінили (оновлення / make install).
+        case .notRegistered: helper.wanted == true ? .unreachable : helper.wanted == false ? nil : .notInstalled
         default: nil
         }
         guard problem != helperProblem else { return }
@@ -94,7 +100,8 @@ extension AppModel {
             helperNotified = nil
             return
         }
-        // «Не встановлено» — лише банер: сповіщення про це було б нав'язливим.
+        // «Не встановлено» / «чужий helper» — лише банер: сповіщення було б нав'язливим.
+        if case .notAllowed = problem { return }
         guard helperNotified != problem, !helperReinstalling, problem != .notInstalled else { return }
         helperNotified = problem
         let c = UNMutableNotificationContent()
@@ -109,13 +116,32 @@ extension AppModel {
         switch helperProblem {
         case .needsApproval: SMAppService.openSystemSettingsLoginItems()
         case .notInstalled: installHelper()
+        case .notAllowed: Task { await claimHelper() }
         default: Task { await reinstallHelper() }
         }
     }
 
+    /// Хто може користуватися helper-ом (власник у налаштуваннях; інший — з паролем адміністратора).
+    func setHelperAccess(_ p: HelperAccessPolicy) async {
+        let r = await helper.setAccessPolicy(p)
+        if !r.ok { toast = "Helper: \(r.output)" }
+        await checkHelper()
+    }
+
+    /// Забрати helper собі (пароль адміністратора): попередній власник втрачає доступ, якщо політика «лише власник».
+    func claimHelper() async {
+        let r = await helper.claimAccess()
+        if !r.ok { toast = "Helper: \(r.output)" }
+        await checkHelper()
+    }
+
     /// × на банері «встанови helper»: більше не пропонувати (у налаштуваннях лишається).
     func dismissHelperOffer() {
-        helper.wanted = false
+        if case .notAllowed = helperProblem {
+            UserDefaults.standard.set(true, forKey: Self.notAllowedDismissedKey)   // чужий helper: не нагадувати
+        } else {
+            helper.wanted = false
+        }
         updateHelperProblem()
     }
 }

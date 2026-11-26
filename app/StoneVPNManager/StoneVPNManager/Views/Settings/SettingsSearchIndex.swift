@@ -161,6 +161,8 @@ enum SettingsSearchIndex {
               ["helper", "daemon", "root", "password", "демон", "пароль", "стан"]),
             e("helper.install", String(localized: "Install"), .helper, g,
               ["install", "reinstall", "remove", "login items", "встановити", "перевстановити", "видалити"]),
+            e("helper.access", String(localized: "Who May Use It"), .helper, String(localized: "Access"),
+              ["access", "owner", "users", "admin", "take over", "multi-user", "доступ", "власник", "користувачі", "адміністратори", "забрати"]),
         ]
     }
 

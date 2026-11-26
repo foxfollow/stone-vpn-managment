@@ -74,6 +74,16 @@
         }
       }
     },
+    "%@ (you)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (ви)"
+          }
+        }
+      }
+    },
     "%@ does not resolve (DNS: %@) — the connection will most likely fail. DNS → Fix or a split rule." : {
       "localizations" : {
         "uk" : {
@@ -610,6 +620,16 @@
         }
       }
     },
+    "Access" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступ"
+          }
+        }
+      }
+    },
     "Add" : {
       "localizations" : {
         "uk" : {
@@ -746,6 +766,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Все здорове: резолвер відповідає, осиротілих записів немає."
+          }
+        }
+      }
+    },
+    "All users of this Mac" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Усі користувачі цього Mac"
           }
         }
       }
@@ -2450,6 +2480,16 @@
         }
       }
     },
+    "Only the owner" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Лише власник"
+          }
+        }
+      }
+    },
     "Open Defguard.app" : {
       "localizations" : {
         "uk" : {
@@ -3561,6 +3601,16 @@
         }
       }
     },
+    "Take Over…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Забрати собі…"
+          }
+        }
+      }
+    },
     "The Cisco GUI is open — the CLI can't fetch groups" : {
       "localizations" : {
         "uk" : {
@@ -3641,12 +3691,42 @@
         }
       }
     },
+    "The helper belongs to %@, so privileged actions ask for the administrator password. %@ can allow administrators or everyone in Settings → Helper." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper належить користувачу %1$@, тож привілейовані дії питають пароль адміністратора. %2$@ може дозволити його адміністраторам або всім у Налаштуваннях → Helper."
+          }
+        }
+      }
+    },
     "The helper doesn't respond (usually after the app was updated), so every privileged action asks for the password. Reinstall it." : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Helper не відповідає (зазвичай після оновлення застосунку), тож кожна привілейована дія питає пароль. Перевстанови його."
+          }
+        }
+      }
+    },
+    "The helper doesn't serve you, so privileged actions ask for the administrator password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper вас не обслуговує, тож привілейовані дії питають пароль адміністратора."
+          }
+        }
+      }
+    },
+    "The helper has no owner yet, so privileged actions ask for the administrator password. Take it over in Settings → Helper." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper ще не має власника, тож привілейовані дії питають пароль адміністратора. Заберіть його собі в Налаштуваннях → Helper."
           }
         }
       }
@@ -3671,22 +3751,22 @@
         }
       }
     },
+    "The helper runs actions as root, including OpenVPN profile scripts, so it serves only its owner unless the owner allows more. The owner is the user who installed the app; another user can take it over with the administrator password. OpenVPN profiles must belong to the user who connects them." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper виконує дії від root, зокрема скрипти OpenVPN-профілів, тому обслуговує лише власника, якщо той не дозволив більше. Власник — користувач, що встановив застосунок; інший користувач може забрати helper собі паролем адміністратора. OpenVPN-профілі мають належати тому, хто їх підключає."
+          }
+        }
+      }
+    },
     "The helper waits for your approval in System Settings → Login Items; until then every privileged action asks for the password." : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Helper чекає схвалення в System Settings → Login Items; доти кожна привілейована дія питає пароль."
-          }
-        }
-      }
-    },
-    "The helper was re-registered for this version of the app." : {
-      "localizations" : {
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Helper перереєстровано для цієї версії застосунку."
           }
         }
       }
@@ -3707,6 +3787,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Нова мова застосується після перезапуску."
+          }
+        }
+      }
+    },
+    "The owner and administrators" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Власник і адміністратори"
           }
         }
       }
@@ -4121,6 +4211,16 @@
         }
       }
     },
+    "Who May Use It" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хто може користуватися"
+          }
+        }
+      }
+    },
     "Whole Profile (.ovpn)…" : {
       "localizations" : {
         "uk" : {
@@ -4287,6 +4387,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "змінити маршрут до VPN-сервера"
+          }
+        }
+      }
+    },
+    "change who may use the helper" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "змінити, хто може користуватися helper-ом"
           }
         }
       }
@@ -4621,6 +4731,16 @@
         }
       }
     },
+    "nobody yet" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ще немає"
+          }
+        }
+      }
+    },
     "none" : {
       "localizations" : {
         "uk" : {
@@ -4911,6 +5031,16 @@
         }
       }
     },
+    "take over the helper" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "забрати helper собі"
+          }
+        }
+      }
+    },
     "the gateway doesn't answer the handshake" : {
       "localizations" : {
         "uk" : {
@@ -4927,6 +5057,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "helper не відповів"
+          }
+        }
+      }
+    },
+    "the helper is not installed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "helper не встановлено"
           }
         }
       }

@@ -34,7 +34,10 @@ final class Service: NSObject, HelperXPC {
     func run(_ request: Data, withReply reply: @escaping (Data) -> Void) {
         let result: PrivResult
         if let (op, lang) = decodeRequest(request) {
-            result = HelperL10n.with(lang) { Executor.execute(op, waitAuthCleanup: false, caller: caller) }
+            result = HelperL10n.with(lang) {
+                // Підпис каже, *що* підключилося; Access — *хто* (власник / адміни / всі).
+                Access.gate(op, caller: caller) ?? Executor.execute(op, waitAuthCleanup: false, caller: caller)
+            }
         } else {
             result = .fail(L("unknown request (update the helper)"))
         }

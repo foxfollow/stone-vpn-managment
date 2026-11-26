@@ -10,9 +10,13 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
     /// Версія встановленого демона (з останнього `version()`): до v6 він не знає PrivRequest.
     private let lock = NSLock()
     private var daemonVersion: Int?
+    /// v7: демон обслуговує лише власника (або адмінів / всіх — HelperAccessPolicy). Не дозволено →
+    /// дії йдуть через пароль адміністратора, а фонові (лише через helper) не виконуються.
+    private var denied = false
 
     var status: SMAppService.Status { service.status }
-    var isEnabled: Bool { service.status == .enabled }
+    /// Демон встановлено *і* він обслуговує цього користувача: лише тоді дії без пароля.
+    var isEnabled: Bool { service.status == .enabled && !lock.withLock { denied } }
 
     var helperPath: String { Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/\(HelperConst.helperExecutable)").path }
 
@@ -63,7 +67,7 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
     /// Перереєструвати демона з бінарником цього бандла (без пароля, якщо його вже схвалено).
     func reinstall() async throws {
         if service.status != .notRegistered { try? await service.unregister() }
-        lock.withLock { daemonVersion = nil }
+        lock.withLock { daemonVersion = nil; denied = false }
         try register()
     }
 
@@ -80,8 +84,12 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
 
     func run(_ op: PrivOp) async -> PrivResult {
         if isEnabled {
-            if let r = await xpc(op) { return r }
-            onUnreachable?()
+            if let r = await xpc(op) {
+                guard r.denied == true else { return r }
+                lock.withLock { denied = true }       // не наш демон — пароль адміністратора
+            } else {
+                onUnreachable?()
+            }
         }
         return await viaAppleScript(op)
     }
@@ -90,11 +98,36 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
         guard isEnabled else { return nil }
         let r = await xpc(op)
         if r == nil { onUnreachable?() }
+        if r?.denied == true { lock.withLock { denied = true }; return nil }
         return r
     }
 
+    /// Хто власник демона і чи можна цьому користувачу (v7+). Оновлює `isEnabled`.
+    func accessInfo() async -> HelperAccessInfo? {
+        guard service.status == .enabled, (lock.withLock { daemonVersion } ?? 0) >= 7 else {
+            lock.withLock { denied = false }          // старий демон про доступ не знає
+            return nil
+        }
+        guard let r = await xpc(.accessInfo), r.ok,
+              let info = try? JSONDecoder().decode(HelperAccessInfo.self, from: Data(r.output.utf8)) else { return nil }
+        lock.withLock { denied = !info.callerAllowed }
+        return info
+    }
+
+    /// Власник — через демон; інший користувач — з паролем адміністратора.
+    func setAccessPolicy(_ p: HelperAccessPolicy) async -> PrivResult {
+        guard service.status == .enabled else { return .fail(String(localized: "the helper is not installed")) }
+        if let r = await xpc(.accessSetPolicy(policy: p)), r.denied != true { return r }
+        return await viaAppleScript(.accessSetPolicy(policy: p))
+    }
+
+    /// Стати власником демона: лише з паролем адміністратора (XPC це завжди відхиляє).
+    func claimAccess() async -> PrivResult {
+        await viaAppleScript(.accessClaim)
+    }
+
     func version() async -> Int? {
-        guard isEnabled else { return nil }
+        guard service.status == .enabled else { return nil }
         let v: Int? = await withCheckedContinuation { cont in
             let once = Once()
             let c = connection()
@@ -171,6 +204,8 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
         case .dnsOverride, .dnsOverrideClear: String(localized: "switch the primary DNS")
         case .orderServices: String(localized: "change the network service order")
         case .killPid: String(localized: "stop a VPN tunnel process")
+        case .accessSetPolicy: String(localized: "change who may use the helper")
+        case .accessClaim: String(localized: "take over the helper")
         case .batch(let ops): ops.first.map(describe) ?? String(localized: "action")
         default: String(localized: "privileged action")
         }
