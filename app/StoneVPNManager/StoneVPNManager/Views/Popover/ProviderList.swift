@@ -83,6 +83,9 @@ struct ProviderCell: View {
                 }
                 Spacer(minLength: 0)
                 if let main = row.main, main.status == .stale { renewButton(main) }
+                // Головний рядок — активний/останній профіль; якщо він обраний, без зірки тут
+                // здавалося, що з кількох обраних показано лише ті, що в підрядках.
+                if let main = row.main, !model.editingList { favoriteButton(main) }
                 if model.editingList { editControls }
                 Button { model.openProfiles(row.backend, select: row.main?.id) } label: {
                     HStack(spacing: 4) {
@@ -108,12 +111,7 @@ struct ProviderCell: View {
                     Text(subtitle(it, isMain: false)).font(.system(size: 11)).foregroundStyle(it.status.color).lineLimit(1).truncationMode(.tail)
                     Spacer(minLength: 0)
                     if it.status == .stale { renewButton(it) }
-                    let fav = model.prefs.isFavorite(it.id)
-                    Button { model.prefs.toggleFavorite(it.id) } label: {
-                        Image(systemName: fav ? "star.fill" : "star").foregroundStyle(fav ? .yellow : .secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help(fav ? "Remove from Favourites" : "Add to Favourites")
+                    favoriteButton(it)
                 }
                 .padding(.leading, 58).padding(.trailing, 10)
                 .frame(minHeight: 32)
@@ -127,6 +125,15 @@ struct ProviderCell: View {
                 .padding(.leading, 58).padding(.bottom, 8)
             }
         }
+    }
+
+    private func favoriteButton(_ it: ProfileItem) -> some View {
+        let fav = model.prefs.isFavorite(it.id)
+        return Button { model.prefs.toggleFavorite(it.id) } label: {
+            Image(systemName: fav ? "star.fill" : "star").foregroundStyle(fav ? .yellow : .secondary)
+        }
+        .buttonStyle(.borderless)
+        .help(fav ? "Remove from Favourites" : "Add to Favourites")
     }
 
     private func renewButton(_ it: ProfileItem) -> some View {
