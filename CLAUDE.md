@@ -172,7 +172,7 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   for that location name in `log show` (nesessionmanager, sudo-free, ~1.5 s; the adapter's own lines
   don't name the location) after our last connect, older than 15 s; no DNS in the session → ≥2
   reasserting events. Then: status `.stale`, red icon, banner + "Оновити" (MFA → asks only for the
-  TOTP; perform quits Defguard.app, `dgDownAndWait`, `dgUp`), and a DNS failover via the helper's
+  TOTP; perform quits Defguard.app, `dgDown`, `dgUp`), and a DNS failover via the helper's
   `dnsOverride` to a live candidate / the primary service DNS. It is undone once the session is
   renewed or gone. DNS Fix does not help here and says so.
 - **ClearVPN in IKEv2 mode is `ipsec0`, not a utun** (personal VPN, no Setup service — only a UUID
@@ -466,8 +466,11 @@ There are no unit tests. Validate changes like this:
   key never reaches the profile).
   `dg_cli` prefers the bundle path and `realpath`s symlinks. The CLI prints `Connected to …`
   even when the tunnel then dies, so `dg_up` waits on the session state (`dg_wait`).
-  Connect/disconnect only via the CLI (shares the GUI's DB, handles MFA prompts itself);
-  `scutil --nc stop` is only the no-CLI fallback in `dg_down`. After `down`, Defguard (like
+  Connect/disconnect via the CLI (shares the GUI's DB, handles MFA prompts itself), but
+  **`disconnect` judges by its own DB, not NE**: for an expired MFA session (NE still Connected)
+  it prints `'X' is not currently connected` with **exit 0** and sends no stop — the toggle "did
+  nothing". So `dg_down` / `Actions.dgDown` verify `scutil --nc list` afterwards and fall back to
+  `scutil --nc stop <uuid>` (also the no-CLI path), then wait for Disconnected. After `down`, Defguard (like
   Cisco) restores its own DNS → `dns_flush` only, not `restore_dns` (`down_is_foreign`).
   Bare names in `up`/`down` go to Defguard only when no WG config/active WG tunnel has that name.
 - **`DISABLED_BACKENDS` (config.env or env) turns backends off entirely**: wireguard | openvpn |

@@ -501,7 +501,7 @@ final class AppModel {
                 if r.reconnect, let st = await actions.dgSessionState(p.name), st != "Disconnected" {
                     step("defguard-client disconnect")
                     stopping.insert(p.key)
-                    try await actions.dgDownAndWait(p.name, kind: p.dgKind, cliPath: config.defguardCLI)
+                    try await actions.dgDown(p.name, kind: p.dgKind, cliPath: config.defguardCLI)
                 }
                 step("defguard-client connect")
                 try await actions.dgUp(p, code: r.code, cliPath: config.defguardCLI)
@@ -775,6 +775,8 @@ final class AppModel {
         } catch {
             errors[p.key] = error.localizedDescription
             stopping.remove(p.key)
+            // Сесія жива → рядок показує її стан, а не errors[]; без тосту невдача була б невидимою.
+            toast = "\(p.backend.title) · \(prefs.display(p)): \(error.localizedDescription)"
         }
         busy[p.key] = nil
         await refresh()
