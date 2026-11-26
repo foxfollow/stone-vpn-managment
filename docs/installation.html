@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+  <title>Install StoneVPN Manager – Homebrew, manual, first launch</title>
+  <meta name="description" content="How to install StoneVPN Manager on macOS 26: Homebrew cask, manual zip, first launch, privileged helper, VPN backends, updates and uninstall.">
+  <link rel="canonical" href="https://foxfollow.github.io/stone-vpn-managment/installation.html">
+  <link rel="alternate" hreflang="en" href="https://foxfollow.github.io/stone-vpn-managment/installation.html">
+  <link rel="alternate" hreflang="uk" href="https://foxfollow.github.io/stone-vpn-managment/installation-ua.html">
+  <link rel="alternate" hreflang="x-default" href="https://foxfollow.github.io/stone-vpn-managment/installation.html">
+  <link rel="icon" type="image/png" sizes="48x48" href="resources/favicon-48.png" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" sizes="48x48" href="resources/favicon-dark-48.png" media="(prefers-color-scheme: dark)">
+  <link rel="apple-touch-icon" href="resources/apple-touch-icon.png">
+  <meta name="theme-color" content="#061820">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="resources/site.css">
+</head>
+<body>
+
+<nav class="nav" aria-label="Main">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="resources/icon-512.png" alt="" width="30" height="30">StoneVPN Manager</a>
+    <div class="nav-links">
+      <a href="./#features">Features</a>
+      <a href="./#screens">Screens</a>
+      <a href="./#how">How it works</a>
+      <a href="./#cli">CLI</a>
+      <a href="./#install">Install</a>
+    </div>
+    <div class="nav-tools">
+      <a class="chip-btn" href="installation-ua.html" hreflang="uk" lang="uk" title="Українська версія">UA</a>
+      <button class="chip-btn" type="button" data-theme-toggle aria-label="Toggle light/dark theme">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4"/></svg>
+      </button>
+      <a class="chip-btn" href="https://github.com/foxfollow/stone-vpn-managment" aria-label="GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<main class="doc">
+  <div class="wrap">
+    <h1>Install StoneVPN Manager</h1>
+    <p class="lead">From zero to a working menu bar icon in a couple of minutes. Homebrew is the easiest path; a plain <code>.zip</code> works too.</p>
+    <nav class="toc" aria-label="On this page">
+      <a href="#requirements">Requirements</a><a href="#homebrew">Homebrew</a><a href="#manual">Manual download</a><a href="#first-launch">First launch</a>
+      <a href="#backends">VPN backends</a><a href="#cli">With the CLI</a><a href="#updates">Updates</a><a href="#uninstall">Uninstall</a><a href="#source">Build from source</a><a href="#trouble">Troubleshooting</a>
+    </nav>
+
+    <h2 id="requirements">Requirements</h2>
+    <ul>
+      <li><strong>macOS 26 Tahoe</strong> or later, Apple silicon or Intel (universal build).</li>
+      <li>An administrator account — creating tunnels, DNS and route changes need root.</li>
+      <li>The VPN tools you actually use (see <a href="#backends">VPN backends</a>). Nothing else is bundled.</li>
+    </ul>
+
+    <h2 id="homebrew">Option 1 — Homebrew (recommended)</h2>
+    <p>The app lives in the <a href="https://github.com/foxfollow/homebrew-stone">foxfollow/stone</a> tap. Recent Homebrew versions ask you to trust a third-party tap once:</p>
+    <div class="cmd"><code>brew tap foxfollow/stone</code><button class="copy" type="button" data-copy="brew tap foxfollow/stone" data-done="✓">Copy</button></div>
+    <div class="cmd"><code>brew trust --tap foxfollow/stone</code><button class="copy" type="button" data-copy="brew trust --tap foxfollow/stone" data-done="✓">Copy</button></div>
+    <div class="cmd"><code>brew install --cask stone-vpn-manager</code><button class="copy" type="button" data-copy="brew install --cask stone-vpn-manager" data-done="✓">Copy</button></div>
+    <p>The cask removes the quarantine flag, so the first launch is not blocked. Launch it from Spotlight or with <code>open -a StoneVPNManager</code>.</p>
+
+    <h2 id="manual">Option 2 — manual download</h2>
+    <ol>
+      <li>Download <code>StoneVPNManager.zip</code> from the <a href="https://github.com/foxfollow/stone-vpn-managment/releases/latest">latest release</a>.</li>
+      <li>Unzip it and move <code>StoneVPNManager.app</code> to <code>/Applications</code> — the privileged helper only installs from there.</li>
+      <li>Allow the first launch. The app is ad-hoc signed (no paid Apple Developer ID), so macOS asks once:</li>
+    </ol>
+    <div class="cmd"><code>xattr -cr /Applications/StoneVPNManager.app</code><button class="copy" type="button" data-copy="xattr -cr /Applications/StoneVPNManager.app" data-done="✓">Copy</button></div>
+    <p>Or right-click the app → <strong>Open</strong> → <strong>Open</strong>. On recent macOS you may also need System Settings → Privacy &amp; Security → <strong>Open Anyway</strong>.</p>
+    <div class="callout info">Each release lists the SHA-256 of the zip. Updates after that are verified by Sparkle with an EdDSA signature before they are installed.</div>
+
+    <h2 id="first-launch">First launch</h2>
+    <ol>
+      <li><strong>Menu bar icon.</strong> A shield appears in the menu bar (no Dock icon). Grey outline = no tunnels, green with a number = tunnels up, orange = connecting, red “!” = DNS or network problem, purple = a foreign VPN owns the network.</li>
+      <li><strong>Local Network.</strong> macOS asks once whether the app may “find devices on local networks”. Allow it — the DNS and internet probes often talk to a resolver in your LAN; without it the indicators can show false problems.</li>
+      <li><strong>Privileged helper.</strong> Settings → Helper → <strong>Install</strong>, then approve “StoneVPN Manager” in System Settings → General → <strong>Login Items &amp; Extensions</strong>. Without the helper everything still works, but every root action asks for your password.</li>
+      <li><strong>Backends.</strong> Settings → Backends: switch off the VPNs you don't use — they are then neither shown nor probed.</li>
+    </ol>
+    <div class="callout info">The app speaks English and Ukrainian and follows your system language; Settings → General → Interface Language switches it.</div>
+
+    <h2 id="backends">VPN backends</h2>
+    <h3>WireGuard</h3>
+    <div class="cmd"><code>brew install wireguard-tools</code><button class="copy" type="button" data-copy="brew install wireguard-tools" data-done="✓">Copy</button></div>
+    <p>Tunnel configs (<code>.conf</code>) live in the standard <code>wg-quick</code> dirs: <code>/opt/homebrew/etc/wireguard</code>, <code>/usr/local/etc/wireguard</code> or <code>/etc/wireguard</code>. They appear in the popover automatically.</p>
+    <h3>OpenVPN</h3>
+    <div class="cmd"><code>brew install openvpn</code><button class="copy" type="button" data-copy="brew install openvpn" data-done="✓">Copy</button></div>
+    <p>Profiles (<code>.ovpn</code>) are imported in the Profiles window and stored in <code>~/Library/Application Support/OpenVPN Connect/profiles/</code> (shared with OpenVPN Connect). The Homebrew binary is used because it writes routes into the kernel correctly. The password and OTP are asked per connect and never stored; the username can be remembered per profile (Settings → OpenVPN).</p>
+    <h3>Defguard</h3>
+    <p>Install the <a href="https://docs.defguard.net/">Defguard desktop client</a> and add your instance there once. StoneVPN drives it through <code>defguard-client</code> inside <code>Defguard.app</code>; MFA codes are asked in the app.</p>
+    <h3>Cisco Secure Client</h3>
+    <p>Install Cisco Secure Client from your organisation. StoneVPN connects through its <code>vpn</code> CLI — groups are fetched from the head-end, Duo push or passcodes are supported, passwords are not stored. Custom hosts (<code>host:port</code>) can be added in Profiles.</p>
+
+    <h2 id="cli">Use it together with the CLI (optional)</h2>
+    <p>The repository also contains the Bash toolkit <code>main-vpn-manager.sh</code>. If the app finds it, both share <code>config.env</code> and <code>state.env</code>:</p>
+    <pre><code>git clone https://github.com/foxfollow/stone-vpn-managment.git
+cd stone-vpn-managment
+cp config.env.example config.env      # optional defaults
+./main-vpn-manager.sh help</code></pre>
+    <p>Then point the app at it in Settings → Advanced → Configuration (“shared with the CLI repository”, repository folder). Without the repo the app keeps the same files in <code>~/Library/Application Support/StoneVPNManager/</code>.</p>
+
+    <h2 id="updates">Updates</h2>
+    <p>The app checks for updates daily (Sparkle) — Settings → General → <strong>Check for updates…</strong>. Because of that, <code>brew upgrade</code> skips it by default; to update through Homebrew anyway:</p>
+    <div class="cmd"><code>brew upgrade --cask --greedy stone-vpn-manager</code><button class="copy" type="button" data-copy="brew upgrade --cask --greedy stone-vpn-manager" data-done="✓">Copy</button></div>
+    <p>If a new version changes the helper protocol, the Helper tab says “outdated — reinstall”: press <strong>Reinstall</strong>.</p>
+
+    <h2 id="uninstall">Uninstall</h2>
+    <ol>
+      <li>Settings → Helper → <strong>Remove</strong> (stops and unregisters the root daemon).</li>
+      <li>Quit the app, then:</li>
+    </ol>
+    <div class="cmd"><code>brew uninstall --cask --zap stone-vpn-manager</code><button class="copy" type="button" data-copy="brew uninstall --cask --zap stone-vpn-manager" data-done="✓">Copy</button></div>
+    <p>Manual install: delete <code>/Applications/StoneVPNManager.app</code> and <code>~/Library/Application Support/StoneVPNManager</code>. Your VPN configs are not touched.</p>
+
+    <h2 id="source">Build from source</h2>
+    <p>Needs Xcode 26 or later.</p>
+    <pre><code>git clone https://github.com/foxfollow/stone-vpn-managment.git
+cd stone-vpn-managment
+make -C app test       # unit tests of the core package
+make -C app install    # Release build → /Applications</code></pre>
+    <p>Set your own team in Xcode (Signing &amp; Capabilities) or build ad-hoc. Builds from source don't run the auto-updater — update them with <code>git pull</code> and <code>make -C app install</code>.</p>
+
+    <h2 id="trouble">Troubleshooting</h2>
+    <ul>
+      <li><strong>“App is damaged and can't be opened”</strong> — the quarantine flag: run <code>xattr -cr /Applications/StoneVPNManager.app</code>.</li>
+      <li><strong>Helper shows “requires approval”</strong> — open System Settings → General → Login Items &amp; Extensions and switch StoneVPN Manager on.</li>
+      <li><strong>DNS indicator red although the internet works</strong> — check that Local Network access is allowed (System Settings → Privacy &amp; Security → Local Network).</li>
+      <li><strong>Ping hangs after a VPN disconnect</strong> — popover → DNS → <strong>Fix DNS</strong>, or <code>./main-vpn-manager.sh dns fix</code>.</li>
+      <li>Anything else — <a href="https://github.com/foxfollow/stone-vpn-managment/issues">open an issue</a>.</li>
+    </ul>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 foxfollow · <a href="https://github.com/foxfollow/stone-vpn-managment/blob/main/LICENSE">MIT</a></span>
+    <span class="sp"></span>
+    <a href="installation.html">Installation</a>
+    <a href="https://github.com/foxfollow/stone-vpn-managment/releases">Releases</a>
+    <a href="https://github.com/foxfollow/homebrew-stone">Homebrew tap</a>
+    <a href="https://github.com/foxfollow/stone-vpn-managment/blob/main/SECURITY.md">Security</a>
+    <a href="installation-ua.html" hreflang="uk" lang="uk">Українською</a>
+  </div>
+</footer>
+
+<script src="resources/site.js" defer></script>
+</body>
+</html>

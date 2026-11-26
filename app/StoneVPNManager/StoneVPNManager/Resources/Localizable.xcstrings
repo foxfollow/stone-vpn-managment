@@ -1,0 +1,4850 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+      "shouldTranslate" : false
+    },
+    "%@ (%@) became primary" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@) став первинним"
+          }
+        }
+      }
+    },
+    "%@ (%@) holds the default route and DNS, but passes no traffic. DNS edits won't help." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@) тримає default route і DNS, але не пропускає трафік. Правки DNS не допоможуть."
+          }
+        }
+      }
+    },
+    "%@ (%@) holds the default route and DNS." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@) тримає default route і DNS."
+          }
+        }
+      }
+    },
+    "%@ (%@) — a foreign tunnel, managed by its own app." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@) — сторонній тунель, керується своїм застосунком."
+          }
+        }
+      }
+    },
+    "%@ (%@) — processes that may be holding it:" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@) — процеси, що можуть його тримати:"
+          }
+        }
+      }
+    },
+    "%@ (%@) → %@ direct, around %@. If %@ has a Kill Switch on, it may still pull everything into its tunnel." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@) → %3$@ напряму, повз %4$@. Якщо в %5$@ увімкнено Kill Switch, він може й далі тягнути все в тунель."
+          }
+        }
+      }
+    },
+    "%@ (old version: %@)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (стара версія: %2$@)"
+          }
+        }
+      }
+    },
+    "%@ does not resolve (DNS: %@) — the connection will most likely fail. DNS → Fix or a split rule." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ не резолвиться (DNS: %2$@) — підключення, найімовірніше, не вдасться. DNS → Fix або split-правило."
+          }
+        }
+      }
+    },
+    "%@ has no internet — macOS picks by service order, not by reachability." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ без інтернету — macOS обирає за порядком сервісів, не за доступністю."
+          }
+        }
+      }
+    },
+    "%@ is the address of interface %@, not a DNS server." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ — адреса інтерфейсу %2$@, а не DNS-сервер."
+          }
+        }
+      }
+    },
+    "%@ may hold the network" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ може тримати мережу"
+          }
+        }
+      }
+    },
+    "%@ no internet" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ без інтернету"
+          }
+        }
+      }
+    },
+    "%@ put its DNS back. Only an up-to-date helper can hold your choice without a password (Settings → Helper)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ повернув свій DNS. Тримати вибір без пароля може лише актуальний helper (Settings → Helper)."
+          }
+        }
+      }
+    },
+    "%@ stays via %@ on the network “%@”. Reset it in Routes → Decisions." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ лишається через %2$@ у мережі «%3$@». Скинути — Routes → Рішення."
+          }
+        }
+      }
+    },
+    "%@ stays via %@. Reset it in Routes → Decisions." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ лишається через %2$@. Скинути — Routes → Рішення."
+          }
+        }
+      }
+    },
+    "%@ via %@ · %@: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ через %2$@ · %3$@: %4$@"
+          }
+        }
+      }
+    },
+    "%@ · %lld connecting" : {
+      "comment" : "Headline: “2 tunnels up · 1 connecting”",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %#@conn@"
+          },
+          "substitutions" : {
+            "conn" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "few" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg підключаються"
+                    }
+                  },
+                  "many" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg підключаються"
+                    }
+                  },
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg підключається"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg підключаються"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%@ — reconnect to apply (old version: %@)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ — перепідключись, щоб застосувати (стара версія: %2$@)"
+          }
+        }
+      }
+    },
+    "%@. Only the helper can restore them without a password (Settings → Helper); or open DNS → Fix." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@. Повернути без пароля може лише helper (Settings → Helper); або відкрий DNS → Fix."
+          }
+        }
+      }
+    },
+    "%@. Temporarily displaced: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@. Тимчасово відсунуто: %2$@"
+          }
+        }
+      }
+    },
+    "%@: done" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: готово"
+          }
+        }
+      }
+    },
+    "%@: server %@ goes direct via %@ again, around %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: сервер %2$@ знову напряму через %3$@, повз %4$@"
+          }
+        }
+      }
+    },
+    "%@: server %@ goes via %@ (%@) — a tunnel inside a tunnel. It works, but slower, and reconnecting %@ drops the session." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: сервер %2$@ іде через %3$@ (%4$@) — тунель у тунелі. Працює, але повільніше, і перепідключення %5$@ рве сесію."
+          }
+        }
+      }
+    },
+    "%lld (outdated — reinstall)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld (застаріла — перевстанови)"
+          }
+        }
+      }
+    },
+    "%lld resolvers of dead tunnels" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld resolver of a dead tunnel"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld resolvers of dead tunnels"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld резолвери мертвих тунелів"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld резолверів мертвих тунелів"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld резолвер мертвого тунелю"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld резолвера мертвих тунелів"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld tunnels up" : {
+      "comment" : "Popover headline: number of connected tunnels",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tunnel up"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tunnels up"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld тунелі активні"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld тунелів активних"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld тунель активний"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld тунелю активного"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld/%lld" : {
+      "shouldTranslate" : false
+    },
+    "(empty)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(порожньо)"
+          }
+        }
+      }
+    },
+    "(none)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(немає)"
+          }
+        }
+      }
+    },
+    "*.conf configs in /opt/homebrew/etc/wireguard, /usr/local/etc/wireguard or /etc/wireguard (root-only folders become visible once the helper is installed)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Конфіги *.conf у /opt/homebrew/etc/wireguard, /usr/local/etc/wireguard або /etc/wireguard (root-only теки видно після встановлення helper)."
+          }
+        }
+      }
+    },
+    "*.ovpn profiles in %@." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Профілі *.ovpn у %@."
+          }
+        }
+      }
+    },
+    "+ %@" : {
+      "shouldTranslate" : false
+    },
+    "0/1 + 128.0/1 hijack → %@: a full-tunnel VPN carries all traffic." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перехоплення 0/1 + 128.0/1 → %@: повнотунельний VPN тримає весь трафік."
+          }
+        }
+      }
+    },
+    "<%@> updated" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "<%@> оновлено"
+          }
+        }
+      }
+    },
+    "A Foreign VPN Took Over the Route" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сторонній VPN захопив маршрут"
+          }
+        }
+      }
+    },
+    "A StoneVPN host (not from the Cisco profile)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Власний хост StoneVPN (не з профілю Cisco)."
+          }
+        }
+      }
+    },
+    "A VPN Server Goes Through Another Tunnel" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер VPN іде через чужий тунель"
+          }
+        }
+      }
+    },
+    "A build from source — update it with git pull and make -C app install. Automatic updates come with releases (Homebrew / GitHub Releases)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Збірка з вихідного коду — оновлюється через git pull і make -C app install. Автооновлення є в релізах (Homebrew / GitHub Releases)."
+          }
+        }
+      }
+    },
+    "A disabled backend is neither shown nor probed. To hide it from the popover without disabling it, use “Edit” in the provider list." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вимкнений бекенд не показується і не опитується. Приховати з поповера, не вимикаючи, — «Змінити» у списку провайдерів."
+          }
+        }
+      }
+    },
+    "A folder shared with OpenVPN Connect (files are named by ms timestamp — give them aliases in the Profiles window)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Спільна з OpenVPN Connect тека (файли названі ms-timestamp — дай псевдоніми у вікні профілів)."
+          }
+        }
+      }
+    },
+    "A foreign VPN holds the network" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сторонній VPN тримає мережу"
+          }
+        }
+      }
+    },
+    "A foreign VPN owns the network" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мережу тримає сторонній VPN"
+          }
+        }
+      }
+    },
+    "A host route to the VPN server via the LAN gateway, for when macOS sends it out the wrong interface. Servers reachable through another tunnel (VPN-in-VPN) are skipped automatically." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host-маршрут до VPN-сервера через LAN-шлюз, коли macOS веде його не тим інтерфейсом. Сервери, досяжні через інший тунель (VPN-у-VPN), пропускаються автоматично."
+          }
+        }
+      }
+    },
+    "A port is allowed, e.g. vpn.example.com:8448" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Можна з портом, напр. vpn.example.com:8448"
+          }
+        }
+      }
+    },
+    "A port is allowed: host:8448. A new host is saved to the profile list." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Можна з портом: host:8448. Новий хост збережеться у списку профілів."
+          }
+        }
+      }
+    },
+    "A root daemon for wg-quick / openvpn / DNS / routes without asking for a password every time. It accepts connections only from StoneVPN with the same signature and runs a fixed set of checked actions. Without it, every such action asks for the administrator password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Root-демон для wg-quick / openvpn / DNS / маршрутів без запиту пароля щоразу. Приймає з'єднання лише від StoneVPN з тим самим підписом і виконує фіксований набір перевірених дій. Без нього кожна дія питає пароль адміністратора."
+          }
+        }
+      }
+    },
+    "Accept" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Погодити"
+          }
+        }
+      }
+    },
+    "Accept it, or send it direct via %@?" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Погодити чи пустити напряму через %@?"
+          }
+        }
+      }
+    },
+    "Accept — keep it this way" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Погодити — лишити так"
+          }
+        }
+      }
+    },
+    "Add" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати"
+          }
+        }
+      }
+    },
+    "Add / import / certificates" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати / імпорт / сертифікати"
+          }
+        }
+      }
+    },
+    "Add Host…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати хост…"
+          }
+        }
+      }
+    },
+    "Add Profile (.ovpn)…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати профіль (.ovpn)…"
+          }
+        }
+      }
+    },
+    "Add a Favourite Profile…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати обраний профіль…"
+          }
+        }
+      }
+    },
+    "Add or remove them in the popover: DNS → Set DNS / split." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати/прибрати — у поповері: DNS → Встановити DNS / split."
+          }
+        }
+      }
+    },
+    "Add to Favourites" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати в обрані"
+          }
+        }
+      }
+    },
+    "Added profile %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додано профіль %@"
+          }
+        }
+      }
+    },
+    "Address" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Адреса"
+          }
+        }
+      }
+    },
+    "Advanced" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додатково"
+          }
+        }
+      }
+    },
+    "After a VPN Disconnects" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Після відключення VPN"
+          }
+        }
+      }
+    },
+    "Alias" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Псевдонім"
+          }
+        }
+      }
+    },
+    "All %@ profiles" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Усі профілі %@"
+          }
+        }
+      }
+    },
+    "All healthy: the resolver responds, no orphaned entries." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Все здорове: резолвер відповідає, осиротілих записів немає."
+          }
+        }
+      }
+    },
+    "Allow" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дозволити"
+          }
+        }
+      }
+    },
+    "App" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Застосунок"
+          }
+        }
+      }
+    },
+    "App Folder" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тека застосунку"
+          }
+        }
+      }
+    },
+    "Apply" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Застосувати"
+          }
+        }
+      }
+    },
+    "Ask" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Питати"
+          }
+        }
+      }
+    },
+    "Ask When Connecting" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Питати при підключенні"
+          }
+        }
+      }
+    },
+    "Asking the server which groups are available (without signing in)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Питаю сервер, які групи доступні (без входу)"
+          }
+        }
+      }
+    },
+    "Auto" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto"
+          }
+        }
+      }
+    },
+    "Auto DNS Fix When No VPN Is Up" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto DNS fix, коли жодного VPN немає"
+          }
+        }
+      }
+    },
+    "Auto DNS fix did not help" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto DNS fix не допоміг"
+          }
+        }
+      }
+    },
+    "Auto DNS fix skipped" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto DNS fix пропущено"
+          }
+        }
+      }
+    },
+    "Auto-fix: Primary Without Internet → Move a Working One Up" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-fix: первинний без інтернету → підняти робочий"
+          }
+        }
+      }
+    },
+    "Automatically Check for Updates" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоматично перевіряти оновлення"
+          }
+        }
+      }
+    },
+    "Automation" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоматика"
+          }
+        }
+      }
+    },
+    "Backends" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бекенди"
+          }
+        }
+      }
+    },
+    "Baseline" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Еталон"
+          }
+        }
+      }
+    },
+    "Can't hold the primary DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Основний DNS не втримати"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скасувати"
+          }
+        }
+      }
+    },
+    "Certificate <cert>…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сертифікат <cert>…"
+          }
+        }
+      }
+    },
+    "Certificate management works through the CLI repository (Settings → Advanced)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Керування сертифікатами працює через CLI-репозиторій (Settings → Додатково)"
+          }
+        }
+      }
+    },
+    "Check" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевірити"
+          }
+        }
+      }
+    },
+    "Check for Updates…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевірити оновлення…"
+          }
+        }
+      }
+    },
+    "Check the Resolver in the Background" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевіряти резолвер у фоні"
+          }
+        }
+      }
+    },
+    "Chosen by the System" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Як вирішила система"
+          }
+        }
+      }
+    },
+    "Close the Cisco GUI and fetch groups from the server" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрити GUI Cisco і отримати групи з сервера"
+          }
+        }
+      }
+    },
+    "Closing Defguard.app" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закриваю Defguard.app"
+          }
+        }
+      }
+    },
+    "Closing the Cisco GUI" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закриваю GUI Cisco"
+          }
+        }
+      }
+    },
+    "Coloured Icon" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кольорова іконка"
+          }
+        }
+      }
+    },
+    "Config deleted" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Конфіг видалено"
+          }
+        }
+      }
+    },
+    "Configuration" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Конфігурація"
+          }
+        }
+      }
+    },
+    "Connect" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підключення"
+          }
+        }
+      }
+    },
+    "Connect %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підключити %@"
+          }
+        }
+      }
+    },
+    "Connected" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підключено"
+          }
+        }
+      }
+    },
+    "Connecting…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підключення…"
+          }
+        }
+      }
+    },
+    "Connection" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підключення"
+          }
+        }
+      }
+    },
+    "Connection timeout" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Таймаут підключення"
+          }
+        }
+      }
+    },
+    "Could not remove a dead route: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося прибрати мертвий маршрут: %@"
+          }
+        }
+      }
+    },
+    "Current LAN Gateway" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поточний LAN-шлюз"
+          }
+        }
+      }
+    },
+    "Custom" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свій"
+          }
+        }
+      }
+    },
+    "Custom…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свій…"
+          }
+        }
+      }
+    },
+    "DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS"
+          }
+        }
+      }
+    },
+    "DNS Not Responding" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS не відповідає"
+          }
+        }
+      }
+    },
+    "DNS Restore After WireGuard" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повернення DNS після WireGuard"
+          }
+        }
+      }
+    },
+    "DNS cache flushed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS-кеш очищено"
+          }
+        }
+      }
+    },
+    "DNS did not recover after VPN" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS не відновився після VPN"
+          }
+        }
+      }
+    },
+    "DNS is not responding" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS не відповідає"
+          }
+        }
+      }
+    },
+    "DNS is not responding, but repairing it without a password needs the helper (Settings → Helper)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS не відповідає, але для ремонту без пароля потрібен helper (Settings → Helper)."
+          }
+        }
+      }
+    },
+    "DNS of an active tunnel" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS активного тунелю"
+          }
+        }
+      }
+    },
+    "DNS of an expired Defguard session" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS протухлої сесії Defguard"
+          }
+        }
+      }
+    },
+    "DNS of “%@” → %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS «%1$@» → %2$@"
+          }
+        }
+      }
+    },
+    "DNS problem" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проблема з DNS"
+          }
+        }
+      }
+    },
+    "DNS repaired automatically" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS відремонтовано автоматично"
+          }
+        }
+      }
+    },
+    "DNS restore: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повернення DNS: %@"
+          }
+        }
+      }
+    },
+    "DNS restored after VPN: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS повернуто після VPN: %@"
+          }
+        }
+      }
+    },
+    "DNS temporarily on %@ — the resolver of the expired Defguard session is silent" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS тимчасово на %@ — резолвер протухлої сесії Defguard мовчить"
+          }
+        }
+      }
+    },
+    "DNS temporarily switched to %@." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS тимчасово переключено на %@."
+          }
+        }
+      }
+    },
+    "DNS_SERVICES" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS_SERVICES"
+          }
+        }
+      }
+    },
+    "Decision reset" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рішення скинуто"
+          }
+        }
+      }
+    },
+    "Decision reset, direct route to %@ removed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рішення скинуто, маршрут напряму до %@ прибрано"
+          }
+        }
+      }
+    },
+    "Decisions" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рішення"
+          }
+        }
+      }
+    },
+    "Decline — go direct via LAN" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відхилити — напряму через LAN"
+          }
+        }
+      }
+    },
+    "Default" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        }
+      }
+    },
+    "Defguard %@: the tunnel says “Connected”, but the gateway doesn't answer the handshake — the (MFA) session was dropped on the server. DNS edits won't help: press “Renew” with a new code." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defguard %@: тунель «Connected», але gateway не відповідає на хендшейк — сесію (MFA) скинуто на сервері. Правки DNS тут не допоможуть: потрібне «Оновити» з новим кодом."
+          }
+        }
+      }
+    },
+    "Defguard “%@” shows “connected”, but the gateway no longer accepts the session (slept past the threshold)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defguard «%@» показує «підключено», але gateway більше не приймає сесію (сон довший за поріг)."
+          }
+        }
+      }
+    },
+    "Defguard “%@” shows “connected”, but the gateway no longer accepts the session (slept past the threshold). DNS is temporarily on %@." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defguard «%1$@» показує «підключено», але gateway більше не приймає сесію (сон довший за поріг). DNS тимчасово на %2$@."
+          }
+        }
+      }
+    },
+    "Defguard “%@”: session expired" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defguard «%@»: сесія протухла"
+          }
+        }
+      }
+    },
+    "Defguard.app is running — it stops an MFA session started from the CLI and asks for the code in its own window. It will be closed before connecting (the system extension keeps the tunnels)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defguard.app запущений — він зупиняє MFA-сесію, підняту з CLI, і просить код у своєму вікні. Його буде закрито перед підключенням (тунелі тримає системне розширення)."
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити"
+          }
+        }
+      }
+    },
+    "Delete the profile" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити профіль"
+          }
+        }
+      }
+    },
+    "Delete “%@”?" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити «%@»?"
+          }
+        }
+      }
+    },
+    "Delete…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити…"
+          }
+        }
+      }
+    },
+    "Direct route to %@: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Маршрут напряму до %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "Direct · %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Напряму · %@"
+          }
+        }
+      }
+    },
+    "Disabled (DISABLED_BACKENDS)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вимкнені (DISABLED_BACKENDS)"
+          }
+        }
+      }
+    },
+    "Disconnect" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відключити"
+          }
+        }
+      }
+    },
+    "Disconnect %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відключити %@"
+          }
+        }
+      }
+    },
+    "Disconnect %@ first" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Спершу відключи %@"
+          }
+        }
+      }
+    },
+    "Disconnect All" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відключити все"
+          }
+        }
+      }
+    },
+    "Disconnect first" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Спершу відключи"
+          }
+        }
+      }
+    },
+    "Disconnected" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відключено"
+          }
+        }
+      }
+    },
+    "Displaced while chosen: %@. Their internal domains go through split DNS." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відсунуто на час вибору: %@. Їхні внутрішні домени — через split DNS."
+          }
+        }
+      }
+    },
+    "Doctor" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doctor"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово"
+          }
+        }
+      }
+    },
+    "Done — DNS responds." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово — DNS відповідає."
+          }
+        }
+      }
+    },
+    "Edit" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Змінити"
+          }
+        }
+      }
+    },
+    "Edit the rule" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Редагувати правило"
+          }
+        }
+      }
+    },
+    "Empty = default" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порожньо = за замовчуванням"
+          }
+        }
+      }
+    },
+    "Empty = leave DNS alone. Defguard and Cisco restore their own — only a flush for them." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порожньо = DNS не чіпати. Defguard і Cisco відновлюють свій самі — для них лише flush."
+          }
+        }
+      }
+    },
+    "Enabled (DISABLED_BACKENDS)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Увімкнені (DISABLED_BACKENDS)"
+          }
+        }
+      }
+    },
+    "Error" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Помилка"
+          }
+        }
+      }
+    },
+    "Failed: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося: %@"
+          }
+        }
+      }
+    },
+    "Favourite" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В обрані"
+          }
+        }
+      }
+    },
+    "Fetch groups from the server" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отримати групи з сервера"
+          }
+        }
+      }
+    },
+    "Fetching groups…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отримую групи…"
+          }
+        }
+      }
+    },
+    "File" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файл"
+          }
+        }
+      }
+    },
+    "Fix DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix DNS"
+          }
+        }
+      }
+    },
+    "Fix Now" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix зараз"
+          }
+        }
+      }
+    },
+    "Fixed Gateway" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фіксований шлюз"
+          }
+        }
+      }
+    },
+    "Flush" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flush"
+          }
+        }
+      }
+    },
+    "Forget" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Забути"
+          }
+        }
+      }
+    },
+    "Found Tools" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Знайдені інструменти"
+          }
+        }
+      }
+    },
+    "From the Cisco profile (the head-end rewrites it) — editing saves a copy in StoneVPN." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "З профілю Cisco (head-end перезаписує його) — зміна збереже копію у StoneVPN."
+          }
+        }
+      }
+    },
+    "Gateway" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шлюз"
+          }
+        }
+      }
+    },
+    "Gateway %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шлюз %@"
+          }
+        }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загальні"
+          }
+        }
+      }
+    },
+    "Group" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Група"
+          }
+        }
+      }
+    },
+    "Hidden:" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приховані:"
+          }
+        }
+      }
+    },
+    "Hide %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приховати %@"
+          }
+        }
+      }
+    },
+    "Hide until the app restarts" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сховати до перезапуску застосунку"
+          }
+        }
+      }
+    },
+    "Host" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хост"
+          }
+        }
+      }
+    },
+    "Hosts from the Cisco profile (vpn -s hosts)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хости з профілю Cisco (vpn -s hosts)."
+          }
+        }
+      }
+    },
+    "If DNS doesn't respond and there are no tunnels (ours, foreign, utun), it's a leftover of a dead VPN, and DNS Fix runs by itself: removes orphaned resolvers and bounces the service. At most once every 2 min. Needs the helper — otherwise just a notification." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Якщо DNS не відповідає, а тунелів (наших, сторонніх, utun) немає — це залишок мертвого VPN, і DNS Fix запускається сам: прибирає осиротілі резолвери і перебиває сервіс. Не частіше раз на 2 хв. Потрібен helper — інакше лише сповіщення."
+          }
+        }
+      }
+    },
+    "If the server asks for a second factor, an empty field sends “push” — approve the sign-in in Duo on your phone. Or enter a passcode." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Якщо сервер питає другий фактор, порожнє поле надсилає «push» — підтверди вхід у Duo на телефоні. Або введи passcode."
+          }
+        }
+      }
+    },
+    "In Favourites" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В обраних"
+          }
+        }
+      }
+    },
+    "In the Background" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У фоні"
+          }
+        }
+      }
+    },
+    "Install" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Встановити"
+          }
+        }
+      }
+    },
+    "Interface" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Інтерфейс"
+          }
+        }
+      }
+    },
+    "Interface Language" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мова інтерфейсу"
+          }
+        }
+      }
+    },
+    "LAN Gateway" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LAN-шлюз"
+          }
+        }
+      }
+    },
+    "Language" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мова"
+          }
+        }
+      }
+    },
+    "Language, updates, startup and the menu bar icon." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мова, оновлення, запуск та іконка в menubar."
+          }
+        }
+      }
+    },
+    "Last Gateway Choice" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Останній вибір шлюзу"
+          }
+        }
+      }
+    },
+    "Last Username" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Останній логін"
+          }
+        }
+      }
+    },
+    "Launch at Login" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запускати при вході"
+          }
+        }
+      }
+    },
+    "List from the server" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Список із сервера"
+          }
+        }
+      }
+    },
+    "Loading…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантаження…"
+          }
+        }
+      }
+    },
+    "Locations are added in Defguard.app." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Локації додаються в Defguard.app."
+          }
+        }
+      }
+    },
+    "Log" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Лог"
+          }
+        }
+      }
+    },
+    "Login" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Логін"
+          }
+        }
+      }
+    },
+    "Login Items…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Login Items…"
+          }
+        }
+      }
+    },
+    "MFA code (%@)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MFA-код (%@)"
+          }
+        }
+      }
+    },
+    "Manage" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Керування"
+          }
+        }
+      }
+    },
+    "Menu Bar Icon" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Іконка в menubar"
+          }
+        }
+      }
+    },
+    "Moved to the app folder: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перенесено в теку застосунку: %@"
+          }
+        }
+      }
+    },
+    "Neither Cisco nor wg-quick touch files in /etc/resolver — a durable way to resolve a tunnel’s internal domains." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файли в /etc/resolver не чіпають ні Cisco, ні wg-quick — стійкий спосіб резолвити внутрішні домени тунелю."
+          }
+        }
+      }
+    },
+    "Network" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мережа"
+          }
+        }
+      }
+    },
+    "Network changes (SystemConfiguration) update the status instantly; while the popover is open — every 3 s." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зміни мережі (SystemConfiguration) оновлюють статус миттєво; поки поповер відкритий — кожні 3 с."
+          }
+        }
+      }
+    },
+    "Network service order and its automation." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порядок мережевих сервісів і автоматика."
+          }
+        }
+      }
+    },
+    "Never" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ніколи"
+          }
+        }
+      }
+    },
+    "New .ovpn for “%@”" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новий .ovpn для «%@»"
+          }
+        }
+      }
+    },
+    "New Cisco Host" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новий Cisco-хост"
+          }
+        }
+      }
+    },
+    "New OpenVPN Profile" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новий профіль OpenVPN"
+          }
+        }
+      }
+    },
+    "No LAN gateway for a direct route" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає LAN-шлюзу для маршруту напряму"
+          }
+        }
+      }
+    },
+    "No Profiles" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає профілів"
+          }
+        }
+      }
+    },
+    "No active tunnels" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає активних тунелів"
+          }
+        }
+      }
+    },
+    "No baseline yet — it appears after a minute without WG and with working DNS." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Еталон ще не знято — з'явиться за хвилину без WG і з живим DNS."
+          }
+        }
+      }
+    },
+    "No connection request" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає запиту на підключення"
+          }
+        }
+      }
+    },
+    "No internet" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає інтернету"
+          }
+        }
+      }
+    },
+    "No live tunnels" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає живих тунелів"
+          }
+        }
+      }
+    },
+    "No profiles" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає профілів"
+          }
+        }
+      }
+    },
+    "No providers. Turn backends on in Settings → Backends." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає провайдерів. Увімкни бекенди в Settings → Бекенди."
+          }
+        }
+      }
+    },
+    "No real service found to repair (DNS_SERVICES in config.env)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не знайшов реального сервісу для ремонту (DNS_SERVICES у config.env)."
+          }
+        }
+      }
+    },
+    "No rules" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Правил немає"
+          }
+        }
+      }
+    },
+    "No rules — a tunnel’s internal domains can be sent to its DNS." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Правил немає — внутрішні домени тунелю можна направити на його DNS."
+          }
+        }
+      }
+    },
+    "No settings found" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нічого не знайдено"
+          }
+        }
+      }
+    },
+    "Not an IP: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не IP: %@"
+          }
+        }
+      }
+    },
+    "Not stored (the username is remembered for the profile). The temporary auth file is deleted after connecting." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не зберігається (логін — запам'ятовується для профілю). Тимчасовий auth-файл видаляється після підключення."
+          }
+        }
+      }
+    },
+    "Not stored; handed to the Cisco client only when it asks for Password. The username and group are remembered for this host." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не зберігається; передається клієнту Cisco лише на запит Password. Логін і група запам'ятовуються для цього хоста."
+          }
+        }
+      }
+    },
+    "Notifications" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сповіщення"
+          }
+        }
+      }
+    },
+    "Off — a monochrome template; only the shape shows the state (outline / filled / “!” / dot)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вимкнено — template-монохром; стан передає лише форма (контур / заповнений / «!» / крапка)."
+          }
+        }
+      }
+    },
+    "On the Primary" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На первинний"
+          }
+        }
+      }
+    },
+    "Only an up-to-date helper can switch DNS to another resolver without a password (Settings → Helper). Or press “Renew”." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переключити DNS на інший резолвер без пароля може лише актуальний helper (Settings → Helper). Або натисни «Оновити»."
+          }
+        }
+      }
+    },
+    "Open Defguard.app" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити Defguard.app"
+          }
+        }
+      }
+    },
+    "Open config.env" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити config.env"
+          }
+        }
+      }
+    },
+    "Open in Terminal Instead" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити в Terminal замість цього"
+          }
+        }
+      }
+    },
+    "OpenVPN: script menu (Terminal)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenVPN: меню скрипта (Terminal)"
+          }
+        }
+      }
+    },
+    "Order" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порядок"
+          }
+        }
+      }
+    },
+    "Orphaned" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осиротілі"
+          }
+        }
+      }
+    },
+    "Other IP" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Інший IP"
+          }
+        }
+      }
+    },
+    "Owner" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Власник"
+          }
+        }
+      }
+    },
+    "PEM for <%@> in “%@”" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PEM для <%1$@> у «%2$@»"
+          }
+        }
+      }
+    },
+    "PID unknown" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PID невідомий"
+          }
+        }
+      }
+    },
+    "Passed as --code; an empty code will be rejected." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Передається як --code; порожній код буде відхилено."
+          }
+        }
+      }
+    },
+    "Password" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароль"
+          }
+        }
+      }
+    },
+    "Password / OTP" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароль / OTP"
+          }
+        }
+      }
+    },
+    "Paths" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шляхи"
+          }
+        }
+      }
+    },
+    "Primary" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Основний"
+          }
+        }
+      }
+    },
+    "Primary DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Основний DNS"
+          }
+        }
+      }
+    },
+    "Primary DNS overridden" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Основний DNS перебито"
+          }
+        }
+      }
+    },
+    "Primary DNS reset" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Основний DNS скинуто"
+          }
+        }
+      }
+    },
+    "Primary DNS: %@ (%@)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Основний DNS: %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "Primary DNS: chosen by the system (%@)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Основний DNS: як вирішила система (%@)"
+          }
+        }
+      }
+    },
+    "Priority: this profile’s username → config.env → auth.txt (the shared LAST_USERNAME from state.env is for the CLI only). OTP is never stored." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пріоритет: логін цього профілю → config.env → auth.txt (спільний LAST_USERNAME зі state.env — лише для CLI). OTP не зберігається ніколи."
+          }
+        }
+      }
+    },
+    "Private Key <key>…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приватний ключ <key>…"
+          }
+        }
+      }
+    },
+    "Privileged helper" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privileged helper"
+          }
+        }
+      }
+    },
+    "Profile Settings" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Налаштування профілю"
+          }
+        }
+      }
+    },
+    "Profile Settings…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Налаштування профілю…"
+          }
+        }
+      }
+    },
+    "Profile file unknown" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файл профілю невідомий"
+          }
+        }
+      }
+    },
+    "Profile moved to the Trash" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Профіль переміщено в Кошик"
+          }
+        }
+      }
+    },
+    "Profile replaced" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Профіль замінено"
+          }
+        }
+      }
+    },
+    "Profiles" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Профілі"
+          }
+        }
+      }
+    },
+    "Profiles, Settings, Connect. macOS only lists apps with a Dock icon in Cmd+Tab, so the icon appears meanwhile and goes away when you close the last window." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Профілі, Налаштування, Підключення. macOS пускає в Cmd+Tab лише застосунки з іконкою в Dock, тож на цей час вона з'являється і зникає, коли закриваєш останнє вікно."
+          }
+        }
+      }
+    },
+    "Profiles, login and route-fix for OpenVPN." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Профілі, логін і route-fix для OpenVPN."
+          }
+        }
+      }
+    },
+    "Profiles…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Профілі…"
+          }
+        }
+      }
+    },
+    "Providers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Провайдери"
+          }
+        }
+      }
+    },
+    "Quit" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вийти"
+          }
+        }
+      }
+    },
+    "Reconnect" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перепідключити"
+          }
+        }
+      }
+    },
+    "Reconnect with a new MFA code" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перепідключити з новим MFA-кодом"
+          }
+        }
+      }
+    },
+    "Refresh" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновити"
+          }
+        }
+      }
+    },
+    "Reinstall" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевстановити"
+          }
+        }
+      }
+    },
+    "Remember for this profile and don't ask again" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запам'ятати для профілю й більше не питати"
+          }
+        }
+      }
+    },
+    "Remember the Gateway Choice per Profile (+ state.env)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запам'ятовувати вибір шлюзу для кожного профілю (+ state.env)"
+          }
+        }
+      }
+    },
+    "Remember the Username per OpenVPN Profile and Cisco Host (+ state.env for the CLI)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запам'ятовувати логін окремо для кожного профілю OpenVPN і хоста Cisco (+ state.env для CLI)"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити"
+          }
+        }
+      }
+    },
+    "Remove from Favourites" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прибрати з обраних"
+          }
+        }
+      }
+    },
+    "Remove the rule" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прибрати правило"
+          }
+        }
+      }
+    },
+    "Removed %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прибрано %@"
+          }
+        }
+      }
+    },
+    "Renew" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновити"
+          }
+        }
+      }
+    },
+    "Replace" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Замінити"
+          }
+        }
+      }
+    },
+    "Replaces exactly this file; the old version stays next to it as .ovpn.bak" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Замінюється саме цей файл; стара версія лишається поруч як .ovpn.bak"
+          }
+        }
+      }
+    },
+    "Repository" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Репозиторій"
+          }
+        }
+      }
+    },
+    "Repository Folder" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тека репозиторію"
+          }
+        }
+      }
+    },
+    "Repository not found — the app runs on its own with its own folder." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Репозиторій не знайдено — застосунок працює окремо зі своєю текою."
+          }
+        }
+      }
+    },
+    "Reset" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скинути"
+          }
+        }
+      }
+    },
+    "Reset App Settings" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скинути налаштування застосунку"
+          }
+        }
+      }
+    },
+    "Reset Baseline" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скинути еталон"
+          }
+        }
+      }
+    },
+    "Reset — ask again" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скинути — знову питати"
+          }
+        }
+      }
+    },
+    "Resolver" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resolver"
+          }
+        }
+      }
+    },
+    "Resolver %@ is silent. Open StoneVPN → DNS → Fix." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Резолвер %@ мовчить. Відкрий StoneVPN → DNS → Fix."
+          }
+        }
+      }
+    },
+    "Resolver %@ isn't responding — ping hangs. Fix checks orphaned DNS and bounces the service." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Резолвер %@ не відповідає — ping «висить». Fix перевірить осиротілі DNS і переб'є сервіс."
+          }
+        }
+      }
+    },
+    "Restart Now" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустити"
+          }
+        }
+      }
+    },
+    "Restore DNS after down (WireGuard / OpenVPN)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відновлювати DNS після down (WireGuard / OpenVPN)"
+          }
+        }
+      }
+    },
+    "Restore Now" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повернути зараз"
+          }
+        }
+      }
+    },
+    "Restore the Services’ DNS as Soon as WireGuard Disconnects" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повертати DNS сервісів, щойно WireGuard відключено"
+          }
+        }
+      }
+    },
+    "Restoring DNS after VPN…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повертаю DNS після VPN…"
+          }
+        }
+      }
+    },
+    "Restoring DNS after a VPN, the doctor and split DNS." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повернення DNS після VPN, doctor і split DNS."
+          }
+        }
+      }
+    },
+    "Route" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Маршрут"
+          }
+        }
+      }
+    },
+    "Route in question: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Маршрут під питанням: %@"
+          }
+        }
+      }
+    },
+    "Route-fix" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route-fix"
+          }
+        }
+      }
+    },
+    "Route-fix (to VPN servers, around the tunnel)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route-fix (до VPN-серверів повз тунель)"
+          }
+        }
+      }
+    },
+    "Route-fix gateway for %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route-fix шлюз для %@"
+          }
+        }
+      }
+    },
+    "Route-fix per profile" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route-fix для кожного профілю"
+          }
+        }
+      }
+    },
+    "Routes" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Маршрути"
+          }
+        }
+      }
+    },
+    "Same as System" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Як у системі"
+          }
+        }
+      }
+    },
+    "Same as “net auto”. Runs in the background only with the helper installed (no password prompts)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Те саме, що «net auto». Працює у фоні лише з встановленим helper (без запитів пароля)."
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зберегти"
+          }
+        }
+      }
+    },
+    "Save a Copy" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зберегти копію"
+          }
+        }
+      }
+    },
+    "Search" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пошук"
+          }
+        }
+      }
+    },
+    "Search settings" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пошук у налаштуваннях"
+          }
+        }
+      }
+    },
+    "Second Factor (Duo / OTP)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Другий фактор (Duo / OTP)"
+          }
+        }
+      }
+    },
+    "Select a Profile" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оберіть профіль"
+          }
+        }
+      }
+    },
+    "Server %@ goes via %@ (%@) on the network “%@” — a tunnel inside a tunnel." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер %1$@ іде через %2$@ (%3$@) у мережі «%4$@» — тунель у тунелі."
+          }
+        }
+      }
+    },
+    "Server %@ goes via %@ (%@) — a tunnel inside a tunnel." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер %1$@ іде через %2$@ (%3$@) — тунель у тунелі."
+          }
+        }
+      }
+    },
+    "Server behind another VPN, but no route to it? Pick the tunnel's gateway." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер за іншим VPN, але маршруту до нього немає? Обери шлюз тунелю."
+          }
+        }
+      }
+    },
+    "Service Priority" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пріоритет сервісів"
+          }
+        }
+      }
+    },
+    "Set DNS on a Service" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Встановити DNS на сервіс"
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Налаштування"
+          }
+        }
+      }
+    },
+    "Settings reset — restart StoneVPN" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Налаштування скинуто — перезапусти StoneVPN"
+          }
+        }
+      }
+    },
+    "Shared with the CLI Repository (main-vpn-manager.sh)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Спільно з CLI-репозиторієм (main-vpn-manager.sh)"
+          }
+        }
+      }
+    },
+    "Sharing settings with the CLI repository and resetting the app." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Спільні з CLI-репозиторієм налаштування і скидання застосунку."
+          }
+        }
+      }
+    },
+    "Show" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показувати"
+          }
+        }
+      }
+    },
+    "Show Folder" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показати теку"
+          }
+        }
+      }
+    },
+    "Show in Cmd+Tab While a Window Is Open" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показувати в Cmd+Tab, поки відкрите вікно"
+          }
+        }
+      }
+    },
+    "Show in Finder" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показати у Finder"
+          }
+        }
+      }
+    },
+    "Show the Active Tunnel’s Name" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показувати назву активного тунелю"
+          }
+        }
+      }
+    },
+    "Show the Number of Tunnels" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показувати кількість тунелів"
+          }
+        }
+      }
+    },
+    "Skip route-fix" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустити route-fix"
+          }
+        }
+      }
+    },
+    "Split DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Split DNS"
+          }
+        }
+      }
+    },
+    "Split DNS (/etc/resolver)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Split DNS (/etc/resolver)"
+          }
+        }
+      }
+    },
+    "Standalone mode: settings live in the app folder; the CLI doesn’t see them (Advanced)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Окремий режим: налаштування в теці застосунку, CLI їх не бачить (Додатково)."
+          }
+        }
+      }
+    },
+    "Standalone mode: the app doesn't depend on the repo; when it was turned off, the files were copied here." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Окремий режим: застосунок не залежить від репо; при вимкненні файли скопійовано сюди."
+          }
+        }
+      }
+    },
+    "Startup" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запуск"
+          }
+        }
+      }
+    },
+    "Status" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стан"
+          }
+        }
+      }
+    },
+    "Status Updates" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновлення"
+          }
+        }
+      }
+    },
+    "StoneVPN: %@" : {
+      "comment" : "Administrator password prompt; the argument is the action, e.g. “connect WireGuard”",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StoneVPN: %@"
+          }
+        }
+      }
+    },
+    "Symlinks are resolved: NetworkExtension finds the bundle by the exec path." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Симлінки розгортаються: NetworkExtension шукає бандл за шляхом exec."
+          }
+        }
+      }
+    },
+    "System" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Система"
+          }
+        }
+      }
+    },
+    "Take Down" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Розірвати"
+          }
+        }
+      }
+    },
+    "Take Down…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Розірвати…"
+          }
+        }
+      }
+    },
+    "The Cisco GUI is open — the CLI can't fetch groups" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GUI Cisco відкритий — CLI не може отримати групи"
+          }
+        }
+      }
+    },
+    "The Cisco Secure Client GUI is open — the CLI and the GUI can't drive the agent at the same time. It will be closed before connecting (vpnagentd keeps the tunnel)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрито GUI Cisco Secure Client — CLI і GUI не можуть керувати агентом одночасно. Його закриють перед підключенням (тунель тримає vpnagentd)."
+          }
+        }
+      }
+    },
+    "The VPN client keeps putting its DNS back. Use split DNS for its internal domains." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клієнт VPN постійно повертає свій DNS. Для його внутрішніх доменів — split DNS."
+          }
+        }
+      }
+    },
+    "The config %@ will be deleted permanently (needs root — asks for a password if the helper isn't installed), together with its private key." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Конфіг %@ буде видалено назавжди (root — попросить пароль, якщо helper не встановлено), разом із приватним ключем."
+          }
+        }
+      }
+    },
+    "The decision applies to the network “%@”." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рішення — для мережі «%@»."
+          }
+        }
+      }
+    },
+    "The default gateway for host routes to the VPN server." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Типовий шлюз для host-маршрутів до VPN-сервера."
+          }
+        }
+      }
+    },
+    "The file %@ will go to the Trash (it can be restored). The profile's alias and settings will be forgotten." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файл %@ піде в Кошик (його можна відновити). Псевдонім і налаштування профілю буде забуто."
+          }
+        }
+      }
+    },
+    "The gateway no longer accepts the tunnel (slept longer than the threshold). DNS switched to another resolver; StoneVPN → Renew." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gateway більше не приймає тунель (сон довший за поріг). DNS переключено на інший резолвер; StoneVPN → Оновити."
+          }
+        }
+      }
+    },
+    "The helper is outdated (v%lld, needs v%lld) — Settings → Helper → Reinstall" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper застарий (v%1$lld, треба v%2$lld) — Settings → Helper → Перевстановити"
+          }
+        }
+      }
+    },
+    "The highest service with a gateway becomes primary — even without internet. Auto moves the first working one up." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Первинним стає найвищий сервіс зі шлюзом — навіть без інтернету. Auto піднімає перший робочий."
+          }
+        }
+      }
+    },
+    "The new language applies after a restart." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нова мова застосується після перезапуску."
+          }
+        }
+      }
+    },
+    "The primary is a VPN tunnel (%@) and its DNS responds. Nothing to fix." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Первинний — VPN-тунель (%@), і його DNS відповідає. Лагодити нічого."
+          }
+        }
+      }
+    },
+    "The primary is a VPN tunnel (%@), but its resolvers don't respond: a black hole for all traffic. DNS edits won't help — the tunnel has to go down." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Первинний — VPN-тунель (%@), але його резолвери не відповідають: чорна діра для всього трафіку. Правки DNS не допоможуть — тунель треба опустити."
+          }
+        }
+      }
+    },
+    "The primary is still %@ — the VPN did not release the network." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Первинний досі %@ — VPN не відпустив мережу."
+          }
+        }
+      }
+    },
+    "The primary service" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Первинний сервіс"
+          }
+        }
+      }
+    },
+    "The resolver still doesn't respond. The configuration is fixed, so the problem is lower — routes/network." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Резолвер досі не відповідає. Конфігурацію виправлено, тож проблема нижче — маршрути/мережа."
+          }
+        }
+      }
+    },
+    "The root daemon that runs privileged actions without a password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Root-демон, що виконує привілейовані дії без пароля."
+          }
+        }
+      }
+    },
+    "The routing table and SystemConfiguration disagree — normal with two defaults (scoped + regular)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Таблиця маршрутів і SystemConfiguration розходяться — це нормально при двох default (scoped + звичайний)."
+          }
+        }
+      }
+    },
+    "The server offers no group choice" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер не пропонує вибору групи"
+          }
+        }
+      }
+    },
+    "The session was dropped on the server — the tunnel says “connected”, but no traffic flows. Enter a new code: the app will disconnect and reconnect the location itself." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сесію скинуто на сервері — тунель «підключений», але трафік не ходить. Введи новий код: застосунок сам відключить і підключить локацію."
+          }
+        }
+      }
+    },
+    "The tunnel is still primary — the extension seems to have restarted. Disconnect the VPN in its app and try again." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тунель досі первинний — розширення, схоже, перезапустилось. Відключи VPN у його застосунку і повтори."
+          }
+        }
+      }
+    },
+    "The tunnel with DNS %@ is no longer active — the system picks DNS again." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тунель із DNS %@ більше не активний — DNS знову обирає система."
+          }
+        }
+      }
+    },
+    "There is no LAN gateway to go around it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LAN-шлюзу для обходу немає."
+          }
+        }
+      }
+    },
+    "This tunnel's DNS: %@." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS цього тунелю: %@."
+          }
+        }
+      }
+    },
+    "Timeout: %lld s" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Таймаут: %lld с"
+          }
+        }
+      }
+    },
+    "To Top" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На верх"
+          }
+        }
+      }
+    },
+    "To the top of the service order" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На верх порядку сервісів"
+          }
+        }
+      }
+    },
+    "Tunnel" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тунель"
+          }
+        }
+      }
+    },
+    "Tunnel %@ is held by Defguard “%@”. Disconnect it via defguard-client?" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тунель %1$@ тримає Defguard «%2$@». Від'єднати через defguard-client?"
+          }
+        }
+      }
+    },
+    "Tunnel Connected" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тунель підключено"
+          }
+        }
+      }
+    },
+    "Tunnel DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS тунелю"
+          }
+        }
+      }
+    },
+    "Tunnel DNS (never taken into the baseline)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS тунелів (не беруться в еталон)"
+          }
+        }
+      }
+    },
+    "Tunnel DNS left on services" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На сервісах лишився DNS тунелю"
+          }
+        }
+      }
+    },
+    "Tunnel Disconnected" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тунель відключено"
+          }
+        }
+      }
+    },
+    "Tunnel Dropped Unexpectedly" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тунель упав неочікувано"
+          }
+        }
+      }
+    },
+    "Tunnel dropped" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тунель упав"
+          }
+        }
+      }
+    },
+    "Type" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тип"
+          }
+        }
+      }
+    },
+    "Unchecked, the last choice is simply preselected next time. Change the policy in Profiles → profile." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без галочки останній вибір просто буде обраний наступного разу. Змінити політику — Профілі → профіль."
+          }
+        }
+      }
+    },
+    "Unknown names in DISABLED_BACKENDS: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Невідомі назви в DISABLED_BACKENDS: %@"
+          }
+        }
+      }
+    },
+    "Updates" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновлення"
+          }
+        }
+      }
+    },
+    "Uptime" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Час"
+          }
+        }
+      }
+    },
+    "Username" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Логін"
+          }
+        }
+      }
+    },
+    "Usually not needed for WireGuard — wg-quick routes to the Endpoint itself. Turn it on if the endpoint goes out the wrong interface." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для WireGuard зазвичай не потрібен — wg-quick сам веде маршрут до Endpoint. Увімкни, якщо endpoint іде не тим інтерфейсом."
+          }
+        }
+      }
+    },
+    "VPN disconnected — watching DNS and restoring the services' baseline servers until the resolver works." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VPN відключено — стежу за DNS і повертаю еталонні сервери сервісів, поки резолвер не запрацює."
+          }
+        }
+      }
+    },
+    "VPN service" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VPN-сервіс"
+          }
+        }
+      }
+    },
+    "Version" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Версія"
+          }
+        }
+      }
+    },
+    "WG folder" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WG тека"
+          }
+        }
+      }
+    },
+    "Warn again" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Знову попереджати"
+          }
+        }
+      }
+    },
+    "Which VPNs StoneVPN manages and where their tools are." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Якими VPN керує StoneVPN і де лежать їхні інструменти."
+          }
+        }
+      }
+    },
+    "Which events show a notification." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Про які події показувати сповіщення."
+          }
+        }
+      }
+    },
+    "Whole Profile (.ovpn)…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Весь профіль (.ovpn)…"
+          }
+        }
+      }
+    },
+    "Whose DNS to ask first for all domains. Other VPNs’ catch-all entries are moved aside meanwhile and put back on reset. A tunnel’s DNS resets by itself when the tunnel goes down." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чий DNS питати першим для всіх доменів. Catch-all записи інших VPN на цей час відсуваються і повертаються при скиданні. DNS тунелю скидається сам, коли тунель падає."
+          }
+        }
+      }
+    },
+    "WireGuard: generate / import / delete… (Terminal)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WireGuard: згенерувати / імпорт / видалити… (Terminal)"
+          }
+        }
+      }
+    },
+    "Written, but %@ stayed first" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записано, але першим лишився %@"
+          }
+        }
+      }
+    },
+    "Written, but %@ stayed first — its client put its entry back right away" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записано, але першим лишився %@ — його клієнт одразу повернув свій запис"
+          }
+        }
+      }
+    },
+    "a domain without a dot — the rule only catches names *.%@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "домен без крапки — правило ловить лише імена *.%@"
+          }
+        }
+      }
+    },
+    "accepted" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "погоджено"
+          }
+        }
+      }
+    },
+    "action" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "дія"
+          }
+        }
+      }
+    },
+    "all networks" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "усі мережі"
+          }
+        }
+      }
+    },
+    "all traffic" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "весь трафік"
+          }
+        }
+      }
+    },
+    "another resolver" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "інший резолвер"
+          }
+        }
+      }
+    },
+    "auth-user-pass (username + password/OTP)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "auth-user-pass (логін + пароль/OTP)"
+          }
+        }
+      }
+    },
+    "auto" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "авто"
+          }
+        }
+      }
+    },
+    "cancelled" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "скасовано"
+          }
+        }
+      }
+    },
+    "change split DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "змінити split-DNS"
+          }
+        }
+      }
+    },
+    "change the network service order" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "змінити порядок мережевих сервісів"
+          }
+        }
+      }
+    },
+    "change the route to a VPN server" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "змінити маршрут до VPN-сервера"
+          }
+        }
+      }
+    },
+    "checking DNS…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "перевірка DNS…"
+          }
+        }
+      }
+    },
+    "checking the route…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "перевірка маршруту…"
+          }
+        }
+      }
+    },
+    "config.env, state.env and auth.txt are the same ones main-vpn-manager.sh reads." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "config.env, state.env і auth.txt — ті самі, що читає main-vpn-manager.sh."
+          }
+        }
+      }
+    },
+    "connect OpenVPN" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "підключити OpenVPN"
+          }
+        }
+      }
+    },
+    "connect WireGuard" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "підключити WireGuard"
+          }
+        }
+      }
+    },
+    "connected" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "підключено"
+          }
+        }
+      }
+    },
+    "connecting" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "підключається"
+          }
+        }
+      }
+    },
+    "connecting…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "підключається…"
+          }
+        }
+      }
+    },
+    "dead" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "мертвий"
+          }
+        }
+      }
+    },
+    "delete a WireGuard config" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "видалити конфіг WireGuard"
+          }
+        }
+      }
+    },
+    "dig apple.com with a 2 s timeout every 30 s and on DNS changes; on failure the icon turns red." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dig apple.com з таймаутом 2 с раз на 30 с і при зміні DNS; при відмові іконка стає червоною."
+          }
+        }
+      }
+    },
+    "direct via LAN" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "напряму через LAN"
+          }
+        }
+      }
+    },
+    "disabled" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "вимкнено"
+          }
+        }
+      }
+    },
+    "disconnect OpenVPN" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "відключити OpenVPN"
+          }
+        }
+      }
+    },
+    "disconnect WireGuard" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "відключити WireGuard"
+          }
+        }
+      }
+    },
+    "disconnecting…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "відключається…"
+          }
+        }
+      }
+    },
+    "empty = Duo push" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "порожньо = Duo push"
+          }
+        }
+      }
+    },
+    "enter a host" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "вкажи хост"
+          }
+        }
+      }
+    },
+    "error" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "помилка"
+          }
+        }
+      }
+    },
+    "every 10 s" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "кожні 10 с"
+          }
+        }
+      }
+    },
+    "every 30 s" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "кожні 30 с"
+          }
+        }
+      }
+    },
+    "every 5 min" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "кожні 5 хв"
+          }
+        }
+      }
+    },
+    "every minute" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "кожну хвилину"
+          }
+        }
+      }
+    },
+    "installed · active" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "встановлено · активний"
+          }
+        }
+      }
+    },
+    "last used" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "останній"
+          }
+        }
+      }
+    },
+    "network “%@”" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "мережа «%@»"
+          }
+        }
+      }
+    },
+    "no" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ні"
+          }
+        }
+      }
+    },
+    "no IP" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "немає IP"
+          }
+        }
+      }
+    },
+    "no internet" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "без інтернету"
+          }
+        }
+      }
+    },
+    "no login" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "без логіна"
+          }
+        }
+      }
+    },
+    "no primary interface" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "немає первинного інтерфейсу"
+          }
+        }
+      }
+    },
+    "no profiles" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "немає профілів"
+          }
+        }
+      }
+    },
+    "no service" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "немає сервісу"
+          }
+        }
+      }
+    },
+    "none" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "відсутній"
+          }
+        }
+      }
+    },
+    "none found — disconnect the VPN in its app" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не знайдено — відключи VPN у його застосунку"
+          }
+        }
+      }
+    },
+    "not found" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не знайдено"
+          }
+        }
+      }
+    },
+    "not found in the bundle (build it with make -C app)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не знайдено в бандлі (зберіть через make app)"
+          }
+        }
+      }
+    },
+    "not installed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не встановлено"
+          }
+        }
+      }
+    },
+    "not responding" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не відповідає"
+          }
+        }
+      }
+    },
+    "off" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "вимкнено"
+          }
+        }
+      }
+    },
+    "offline" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "offline"
+          }
+        }
+      }
+    },
+    "on" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "увімкнено"
+          }
+        }
+      }
+    },
+    "online" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "online"
+          }
+        }
+      }
+    },
+    "owner unknown" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "власник невідомий"
+          }
+        }
+      }
+    },
+    "primary · no internet" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "primary · без інтернету"
+          }
+        }
+      }
+    },
+    "primary: %@ · resolver: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "первинний: %1$@ · резолвер: %2$@"
+          }
+        }
+      }
+    },
+    "privileged action" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "привілейована дія"
+          }
+        }
+      }
+    },
+    "profile file unknown" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "файл профілю невідомий"
+          }
+        }
+      }
+    },
+    "repair DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "відремонтувати DNS"
+          }
+        }
+      }
+    },
+    "repairing DNS before connecting…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ремонт DNS перед підключенням…"
+          }
+        }
+      }
+    },
+    "repairing via “%@”: %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ремонтую через «%1$@»: %2$@"
+          }
+        }
+      }
+    },
+    "responding" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "відповідає"
+          }
+        }
+      }
+    },
+    "retrying" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "повторює спроби"
+          }
+        }
+      }
+    },
+    "root-only config — install the helper (Settings → Helper)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "конфіг root-only — встанови helper (Settings → Helper)"
+          }
+        }
+      }
+    },
+    "session expired" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сесія протухла"
+          }
+        }
+      }
+    },
+    "session expired — a new MFA code is needed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сесія протухла — потрібен новий MFA-код"
+          }
+        }
+      }
+    },
+    "skipped" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "пропущено"
+          }
+        }
+      }
+    },
+    "state unknown" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "стан невідомий"
+          }
+        }
+      }
+    },
+    "state unknown — the log is root-only" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "стан невідомий — лог лише для root"
+          }
+        }
+      }
+    },
+    "stop a VPN tunnel process" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "зупинити процес VPN-тунелю"
+          }
+        }
+      }
+    },
+    "switch the primary DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "перемкнути основний DNS"
+          }
+        }
+      }
+    },
+    "system" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "система"
+          }
+        }
+      }
+    },
+    "the gateway doesn't answer the handshake" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gateway не відповідає на хендшейк"
+          }
+        }
+      }
+    },
+    "the helper did not respond" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "helper не відповів"
+          }
+        }
+      }
+    },
+    "unknown" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "невідомо"
+          }
+        }
+      }
+    },
+    "waiting for approval in System Settings → Login Items" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "чекає схвалення в System Settings → Login Items"
+          }
+        }
+      }
+    },
+    "waiting for the tunnel to release the network…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "чекаю, поки тунель відпустить мережу…"
+          }
+        }
+      }
+    },
+    "wg-quick puts the tunnel DNS on every service and doesn't always put the old one back. While no WG is up and the resolver responds, the app remembers each service's DNS (the baseline). After down it watches for up to a minute and restores the baseline on services still holding the tunnel DNS; if the resolver is still silent, it runs Fix. Before every connect the same happens right away, so the new VPN's address resolves. In the background — only with the helper." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "wg-quick ставить DNS тунелю на всі сервіси і не завжди повертає старий. Поки WG немає і резолвер відповідає, застосунок запам'ятовує DNS кожного сервісу (еталон). Після down — до хвилини стежить і повертає еталон тим сервісам, де лишився DNS тунелю; якщо резолвер усе одно мовчить — запускає Fix. Перед кожним підключенням те саме робиться одразу, щоб адреса нового VPN резолвилась. У фоні — лише з helper."
+          }
+        }
+      }
+    },
+    "·" : {
+      "shouldTranslate" : false
+    },
+    "· foreign" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "· сторонній"
+          }
+        }
+      }
+    },
+    "· foreign, allowed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "· сторонній, дозволено"
+          }
+        }
+      }
+    },
+    "“%@”" : {
+      "comment" : "A name in quotes",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@»"
+          }
+        }
+      }
+    },
+    "“%@” is an interface name, not a domain: the rule only catches names *.%@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%1$@» — назва інтерфейсу, а не домен: правило ловить лише імена *.%2$@"
+          }
+        }
+      }
+    },
+    "“%@” is not an IP address" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» — не IP-адреса"
+          }
+        }
+      }
+    },
+    "“%@” is now first" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» тепер перший"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

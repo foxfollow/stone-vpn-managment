@@ -152,28 +152,30 @@ public enum CiscoDriver {
             if t.hasSuffix("group:") || t.contains("group: [") || (t.hasPrefix("group") && t.hasSuffix(":")) {
                 // Меню груп приймає номер (як у CLI: «Group: [VPN1] 1»); назву — лише як запасний варіант.
                 let answer = c.group.isEmpty ? "" : (groupOptions[c.group] ?? c.group)
-                onEvent(.step("Група: \(c.group.isEmpty ? "(за замовчуванням)" : c.group)"))
+                onEvent(.step(c.group.isEmpty ? String(localized: "Group: (default)", bundle: .module)
+                                               : String(localized: "Group: \(c.group)", bundle: .module)))
                 send(answer)
             } else if t.hasPrefix("username:") || t.contains("username: [") {
-                onEvent(.step("Логін: \(c.user)"))
+                onEvent(.step(String(localized: "Username: \(c.user)", bundle: .module)))
                 send(c.user)
             } else if t.contains("second password") || t.contains("secondary password") || t.contains("passcode")
                         || t.contains("duo") || t.hasPrefix("answer:") || t.hasPrefix("response:") {
                 secondSent += 1
-                if secondSent > 2 { throw ActionError("сервер повторно питає другий фактор:\n" + transcriptTail()) }
+                if secondSent > 2 { throw ActionError(String(localized: "the server asks for the second factor again:", bundle: .module) + "\n" + transcriptTail()) }
                 // Меню Duo «Passcode or option (1-3)»: 1 = Duo Push.
                 let answer = t.contains("option") && c.secondPassword.isEmpty ? "1" : second
-                onEvent(.step(answer == "push" || answer == "1" ? "Duo: надіслано push на телефон" : "Другий фактор / OTP"))
+                onEvent(.step(answer == "push" || answer == "1" ? String(localized: "Duo: push sent to your phone", bundle: .module)
+                                                                : String(localized: "Second factor / OTP", bundle: .module)))
                 send(answer)
-                onEvent(.step("Підтверди вхід у Duo на телефоні…"))
+                onEvent(.step(String(localized: "Approve the sign-in in Duo on your phone…", bundle: .module)))
                 deadline = max(deadline, Date().addingTimeInterval(120))
             } else if t.hasSuffix("password:") || t.contains("password: ") {
                 passwordsSent += 1
-                if passwordsSent > 1 { throw ActionError("сервер повторно питає пароль — невірний логін або пароль:\n" + transcriptTail()) }
-                onEvent(.step("Пароль"))
+                if passwordsSent > 1 { throw ActionError(String(localized: "the server asks for the password again — wrong username or password:", bundle: .module) + "\n" + transcriptTail()) }
+                onEvent(.step(String(localized: "Password", bundle: .module)))
                 send(c.password)
                 // Сервер може тримати відповідь, поки ти підтверджуєш Duo-push (auto-push без запиту).
-                onEvent(.step("Чекаю відповіді сервера (Duo/MFA — підтверди на телефоні)…"))
+                onEvent(.step(String(localized: "Waiting for the server (Duo/MFA — approve on your phone)…", bundle: .module)))
                 deadline = max(deadline, Date().addingTimeInterval(120))
             } else if t.contains("accept?") || t.contains("[y/n]") {
                 if !bannerSent {
@@ -181,7 +183,7 @@ public enum CiscoDriver {
                         .filter { !$0.contains(">>") && !$0.trimmingCharacters(in: .whitespaces).isEmpty }
                         .joined(separator: "\n")
                     if !banner.isEmpty { onEvent(.banner(banner)) }
-                    onEvent(.step("Банер прийнято"))
+                    onEvent(.step(String(localized: "Banner accepted", bundle: .module)))
                 }
                 bannerSent = true
                 send("y")
@@ -198,7 +200,9 @@ public enum CiscoDriver {
         if text.lowercased().contains("state: connected") { onEvent(.step("Connected")); return }
         let tailText = transcriptTail()
         if failure(text) != nil { throw ActionError(explain(tailText, text)) }
-        throw ActionError((p.isRunning ? "Cisco не підключився вчасно" : "vpn завершився без підключення") + (tailText.isEmpty ? "" : ":\n" + tailText))
+        let reason = p.isRunning ? String(localized: "Cisco did not connect in time", bundle: .module)
+                                 : String(localized: "vpn exited without connecting", bundle: .module)
+        throw ActionError(reason + (tailText.isEmpty ? "" : ":\n" + tailText))
     }
 
     public struct GroupProbe: Sendable, Equatable {
@@ -264,7 +268,7 @@ public enum CiscoDriver {
         }
         lock.lock(); let text = all; lock.unlock()
         if let r = parseGroupPrompt(text) { return r }
-        throw ActionError(failure(text) ?? "сервер не надіслав форму входу за \(Int(timeout)) с")
+        throw ActionError(failure(text) ?? String(localized: "the server sent no login form within \(Int(timeout)) s", bundle: .module))
     }
 
     /// Вивід до першого запиту: "    0) Employees\n    1) Staff\nGroup: [Employees]" або одразу "Username:".
@@ -296,7 +300,9 @@ public enum CiscoDriver {
 
     /// Підказка до «Connect capability is unavailable»: агент віддає право підключення лише
     /// одному клієнту — GUI або іншому `vpn` (наприклад, у Terminal).
-    public static let capabilityHint = "Право підключення тримає інший клієнт Cisco: GUI Cisco Secure Client або `vpn` у Terminal. Закрий його і спробуй ще раз."
+    public static var capabilityHint: String {
+        String(localized: "Another Cisco client holds the connect capability: the Cisco Secure Client GUI or `vpn` in Terminal. Close it and try again.", bundle: .module)
+    }
 
     // MARK: процеси vpn
 

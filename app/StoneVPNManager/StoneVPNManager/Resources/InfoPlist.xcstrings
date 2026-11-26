@@ -1,0 +1,60 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "StoneVPN Manager"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StoneVPN Manager"
+          }
+        }
+      }
+    },
+    "NSAppleEventsUsageDescription" : {
+      "comment" : "Privacy - AppleEvents Sending Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "StoneVPN closes the Cisco/Defguard GUI before connecting from the CLI and opens Terminal when needed."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StoneVPN закриває GUI Cisco/Defguard перед підключенням з CLI і за потреби відкриває Terminal."
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Privacy - Local Network Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "StoneVPN checks whether the DNS resolver responds and whether each network interface has internet (the resolver is often a server in your LAN). Without this permission the DNS and network indicators may report a false problem."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StoneVPN перевіряє, чи відповідає DNS-резолвер і чи є інтернет через кожен мережевий інтерфейс (часто це сервер у твоїй LAN). Без дозволу індикатори DNS і мережі можуть показувати хибну проблему."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

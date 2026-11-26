@@ -8,24 +8,26 @@ struct HelperTab: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Стан") {
+                LabeledContent("Status") {
                     HStack(spacing: 6) { StatusDot(color: statusColor); Text(statusText) }
                 }
+                .settingsAnchor("helper.status")
                 if let v = model.helperVersion {
-                    LabeledContent("Версія") { Text("\(v)" + (v != HelperConst.version ? " (застаріла — перевстанови)" : "")) }
+                    LabeledContent("Version") { v != HelperConst.version ? Text("\(v) (outdated — reinstall)") : Text(verbatim: "\(v)") }
                 }
                 HStack {
-                    Button(model.helperStatus == .enabled ? "Перевстановити" : "Встановити") {
+                    Button(model.helperStatus == .enabled ? "Reinstall" : "Install") {
                         if model.helperStatus == .enabled {
                             Task { try? await model.helper.unregister(); model.installHelper() }
                         } else { model.installHelper() }
                     }
                     Button("Login Items…") { SMAppService.openSystemSettingsLoginItems() }
                     Spacer()
-                    Button("Видалити", role: .destructive) { model.uninstallHelper() }.disabled(model.helperStatus != .enabled)
+                    Button("Remove", role: .destructive) { model.uninstallHelper() }.disabled(model.helperStatus != .enabled)
                 }
+                .settingsAnchor("helper.install")
             } header: { Text("Privileged helper") } footer: {
-                Text("Root-демон для wg-quick / openvpn / DNS / маршрутів без запиту пароля щоразу. Приймає з'єднання лише від StoneVPN з тим самим підписом і виконує фіксований набір перевірених дій. Без нього кожна дія питає пароль адміністратора.")
+                Text("A root daemon for wg-quick / openvpn / DNS / routes without asking for a password every time. It accepts connections only from StoneVPN with the same signature and runs a fixed set of checked actions. Without it, every such action asks for the administrator password.")
             }
         }
         .formStyle(.grouped)
@@ -34,11 +36,11 @@ struct HelperTab: View {
 
     private var statusText: String {
         switch model.helperStatus {
-        case .enabled: "встановлено · активний"
-        case .requiresApproval: "чекає схвалення в System Settings → Login Items"
-        case .notRegistered: "не встановлено"
-        case .notFound: "не знайдено в бандлі (зберіть через make app)"
-        @unknown default: "невідомо"
+        case .enabled: String(localized: "installed · active")
+        case .requiresApproval: String(localized: "waiting for approval in System Settings → Login Items")
+        case .notRegistered: String(localized: "not installed")
+        case .notFound: String(localized: "not found in the bundle (build it with make -C app)")
+        @unknown default: String(localized: "unknown")
         }
     }
 

@@ -1,0 +1,68 @@
+# SonarCloud: static analysis + coverage of the StoneVPNKit unit tests.
+# Needs the project on sonarcloud.io (organization foxfollow, analysis method "GitHub Actions")
+# and the SONAR_TOKEN secret — without it the job only warns. Setup: docs/RELEASING.md.
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sonar:
+    name: Analyze with SonarCloud
+    runs-on: macos-26
+    env:
+      PKG: app/Packages/StoneVPNKit
+    steps:
+      - name: Check token
+        id: token
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [[ -z "$SONAR_TOKEN" ]]; then
+            echo "::warning::SONAR_TOKEN is not set — skipping SonarCloud (see docs/RELEASING.md)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v6
+        if: steps.token.outputs.skip != 'true'
+        with:
+          fetch-depth: 0   # blame data for new-code detection
+
+      - name: Project version (new code = since the previous version)
+        if: steps.token.outputs.skip != 'true'
+        id: ver
+        run: |
+          v=$(grep -m1 -oE 'MARKETING_VERSION = [0-9.]+' app/StoneVPNManager/StoneVPNManager.xcodeproj/project.pbxproj | awk '{print $3}')
+          echo "version=${v:-0.0.0}" >> "$GITHUB_OUTPUT"
+
+      - name: Select Xcode
+        if: steps.token.outputs.skip != 'true'
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)
+          [[ -n "$LATEST_XCODE" ]] && sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Unit tests with coverage
+        if: steps.token.outputs.skip != 'true'
+        run: swift test --package-path "$PKG" --enable-code-coverage
+
+      - name: Coverage → Sonar generic format
+        if: steps.token.outputs.skip != 'true'
+        run: tools/coverage-to-sonar.sh "$PKG" > sonar-coverage.xml
+
+      - name: SonarCloud Scan
+        if: steps.token.outputs.skip != 'true'
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: -Dsonar.projectVersion=${{ steps.ver.outputs.version }}

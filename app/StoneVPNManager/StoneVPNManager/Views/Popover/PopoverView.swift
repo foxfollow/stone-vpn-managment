@@ -66,7 +66,7 @@ struct PopoverView: View {
                     Image(systemName: "arrow.clockwise").frame(width: 28, height: 28)
                 }
                 .buttonStyle(.borderless)
-                .help("Оновити")
+                .help("Refresh")
                 Button {
                     NSApp.activate()
                     openSettings()
@@ -74,11 +74,11 @@ struct PopoverView: View {
                     Image(systemName: "gearshape").frame(width: 28, height: 28)
                 }
                 .buttonStyle(.borderless)
-                .help("Налаштування")
+                .help("Settings")
             }
             Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 5) {
                 GridRow {
-                    Text("Мережа").foregroundStyle(.secondary)
+                    Text("Network").foregroundStyle(.secondary)
                     Text(netLine).lineLimit(1).truncationMode(.middle)
                     stateTag(netState.0, netState.1)
                 }
@@ -106,23 +106,23 @@ struct PopoverView: View {
 
     private var netLine: String {
         let n = model.snap.network
-        guard let i = n.primaryIface else { return "немає первинного інтерфейсу" }
+        guard let i = n.primaryIface else { return String(localized: "no primary interface") }
         let owner = n.primaryIsTunnel ? model.snap.routeGroups.first { $0.iface == i }?.owner : nil
         return [owner ?? n.primaryService, i, n.router.map { "via \($0)" }].compactMap { $0 }.joined(separator: " · ")
     }
 
     private var netState: (String, Color) {
         switch model.primaryOnline {
-        case true?: ("online", .green)
-        case false?: ("без інтернету", .red)
-        case nil: (model.snap.network.primaryIface == nil ? "offline" : "—", model.snap.network.primaryIface == nil ? .red : .secondary)
+        case true?: (String(localized: "online"), .green)
+        case false?: (String(localized: "no internet"), .red)
+        case nil: (model.snap.network.primaryIface == nil ? String(localized: "offline") : "—", model.snap.network.primaryIface == nil ? .red : .secondary)
         }
     }
 
     private var dnsState: (String, Color) {
         switch model.dnsHealthy {
-        case true?: ("відповідає", .green)
-        case false?: ("не відповідає", .red)
+        case true?: (String(localized: "responding"), .green)
+        case false?: (String(localized: "not responding"), .red)
         case nil: ("—", .secondary)
         }
     }
@@ -137,33 +137,38 @@ struct PopoverView: View {
         let n = model.snap.network
         if model.tone == .foreign, let f = model.primaryForeign {
             Banner(color: .purple,
-                   text: "\(f.name) (\(f.iface ?? "")) тримає default route і DNS" + (model.dnsHealthy == false ? ", але не пропускає трафік. Правки DNS не допоможуть." : "."),
-                   action: "Розірвати…", secondary: model.dnsHealthy == false ? nil : ("Дозволити", { model.allowForeign(f.name) }),
+                   text: model.dnsHealthy == false
+                       ? String(localized: "\(f.name) (\(f.iface ?? "")) holds the default route and DNS, but passes no traffic. DNS edits won't help.")
+                       : String(localized: "\(f.name) (\(f.iface ?? "")) holds the default route and DNS."),
+                   action: String(localized: "Take Down…"),
+                   secondary: model.dnsHealthy == false ? nil : (String(localized: "Allow"), { model.allowForeign(f.name) }),
                    close: { model.foreignDismissed.insert(f.id) }) {
                 model.openTool = "dns"; Task { await model.runDNSFix() }
             }
         } else if let name = model.dgStale.sorted().first, model.busy.isEmpty {
             Banner(color: .red,
-                   text: "Defguard «\(name)» показує «підключено», але gateway більше не приймає сесію (сон довший за поріг)." +
-                         (model.dnsFailover.map { " DNS тимчасово на \($0.joined(separator: " "))." } ?? ""),
-                   action: "Оновити") { model.renewDefguard(name) }
+                   text: model.dnsFailover.map {
+                       String(localized: "Defguard “\(name)” shows “connected”, but the gateway no longer accepts the session (slept past the threshold). DNS is temporarily on \($0.joined(separator: " ")).")
+                   } ?? String(localized: "Defguard “\(name)” shows “connected”, but the gateway no longer accepts the session (slept past the threshold)."),
+                   action: String(localized: "Renew")) { model.renewDefguard(name) }
         } else if model.dnsGuardActive, model.busy.isEmpty {
-            Banner(color: .orange, text: "VPN відключено — стежу за DNS і повертаю еталонні сервери сервісів, поки резолвер не запрацює.",
-                   action: "Fix зараз") { model.openTool = "dns"; Task { await model.runDNSFix() } }
+            Banner(color: .orange, text: String(localized: "VPN disconnected — watching DNS and restoring the services' baseline servers until the resolver works."),
+                   action: String(localized: "Fix Now")) { model.openTool = "dns"; Task { await model.runDNSFix() } }
         } else if model.dnsHealthy == false, model.busy.isEmpty {
             Banner(color: .red,
-                   text: "Резолвер \(n.dnsServers.first ?? "") не відповідає — ping «висить». Fix перевірить осиротілі DNS і переб'є сервіс.",
-                   action: "Fix DNS") { model.openTool = "dns"; Task { await model.runDNSFix() } }
+                   text: String(localized: "Resolver \(n.dnsServers.first ?? "") isn't responding — ping hangs. Fix checks orphaned DNS and bounces the service."),
+                   action: String(localized: "Fix DNS")) { model.openTool = "dns"; Task { await model.runDNSFix() } }
         } else if model.primaryOnline == false {
-            Banner(color: .red, text: "\(n.primaryService ?? n.primaryIface ?? "Первинний сервіс") без інтернету — macOS обирає за порядком сервісів, не за доступністю.",
-                   action: "Auto") { model.runAction("Мережа") { try await model.actions.netAuto(primaryIface: n.primaryIface) } }
+            let svc = n.primaryService ?? n.primaryIface ?? String(localized: "The primary service")
+            Banner(color: .red, text: String(localized: "\(svc) has no internet — macOS picks by service order, not by reachability."),
+                   action: String(localized: "Auto")) { model.runAction(String(localized: "Network")) { try await model.actions.netAuto(primaryIface: n.primaryIface) } }
         }
         ForEach(model.routeIssues) { i in
             Banner(color: .orange,
-                   text: "\(i.label): сервер \(i.host) іде через \(i.viaOwner) (\(i.via)) — тунель у тунелі. Працює, але повільніше, і перепідключення \(i.viaOwner) рве сесію." +
-                         (i.networkLabel.map { " Рішення — для мережі «\($0)»." } ?? ""),
-                   action: i.gateway.map { "Напряму · \($0)" } ?? "Погодити",
-                   secondary: i.gateway == nil ? nil : ("Погодити", { model.keepRoute(i) })) {
+                   text: String(localized: "\(i.label): server \(i.host) goes via \(i.viaOwner) (\(i.via)) — a tunnel inside a tunnel. It works, but slower, and reconnecting \(i.viaOwner) drops the session.")
+                         + (i.networkLabel.map { " " + String(localized: "The decision applies to the network “\($0)”.") } ?? ""),
+                   action: i.gateway.map { String(localized: "Direct · \($0)") } ?? String(localized: "Accept"),
+                   secondary: i.gateway == nil ? nil : (String(localized: "Accept"), { model.keepRoute(i) })) {
                 if i.gateway != nil { model.directRoute(i) } else { model.keepRoute(i) }
             }
         }
@@ -200,7 +205,7 @@ struct PopoverView: View {
     private var dnsSummary: String {
         let s = model.snap.network.dnsServers.joined(separator: ", ")
         let split = model.splitRules.isEmpty ? "" : " · split \(model.splitRules.count)"
-        return (s.isEmpty ? "—" : s) + (model.dnsHealthy == false ? " · мертвий" : "") + split
+        return (s.isEmpty ? "—" : s) + (model.dnsHealthy == false ? " · " + String(localized: "dead") : "") + split
     }
 
     private var routesSummary: String {
@@ -211,19 +216,20 @@ struct PopoverView: View {
 
     private var netSummary: String {
         let n = model.snap.network
-        return "\(n.primaryService ?? "—") (\(n.primaryIface ?? "—"))" + (model.primaryOnline == false ? " без інтернету" : "")
+        let base = "\(n.primaryService ?? "—") (\(n.primaryIface ?? "—"))"
+        return model.primaryOnline == false ? String(localized: "\(base) no internet") : base
     }
 
     // MARK: footer
 
     private var footer: some View {
         HStack {
-            Button("Відключити все", role: .destructive) { model.disconnectAll() }
+            Button("Disconnect All", role: .destructive) { model.disconnectAll() }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.red)
                 .disabled(model.snap.sessions.isEmpty)
             Spacer()
-            Button("Профілі…") { model.openProfiles(model.rows.first?.backend ?? .wireguard) }.buttonStyle(.borderless)
+            Button("Profiles…") { model.openProfiles(model.rows.first?.backend ?? .wireguard) }.buttonStyle(.borderless)
             Button("Quit") { NSApp.terminate(nil) }.buttonStyle(.borderless).foregroundStyle(.secondary)
         }
         .font(.system(size: 12.5))
@@ -260,7 +266,7 @@ struct Banner: View {
             if let close {
                 Button(action: close) { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
                     .buttonStyle(.borderless).foregroundStyle(.secondary).padding(6)
-                    .help("Сховати до перезапуску застосунку")
+                    .help("Hide until the app restarts")
             }
         }
     }

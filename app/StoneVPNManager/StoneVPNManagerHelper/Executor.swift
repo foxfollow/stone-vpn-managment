@@ -33,24 +33,24 @@ enum Executor {
         // ── WireGuard ────────────────────────────────────────────────────────
         case .wgUp(let path):
             let c: WGConfHandle
-            switch WGConfGuard.open(path, caller: caller) { case .success(let h): c = h; case .failure(let e): return .fail(e.message) }
+            switch WGConfGuard.open(path, caller: caller) { case .success(let h): c = h; case .failure(let e): return .fail(L(e.text)) }
             guard let wq = firstExecutable(["/opt/homebrew/bin/wg-quick", "/usr/local/bin/wg-quick"]) else {
-                return .fail("wg-quick не знайдено (brew install wireguard-tools)")
+                return .fail(L("wg-quick not found (brew install wireguard-tools)"))
             }
             return run(wq, ["up", c.path])
         case .wgDown(let path):
             let c: WGConfHandle
-            switch WGConfGuard.open(path, caller: caller) { case .success(let h): c = h; case .failure(let e): return .fail(e.message) }
+            switch WGConfGuard.open(path, caller: caller) { case .success(let h): c = h; case .failure(let e): return .fail(L(e.text)) }
             guard let wq = firstExecutable(["/opt/homebrew/bin/wg-quick", "/usr/local/bin/wg-quick"]) else {
-                return .fail("wg-quick не знайдено")
+                return .fail(L("wg-quick not found"))
             }
             return run(wq, ["down", c.path])
         case .wgDelete(let path):
             let c: WGConfHandle
-            switch WGConfGuard.open(path, caller: caller) { case .success(let h): c = h; case .failure(let e): return .fail(e.message) }
-            if FileManager.default.fileExists(atPath: "\(wgRun)/\(c.name).name") { return .fail("\(c.name) підключений — спершу відключи") }
-            if case .failure(let e) = c.delete() { return .fail("не видалено: \(e.message)") }
-            return PrivResult(ok: true, output: "видалено \(c.path)")
+            switch WGConfGuard.open(path, caller: caller) { case .success(let h): c = h; case .failure(let e): return .fail(L(e.text)) }
+            if FileManager.default.fileExists(atPath: "\(wgRun)/\(c.name).name") { return .fail(L("\(c.name) is connected — disconnect it first")) }
+            if case .failure(let e) = c.delete() { return .fail(L("not deleted: \(L(e.text))")) }
+            return PrivResult(ok: true, output: L("deleted \(c.path)"))
         case .wgRuntime:
             let fm = FileManager.default
             let names = ((try? fm.contentsOfDirectory(atPath: wgRun)) ?? []).filter { $0.hasSuffix(".name") }.sorted()
@@ -75,7 +75,7 @@ enum Executor {
             let c: String
             switch WGConfGuard.open(path, caller: caller).flatMap({ $0.read() }) {
             case .success(let s): c = s
-            case .failure(let e): return .fail("не читається: \(e.message)")
+            case .failure(let e): return .fail(L("cannot read: \(L(e.text))"))
             }
             let safe = c.split(separator: "\n", omittingEmptySubsequences: false).filter { line in
                 let k = line.trimmingCharacters(in: .whitespaces).lowercased()
@@ -87,10 +87,10 @@ enum Executor {
         case .ovpnStart(let profilePath, let user, let pass, let addDev):
             return ovpnStart(profilePath, user: user, pass: pass, addDev: addDev, waitAuthCleanup: waitAuthCleanup)
         case .ovpnStop(let pid):
-            guard pid > 1 else { return .fail("PID \(pid) — не openvpn") }
+            guard pid > 1 else { return .fail(L("PID \(String(pid)) is not openvpn")) }
             // Процес уже зник (впав / зупинений з CLI) — лишається тільки прибрати pid-файл.
             if processAlive(pid) {
-                guard processComm(pid).hasSuffix("openvpn") else { return .fail("PID \(pid) — не openvpn") }
+                guard processComm(pid).hasSuffix("openvpn") else { return .fail(L("PID \(String(pid)) is not openvpn")) }
                 kill(pid, SIGTERM)
                 for _ in 0..<10 where processAlive(pid) { sleep(1) }
                 // ps -p, не kill -0: для root тут різниці нема, але тримаємо одну ідіому.
@@ -103,26 +103,26 @@ enum Executor {
                     try? FileManager.default.removeItem(atPath: String(pf.dropLast(4)) + ".log")
                 }
             }
-            return PrivResult(ok: true, output: "OpenVPN PID \(pid) зупинено")
+            return PrivResult(ok: true, output: L("OpenVPN PID \(String(pid)) stopped"))
         case .readLog(let path):
             guard isOvpnLogPath(path), let c = try? String(contentsOfFile: path, encoding: .utf8) else {
-                return .fail("лог недоступний: \(path)")
+                return .fail(L("log unavailable: \(path)"))
             }
             return PrivResult(ok: true, output: c)
 
         // ── Маршрути ─────────────────────────────────────────────────────────
         case .routeHostSet(let ip, let gw):
-            guard isIP(ip), isIP(gw) else { return .fail("невірна адреса: \(ip) / \(gw)") }
+            guard isIP(ip), isIP(gw) else { return .fail(L("invalid address: \(ip) / \(gw)")) }
             _ = run("/sbin/route", ["-q", "-n", "delete", "-host", ip])
             return run("/sbin/route", ["-q", "-n", "add", "-host", ip, gw])
         case .routeHostDelete(let ip):
-            guard isIP(ip) else { return .fail("невірна адреса: \(ip)") }
+            guard isIP(ip) else { return .fail(L("invalid address: \(ip)")) }
             return run("/sbin/route", ["-q", "-n", "delete", "-host", ip])
 
         // ── DNS ──────────────────────────────────────────────────────────────
         case .dnsSet(let svc, let servers):
-            guard networkServices().contains(svc) else { return .fail("немає сервісу: \(svc)") }
-            guard servers.allSatisfy(isIP) else { return .fail("невірний DNS: \(servers.joined(separator: " "))") }
+            guard networkServices().contains(svc) else { return .fail(L("no such service: \(svc)")) }
+            guard servers.allSatisfy(isIP) else { return .fail(L("invalid DNS: \(servers.joined(separator: " "))")) }
             // Дві реальні зміни: на однакове значення SystemConfiguration не реагує.
             let r1 = run("/usr/sbin/networksetup", ["-setdnsservers", svc, "empty"])
             if servers.isEmpty || !r1.ok { return r1 }
@@ -135,10 +135,10 @@ enum Executor {
                 // scutil завжди виходить з 0 — помилка лише у виводі.
                 let r = run("/usr/sbin/scutil", [], stdin: "open\nremove State:/Network/Service/\(u)/DNS\nquit\n")
                 if r.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    out.append("прибрано резолвер \(u)")
+                    out.append(L("removed resolver \(u)"))
                 } else {
                     ok = false
-                    out.append("не прибрано \(u): \(r.output)")
+                    out.append(L("not removed \(u): \(r.output)"))
                 }
             }
             return PrivResult(ok: ok, output: out.joined(separator: "\n"))
@@ -147,58 +147,58 @@ enum Executor {
             _ = run("/usr/bin/killall", ["-HUP", "mDNSResponder"])
             return PrivResult(ok: true, output: "")
         case .resolverSet(let domain, let servers):
-            guard isDomain(domain), !servers.isEmpty, servers.allSatisfy(isIP) else { return .fail("невірний домен або сервер") }
+            guard isDomain(domain), !servers.isEmpty, servers.allSatisfy(isIP) else { return .fail(L("invalid domain or server")) }
             try? FileManager.default.createDirectory(atPath: "/etc/resolver", withIntermediateDirectories: true)
             let body = servers.map { "nameserver \($0)\n" }.joined()
             do { try body.write(toFile: "/etc/resolver/\(domain)", atomically: true, encoding: .utf8) } catch {
-                return .fail("запис /etc/resolver/\(domain): \(error.localizedDescription)")
+                return .fail(L("writing /etc/resolver/\(domain): \(error.localizedDescription)"))
             }
             _ = execute(.dnsFlush, waitAuthCleanup: false, caller: caller)
             return PrivResult(ok: true, output: "*.\(domain) → \(servers.joined(separator: " "))")
         case .dnsOverride(let servers):
-            guard !servers.isEmpty, servers.allSatisfy(isIP) else { return .fail("невірний DNS: \(servers.joined(separator: " "))") }
-            guard let store = SCDynamicStoreCreate(nil, "StoneVPNHelper" as CFString, nil, nil) else { return .fail("SCDynamicStore недоступний") }
+            guard !servers.isEmpty, servers.allSatisfy(isIP) else { return .fail(L("invalid DNS: \(servers.joined(separator: " "))")) }
+            guard let store = SCDynamicStoreCreate(nil, "StoneVPNHelper" as CFString, nil, nil) else { return .fail(L("SCDynamicStore unavailable")) }
             let dict: [String: Any] = ["ServerAddresses": servers, "SupplementalMatchDomains": [""], "SearchOrder": 0]
             // SetValue (не Temporary): запис живе й після виходу одноразового процесу (osascript-режим).
             guard SCDynamicStoreSetValue(store, HelperConst.dnsOverrideKey as CFString, dict as CFDictionary) else {
-                return .fail("не вдалося записати основний DNS")
+                return .fail(L("could not write the primary DNS"))
             }
             let moved = displaceCatchAll(store)
             _ = execute(.dnsFlush, waitAuthCleanup: false, caller: caller)
-            return PrivResult(ok: true, output: "основний DNS → \(servers.joined(separator: " "))" +
-                              (moved.isEmpty ? "" : "; витіснено catch-all: \(moved.joined(separator: ", "))"))
+            let set = L("primary DNS → \(servers.joined(separator: " "))")
+            return PrivResult(ok: true, output: moved.isEmpty ? set : set + "; " + L("displaced catch-all: \(moved.joined(separator: ", "))"))
         case .dnsOverrideClear:
             if let store = SCDynamicStoreCreate(nil, "StoneVPNHelper" as CFString, nil, nil) {
                 SCDynamicStoreRemoveValue(store, HelperConst.dnsOverrideKey as CFString)
                 restoreCatchAll(store)
             }
             _ = execute(.dnsFlush, waitAuthCleanup: false, caller: caller)
-            return PrivResult(ok: true, output: "основний DNS — як вирішила система")
+            return PrivResult(ok: true, output: L("primary DNS — chosen by the system"))
         case .resolverRemove(let domain):
-            guard isDomain(domain) else { return .fail("невірний домен") }
+            guard isDomain(domain) else { return .fail(L("invalid domain")) }
             do { try FileManager.default.removeItem(atPath: "/etc/resolver/\(domain)") } catch {
-                return .fail("немає правила для \(domain)")
+                return .fail(L("no rule for \(domain)"))
             }
             _ = execute(.dnsFlush, waitAuthCleanup: false, caller: caller)
-            return PrivResult(ok: true, output: "прибрано \(domain)")
+            return PrivResult(ok: true, output: L("removed \(domain)"))
 
         // ── Мережа / процеси ────────────────────────────────────────────────
         case .orderServices(let names):
             // networksetup приймає лише ПОВНИЙ список (інакше «parameters were not valid»).
             let all = networkServices()
-            guard Set(names) == Set(all), names.count == all.count else { return .fail("потрібен повний список сервісів") }
+            guard Set(names) == Set(all), names.count == all.count else { return .fail(L("the full list of services is required")) }
             return run("/usr/sbin/networksetup", ["-ordernetworkservices"] + names)
         case .killPid(let pid):
             let cmd = processCommand(pid)
             let isTunnel = cmd.range(of: #"SystemExtensions/.*(vpn|wireguard|tunnel|anyconnect)|vpnagentd"#,
                                      options: [.regularExpression, .caseInsensitive]) != nil
             guard pid > 1, isTunnel, !cmd.lowercased().contains("security-monitor") else {
-                return .fail("PID \(pid) — не процес VPN-тунелю")
+                return .fail(L("PID \(String(pid)) is not a VPN tunnel process"))
             }
             kill(pid, SIGTERM)
             sleep(2)
             if processAlive(pid) { kill(pid, SIGKILL) }
-            return PrivResult(ok: true, output: "PID \(pid) зупинено")
+            return PrivResult(ok: true, output: L("PID \(String(pid)) stopped"))
         }
     }
 
@@ -207,12 +207,12 @@ enum Executor {
         let url = URL(fileURLWithPath: profilePath).standardizedFileURL
         let path = url.path
         guard path.hasSuffix(".ovpn"), !isSymlink(path), FileManager.default.isReadableFile(atPath: path) else {
-            return .fail("профіль недоступний: \(profilePath)")
+            return .fail(L("profile unavailable: \(profilePath)"))
         }
         let id = url.deletingPathExtension().lastPathComponent
-        guard id.range(of: #"^[A-Za-z0-9._ -]+$"#, options: .regularExpression) != nil else { return .fail("недопустима назва профілю") }
+        guard id.range(of: #"^[A-Za-z0-9._ -]+$"#, options: .regularExpression) != nil else { return .fail(L("invalid profile name")) }
         guard let ovpn = firstExecutable(["/opt/homebrew/sbin/openvpn", "/usr/local/sbin/openvpn"]) else {
-            return .fail("openvpn не знайдено (brew install openvpn)")
+            return .fail(L("openvpn not found (brew install openvpn)"))
         }
         let pidFile = "/tmp/openvpn-\(id).pid", logFile = "/tmp/openvpn-\(id).log"
         try? FileManager.default.removeItem(atPath: pidFile)
@@ -233,7 +233,7 @@ enum Executor {
         if !r.ok {
             if let authFile { try? FileManager.default.removeItem(atPath: authFile) }
             let log = (try? String(contentsOfFile: logFile, encoding: .utf8)) ?? ""
-            return .fail("openvpn не запустився: \(r.output)\n\(log)")
+            return .fail(L("openvpn did not start: \(r.output)") + "\n" + log)
         }
         // Лог читабельний для staff — щоб статус бачив стан без root. Секретів у ньому немає.
         chown(logFile, 0, 20)

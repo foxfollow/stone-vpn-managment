@@ -8,6 +8,7 @@ struct StoneVPNManagerApp: App {
     init() {
         if CommandLine.arguments.contains("--dump-status") { Self.dumpStatus() }
         AppModel.shared.start()
+        _ = Updater.shared
     }
 
     /// Діагностика без UI: знімок стану текстом (порівнювати з `main-vpn-manager.sh status`).
@@ -38,6 +39,7 @@ struct StoneVPNManagerApp: App {
     var body: some Scene {
         MenuBarExtra {
             PopoverView(model: model)
+                .environment(\.locale, .app)
         } label: {
             Image(nsImage: MenuIcon.image(tone: model.tone, count: model.snap.upCount,
                                           colored: model.prefs.iconColored, showCount: model.prefs.iconShowCount,
@@ -47,19 +49,22 @@ struct StoneVPNManagerApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Профілі", id: "profiles") {
+        Window("Profiles", id: "profiles") {
             ProfilesView(model: model)
+                .environment(\.locale, .app)
         }
         .defaultSize(width: 980, height: 620)
 
-        Window("Підключення", id: "connect") {
+        Window("Connect", id: "connect") {
             ConnectView(model: model)
+                .environment(\.locale, .app)
         }
         // Звичайний рівень: floating-вікна не потрапляють в App Exposé (Cmd+Tab → ↓ «No Available Windows»).
         .windowResizability(.contentSize)
 
         Settings {
             SettingsView(model: model)
+                .environment(\.locale, .app)
         }
     }
 

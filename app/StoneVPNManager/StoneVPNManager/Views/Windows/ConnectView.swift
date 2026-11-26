@@ -14,7 +14,7 @@ struct ConnectView: View {
             if let r = model.connect {
                 form(r)
             } else {
-                Text("Немає запиту на підключення").foregroundStyle(.secondary).frame(width: 400, height: 120)
+                Text("No connection request").foregroundStyle(.secondary).frame(width: 400, height: 120)
             }
         }
     }
@@ -32,27 +32,27 @@ struct ConnectView: View {
             }
 
             if r.reconnect {
-                warning("Сесію скинуто на сервері — тунель «підключений», але трафік не ходить. Введи новий код: застосунок сам відключить і підключить локацію.")
+                warning("The session was dropped on the server — the tunnel says “connected”, but no traffic flows. Enter a new code: the app will disconnect and reconnect the location itself.")
             }
 
             if r.guiRunning {
                 warning(p.backend == .defguard
-                        ? "Defguard.app запущений — він зупиняє MFA-сесію, підняту з CLI, і просить код у своєму вікні. Його буде закрито перед підключенням (тунелі тримає системне розширення)."
-                        : "Відкрито GUI Cisco Secure Client — CLI і GUI не можуть керувати агентом одночасно. Його закриють перед підключенням (тунель тримає vpnagentd).")
+                        ? "Defguard.app is running — it stops an MFA session started from the CLI and asks for the code in its own window. It will be closed before connecting (the system extension keeps the tunnels)."
+                        : "The Cisco Secure Client GUI is open — the CLI and the GUI can't drive the agent at the same time. It will be closed before connecting (vpnagentd keeps the tunnel).")
             }
 
             if r.needsAuth {
-                field("Логін") {
+                field("Username") {
                     TextField("", text: bind(\.username)).textFieldStyle(.roundedBorder).focused($focus, equals: .user)
                 }
-                field("Пароль / OTP", hint: "Не зберігається (логін — запам'ятовується для профілю). Тимчасовий auth-файл видаляється після підключення.") {
+                field("Password / OTP", hint: Text("Not stored (the username is remembered for the profile). The temporary auth file is deleted after connecting.")) {
                     SecureField("", text: bind(\.password)).textFieldStyle(.roundedBorder).focused($focus, equals: .pass)
                 }
             }
 
             if r.mfa {
-                field("MFA-код (\(p.mfa ?? "TOTP"))", hint: "Передається як --code; порожній код буде відхилено.") {
-                    TextField("123456", text: bind(\.code)).textFieldStyle(.roundedBorder).focused($focus, equals: .code)
+                field("MFA code (\(p.mfa ?? "TOTP"))", hint: Text("Passed as --code; an empty code will be rejected.")) {
+                    TextField(String("123456"), text: bind(\.code)).textFieldStyle(.roundedBorder).focused($focus, equals: .code)
                         .font(.system(size: 15, design: .monospaced))
                 }
             }
@@ -82,13 +82,13 @@ struct ConnectView: View {
             }
 
             HStack {
-                Button("Налаштування профілю…") {
+                Button("Profile Settings…") {
                     model.openProfiles(p.backend, select: p.key)
                 }
                 .buttonStyle(.borderless).font(.system(size: 12))
                 Spacer()
-                Button("Скасувати") { close() }.keyboardShortcut(.cancelAction)
-                Button(r.reconnect ? "Оновити" : "Підключити") { submit() }
+                Button("Cancel") { close() }.keyboardShortcut(.cancelAction)
+                Button(r.reconnect ? "Renew" : "Connect") { submit() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .disabled(r.running || (r.needsAuth && r.username.isEmpty) || (r.mfa && r.code.isEmpty)
@@ -105,9 +105,9 @@ struct ConnectView: View {
 
     /// Cisco: хост редагується (порт — host:port), дефолти — з налаштувань самого Cisco.
     @ViewBuilder private func ciscoFields(_ r: ConnectRequest) -> some View {
-        field("Хост", hint: "Можна з портом: host:8448. Новий хост збережеться у списку профілів.") {
+        field("Host", hint: Text("A port is allowed: host:8448. A new host is saved to the profile list.")) {
             HStack(spacing: 6) {
-                TextField("vpn.example.com:443", text: bind(\.host)).textFieldStyle(.roundedBorder).focused($focus, equals: .host)
+                TextField(String("vpn.example.com:443"), text: bind(\.host)).textFieldStyle(.roundedBorder).focused($focus, equals: .host)
                     .font(.system(size: 13, design: .monospaced))
                 if !r.hostOptions.isEmpty {
                     Menu {
@@ -121,11 +121,11 @@ struct ConnectView: View {
             .onSubmit { Task { await model.selectCiscoHost(model.connect?.host ?? "") } }
         }
         HStack(alignment: .top, spacing: 10) {
-            field("Група", hint: groupHint(r)) {
+            field("Group", hint: Text(groupHint(r))) {
                 HStack(spacing: 6) {
                     if r.groupsLoading {
                         ProgressView().controlSize(.small)
-                        Text("Отримую групи…").font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text("Fetching groups…").font(.system(size: 12)).foregroundStyle(.secondary)
                         Spacer(minLength: 0)
                     } else if !r.groups.isEmpty, r.groupsFor == r.hostKey {
                         Picker("", selection: bind(\.group)) {
@@ -140,20 +140,20 @@ struct ConnectView: View {
                     }
                     .buttonStyle(.borderless)
                     .disabled(r.hostKey.isEmpty)
-                    .help(r.guiRunning ? "Закрити GUI Cisco і отримати групи з сервера" : "Отримати групи з сервера")
+                    .help(r.guiRunning ? "Close the Cisco GUI and fetch groups from the server" : "Fetch groups from the server")
                 }
             }
-            field("Логін") {
+            field("Username") {
                 TextField("", text: bind(\.username)).textFieldStyle(.roundedBorder).focused($focus, equals: .user)
             }
         }
-        field("Пароль", hint: "Не зберігається; передається клієнту Cisco лише на запит Password. Логін і група запам'ятовуються для цього хоста.") {
+        field("Password", hint: Text("Not stored; handed to the Cisco client only when it asks for Password. The username and group are remembered for this host.")) {
             SecureField("", text: bind(\.password)).textFieldStyle(.roundedBorder).focused($focus, equals: .pass)
         }
-        DisclosureGroup("Другий фактор (Duo / OTP)") {
+        DisclosureGroup("Second Factor (Duo / OTP)") {
             VStack(alignment: .leading, spacing: 4) {
-                SecureField("порожньо = Duo push", text: bind(\.secondPassword)).textFieldStyle(.roundedBorder)
-                Text("Якщо сервер питає другий фактор, порожнє поле надсилає «push» — підтверди вхід у Duo на телефоні. Або введи passcode.")
+                SecureField("empty = Duo push", text: bind(\.secondPassword)).textFieldStyle(.roundedBorder)
+                Text("If the server asks for a second factor, an empty field sends “push” — approve the sign-in in Duo on your phone. Or enter a passcode.")
                     .font(.system(size: 10.5)).foregroundStyle(.secondary)
             }
             .padding(.top, 4)
@@ -167,36 +167,37 @@ struct ConnectView: View {
         }
         HStack {
             Spacer()
-            Button("Відкрити в Terminal замість цього") { model.ciscoInTerminal(r.host) }
+            Button("Open in Terminal Instead") { model.ciscoInTerminal(r.host) }
                 .buttonStyle(.borderless).font(.system(size: 11))
         }
     }
 
     private func groupHint(_ r: ConnectRequest) -> String {
         if let n = r.groupsNote { return n }
-        if r.groupsLoading { return "Питаю сервер, які групи доступні (без входу)" }
-        if !r.groups.isEmpty, r.groupsFor == r.hostKey { return "Список із сервера" }
-        return "Порожньо = за замовчуванням"
+        if r.groupsLoading { return String(localized: "Asking the server which groups are available (without signing in)") }
+        if !r.groups.isEmpty, r.groupsFor == r.hostKey { return String(localized: "List from the server") }
+        return String(localized: "Empty = default")
     }
 
     private func gatewayPicker(_ plan: RouteFixPlan) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Route-fix шлюз для \(plan.need.map { "\($0.host) (\($0.ip))" }.joined(separator: ", "))")
+            let hosts = plan.need.map { "\($0.host) (\($0.ip))" }.joined(separator: ", ")
+            Text("Route-fix gateway for \(hosts)")
                 .font(.system(size: 12, weight: .semibold))
             ForEach(plan.candidates, id: \.gw) { c in gwOption(c.gw, c.label) }
-            gwOption("", "Пропустити route-fix")
+            gwOption("", String(localized: "Skip route-fix"))
             HStack {
-                Text("Інший IP").font(.system(size: 12)).foregroundStyle(.secondary)
-                TextField("192.168.0.1", text: bind(\.gateway)).textFieldStyle(.roundedBorder).frame(width: 140)
+                Text("Other IP").font(.system(size: 12)).foregroundStyle(.secondary)
+                TextField(String("192.168.0.1"), text: bind(\.gateway)).textFieldStyle(.roundedBorder).frame(width: 140)
             }
-            if plan.candidates.contains(where: { $0.label.contains("тунель") }) {
-                Text("Сервер за іншим VPN, але маршруту до нього немає? Обери шлюз тунелю.")
+            if plan.candidates.contains(where: { $0.kind == .tunnel }) {
+                Text("Server behind another VPN, but no route to it? Pick the tunnel's gateway.")
                     .font(.system(size: 10.5)).foregroundStyle(.secondary)
             }
-            Toggle("Запам'ятати для профілю й більше не питати", isOn: Binding(
+            Toggle("Remember for this profile and don't ask again", isOn: Binding(
                 get: { model.connect?.rememberGateway ?? false }, set: { model.connect?.rememberGateway = $0 }))
                 .font(.system(size: 12))
-            Text("Без галочки останній вибір просто буде обраний наступного разу. Змінити політику — Профілі → профіль.")
+            Text("Unchecked, the last choice is simply preselected next time. Change the policy in Profiles → profile.")
                 .font(.system(size: 10.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -218,15 +219,15 @@ struct ConnectView: View {
         .buttonStyle(.plain)
     }
 
-    private func field<C: View>(_ label: String, hint: String? = nil, @ViewBuilder _ c: () -> C) -> some View {
+    private func field<C: View>(_ label: LocalizedStringKey, hint: Text? = nil, @ViewBuilder _ c: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label).font(.system(size: 12, weight: .semibold))
             c()
-            if let hint { Text(hint).font(.system(size: 10.5)).foregroundStyle(.secondary) }
+            if let hint { hint.font(.system(size: 10.5)).foregroundStyle(.secondary) }
         }
     }
 
-    private func warning(_ t: String) -> some View {
+    private func warning(_ t: LocalizedStringKey) -> some View {
         Label { Text(t).fixedSize(horizontal: false, vertical: true) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
             .font(.system(size: 12)).foregroundStyle(.orange)
             .padding(10)

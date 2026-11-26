@@ -7,6 +7,9 @@ import StoneVPNShared
 /// того ж бінарника через `osascript … with administrator privileges` (пароль щоразу).
 final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendable {
     let service = SMAppService.daemon(plistName: HelperConst.plistName)
+    /// Версія встановленого демона (з останнього `version()`): до v6 він не знає PrivRequest.
+    private let lock = NSLock()
+    private var daemonVersion: Int?
 
     var status: SMAppService.Status { service.status }
     var isEnabled: Bool { service.status == .enabled }
@@ -30,13 +33,22 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
 
     func version() async -> Int? {
         guard isEnabled else { return nil }
-        return await withCheckedContinuation { cont in
+        let v: Int? = await withCheckedContinuation { cont in
             let once = Once()
             let c = connection()
             let proxy = c.remoteObjectProxyWithErrorHandler { _ in once.run { cont.resume(returning: nil) } } as? HelperXPC
             guard let proxy else { once.run { cont.resume(returning: nil) }; return }
             proxy.version { v in once.run { cont.resume(returning: v) }; c.invalidate() }
         }
+        lock.withLock { daemonVersion = v }
+        return v
+    }
+
+    /// Запит мовою інтерфейсу: helper (root, мова системи) відповідає нею ж. Демону до v6 —
+    /// голий PrivOp, який він розуміє (повідомлення тоді будуть його мовою).
+    private func encode(_ op: PrivOp, envelope: Bool) -> Data? {
+        guard envelope else { return try? JSONEncoder().encode(op) }
+        return try? JSONEncoder().encode(PrivRequest(op: op, lang: Bundle.main.preferredLocalizations.first))
     }
 
     // MARK: XPC
@@ -52,7 +64,8 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
     }
 
     private func xpc(_ op: PrivOp) async -> PrivResult? {
-        guard let data = try? JSONEncoder().encode(op) else { return nil }
+        let envelope = (lock.withLock { daemonVersion } ?? 0) >= 6
+        guard let data = encode(op, envelope: envelope) else { return nil }
         return await withCheckedContinuation { cont in
             let once = Once()
             let c = connection()
@@ -68,34 +81,36 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
     // MARK: fallback
 
     private func viaAppleScript(_ op: PrivOp) async -> PrivResult {
-        guard let data = try? JSONEncoder().encode(op) else { return .fail("encode") }
+        // Одноразовий запуск — бінарник із цього ж бандла, тож завжди v6+.
+        guard let data = encode(op, envelope: true) else { return .fail("encode") }
         // Запит — у файлі 600 (а не в argv), бо там може бути пароль/OTP.
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("stonevpn-\(UUID().uuidString).json")
         FileManager.default.createFile(atPath: file.path, contents: data, attributes: [.posixPermissions: 0o600])
         defer { try? FileManager.default.removeItem(at: file) }
         let cmd = "\(shq(helperPath)) --run-file \(shq(file.path))"
-        let script = "do shell script \"\(asq(cmd))\" with prompt \"StoneVPN: \(asq(Self.describe(op)))\" with administrator privileges"
+        let prompt = String(localized: "StoneVPN: \(Self.describe(op))", comment: "Administrator password prompt; the argument is the action, e.g. “connect WireGuard”")
+        let script = "do shell script \"\(asq(cmd))\" with prompt \"\(asq(prompt))\" with administrator privileges"
         let r = await Shell.run("/usr/bin/osascript", ["-e", script], timeout: 180)
         if let res = try? JSONDecoder().decode(PrivResult.self, from: Data(r.out.utf8)) { return res }
-        if r.err.contains("-128") { return .fail("скасовано") }
-        return .fail(r.err.isEmpty ? "helper не відповів" : r.err)
+        if r.err.contains("-128") { return .fail(String(localized: "cancelled")) }
+        return .fail(r.err.isEmpty ? String(localized: "the helper did not respond") : r.err)
     }
 
     static func describe(_ op: PrivOp) -> String {
         switch op {
-        case .wgUp: "підключити WireGuard"
-        case .wgDown: "відключити WireGuard"
-        case .wgDelete: "видалити конфіг WireGuard"
-        case .ovpnStart: "підключити OpenVPN"
-        case .ovpnStop: "відключити OpenVPN"
-        case .routeHostSet, .routeHostDelete: "змінити маршрут до VPN-сервера"
-        case .dnsSet, .dnsPurge, .dnsFlush: "відремонтувати DNS"
-        case .resolverSet, .resolverRemove: "змінити split-DNS"
-        case .dnsOverride, .dnsOverrideClear: "перемкнути основний DNS"
-        case .orderServices: "змінити порядок мережевих сервісів"
-        case .killPid: "зупинити процес VPN-тунелю"
-        case .batch(let ops): ops.first.map(describe) ?? "дія"
-        default: "привілейована дія"
+        case .wgUp: String(localized: "connect WireGuard")
+        case .wgDown: String(localized: "disconnect WireGuard")
+        case .wgDelete: String(localized: "delete a WireGuard config")
+        case .ovpnStart: String(localized: "connect OpenVPN")
+        case .ovpnStop: String(localized: "disconnect OpenVPN")
+        case .routeHostSet, .routeHostDelete: String(localized: "change the route to a VPN server")
+        case .dnsSet, .dnsPurge, .dnsFlush: String(localized: "repair DNS")
+        case .resolverSet, .resolverRemove: String(localized: "change split DNS")
+        case .dnsOverride, .dnsOverrideClear: String(localized: "switch the primary DNS")
+        case .orderServices: String(localized: "change the network service order")
+        case .killPid: String(localized: "stop a VPN tunnel process")
+        case .batch(let ops): ops.first.map(describe) ?? String(localized: "action")
+        default: String(localized: "privileged action")
         }
     }
 

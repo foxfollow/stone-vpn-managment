@@ -123,11 +123,11 @@ extension AppModel {
         do {
             try await actions.setDirectRoute(ip: i.ip, gateway: gw)
             prefs.directRoutes[i.ip] = "\(gw)|\(i.decisionKey)"
-            toast = "\(i.label): сервер \(i.host) знову напряму через \(gw), повз \(i.viaOwner)"
+            toast = String(localized: "\(i.label): server \(i.host) goes direct via \(gw) again, around \(i.viaOwner)")
             scheduleRefresh()
             return true
         } catch {
-            toast = "Маршрут напряму до \(i.host): \(error.localizedDescription)"
+            toast = String(localized: "Direct route to \(i.host): \(error.localizedDescription)")
             return false
         }
     }
@@ -157,19 +157,21 @@ extension AppModel {
         prefs.routeDecisions[i.decisionKey] = "keep"
         routeIssues.removeAll { $0.id == i.id }
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["route:\(i.id)"])
-        toast = "\(i.label) лишається через \(i.viaOwner)\(i.networkLabel.map { " у мережі «\($0)»" } ?? ""). Скинути — Routes → Рішення."
+        toast = i.networkLabel.map {
+            String(localized: "\(i.label) stays via \(i.viaOwner) on the network “\($0)”. Reset it in Routes → Decisions.")
+        } ?? String(localized: "\(i.label) stays via \(i.viaOwner). Reset it in Routes → Decisions.")
     }
 
     /// «Відхилити»: сервер напряму через LAN-шлюз; надалі — автоматично.
     func directRoute(_ i: RouteIssue) {
-        guard let gw = i.gateway else { toast = "Немає LAN-шлюзу для маршруту напряму"; return }
+        guard let gw = i.gateway else { toast = String(localized: "No LAN gateway for a direct route"); return }
         prefs.routeDecisions[i.decisionKey] = "direct"
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["route:\(i.id)"])
-        runAction("Маршрут") {
+        runAction(String(localized: "Route")) {
             try await self.actions.setDirectRoute(ip: i.ip, gateway: gw)
             self.prefs.directRoutes[i.ip] = "\(gw)|\(i.decisionKey)"
             self.routeIssues.removeAll { $0.id == i.id }
-            return "\(i.host) (\(i.ip)) → \(gw) напряму, повз \(i.viaOwner). Якщо в \(i.viaOwner) увімкнено Kill Switch, він може й далі тягнути все в тунель."
+            return String(localized: "\(i.host) (\(i.ip)) → \(gw) direct, around \(i.viaOwner). If \(i.viaOwner) has a Kill Switch on, it may still pull everything into its tunnel.")
         }
     }
 
@@ -177,13 +179,13 @@ extension AppModel {
     func resetRouteDecision(_ key: String) {
         prefs.routeDecisions[key] = nil
         let ips = prefs.directRoutes.filter { $0.value.split(separator: "|", maxSplits: 1).last.map(String.init) == key }.map(\.key)
-        runAction("Маршрут") {
+        runAction(String(localized: "Route")) {
             for ip in ips {
                 try await self.actions.deleteDirectRoute(ip: ip)
                 self.prefs.directRoutes[ip] = nil
             }
             self.lastRouteCheck = .distantPast
-            return ips.isEmpty ? "Рішення скинуто" : "Рішення скинуто, маршрут напряму до \(ips.joined(separator: ", ")) прибрано"
+            return ips.isEmpty ? String(localized: "Decision reset") : String(localized: "Decision reset, direct route to \(ips.joined(separator: ", ")) removed")
         }
     }
 
@@ -198,10 +200,13 @@ extension AppModel {
 
     private func notifyRouteIssue(_ i: RouteIssue) {
         let c = UNMutableNotificationContent()
-        c.title = "Маршрут під питанням: \(i.label)"
-        c.body = "Сервер \(i.host) іде через \(i.viaOwner) (\(i.via)) — тунель у тунелі" +
-            (i.networkLabel.map { " (мережа «\($0)»)." } ?? ".") +
-            (i.gateway.map { " Погодити чи пустити напряму через \($0)?" } ?? " LAN-шлюзу для обходу немає.")
+        c.title = String(localized: "Route in question: \(i.label)")
+        let what = i.networkLabel.map {
+            String(localized: "Server \(i.host) goes via \(i.viaOwner) (\(i.via)) on the network “\($0)” — a tunnel inside a tunnel.")
+        } ?? String(localized: "Server \(i.host) goes via \(i.viaOwner) (\(i.via)) — a tunnel inside a tunnel.")
+        let ask = i.gateway.map { String(localized: "Accept it, or send it direct via \($0)?") }
+            ?? String(localized: "There is no LAN gateway to go around it.")
+        c.body = what + " " + ask
         c.categoryIdentifier = Self.routeCategory
         c.userInfo = ["issue": i.id]
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "route:\(i.id)", content: c, trigger: nil))
@@ -215,8 +220,8 @@ final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate {
     func install() {
         let c = UNUserNotificationCenter.current()
         c.delegate = self
-        let keep = UNNotificationAction(identifier: "keep", title: "Погодити — лишити так")
-        let direct = UNNotificationAction(identifier: "direct", title: "Відхилити — напряму через LAN")
+        let keep = UNNotificationAction(identifier: "keep", title: String(localized: "Accept — keep it this way"))
+        let direct = UNNotificationAction(identifier: "direct", title: String(localized: "Decline — go direct via LAN"))
         c.setNotificationCategories([UNNotificationCategory(identifier: AppModel.routeCategory, actions: [keep, direct],
                                                             intentIdentifiers: [])])
     }

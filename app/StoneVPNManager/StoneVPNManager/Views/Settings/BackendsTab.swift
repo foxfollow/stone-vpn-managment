@@ -15,23 +15,26 @@ struct BackendsTab: View {
                     })) {
                         HStack { BackendBadge(backend: b, size: 20); Text(b.title) }
                     }
+                    .settingsAnchor(b == Backend.allCases.first ? "backends.enabled" : "backends.\(b.rawValue)")
                 }
                 if !model.config.unknownDisabled.isEmpty {
-                    Text("Невідомі назви в DISABLED_BACKENDS: \(model.config.unknownDisabled.joined(separator: ", "))").foregroundStyle(.orange)
+                    Text("Unknown names in DISABLED_BACKENDS: \(model.config.unknownDisabled.joined(separator: ", "))").foregroundStyle(.orange)
                 }
-            } header: { Text("Увімкнені (DISABLED_BACKENDS)") } footer: {
-                Text("Вимкнений бекенд не показується і не опитується. Приховати з поповера, не вимикаючи, — «Змінити» у списку провайдерів.")
+            } header: { Text("Enabled (DISABLED_BACKENDS)") } footer: {
+                Text("A disabled backend is neither shown nor probed. To hide it from the popover without disabling it, use “Edit” in the provider list.")
             }
-            Section("Знайдені інструменти") {
+            Section("Found Tools") {
                 tool("wg-quick", Shell.which(["/opt/homebrew/bin/wg-quick", "/usr/local/bin/wg-quick"]))
+                    .settingsAnchor("backends.tools")
                 tool("openvpn", Shell.which(["/opt/homebrew/sbin/openvpn", "/usr/local/sbin/openvpn"]))
                 tool("defguard-client", Paths.defguardCLI(model.config.defguardCLI))
                 tool("Cisco vpn", Shell.which(Paths.ciscoCLI))
-                tool("WG тека", model.snap.wgDir)
+                tool(String(localized: "WG folder"), model.snap.wgDir)
             }
-            Section("Шляхи") {
+            Section("Paths") {
                 ConfigField(model: model, label: "DEFGUARD_CLI", key: "DEFGUARD_CLI", value: model.config.defguardCLI,
-                            prompt: Paths.defguardBundleCLI, hint: "Симлінки розгортаються: NetworkExtension шукає бандл за шляхом exec.")
+                            prompt: Paths.defguardBundleCLI, hint: "Symlinks are resolved: NetworkExtension finds the bundle by the exec path.")
+                    .settingsAnchor("backends.defguardCLI")
             }
         }
         .formStyle(.grouped)
@@ -41,7 +44,7 @@ struct BackendsTab: View {
         LabeledContent(name) {
             HStack(spacing: 6) {
                 StatusDot(color: path == nil ? .secondary : .green)
-                Text(path ?? "не знайдено").font(.system(size: 11.5, design: .monospaced)).foregroundStyle(path == nil ? .secondary : .primary)
+                Text(path ?? String(localized: "not found")).font(.system(size: 11.5, design: .monospaced)).foregroundStyle(path == nil ? .secondary : .primary)
                     .lineLimit(1).truncationMode(.middle)
             }
         }

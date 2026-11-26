@@ -58,11 +58,11 @@ public enum OvpnFiles {
 
     /// Замінити один вбудований блок (<cert>/<key>/<ca>…) вмістом PEM-файлу.
     public static func replaceBlock(at path: String, tag: String, pemFile: URL) throws {
-        guard let pem = try? String(contentsOf: pemFile, encoding: .utf8) else { throw ActionError("не читається: \(pemFile.path)") }
-        guard pemMatches(pem, tag: tag) else { throw ActionError("\(pemFile.lastPathComponent) не схожий на вміст <\(tag)>") }
+        guard let pem = try? String(contentsOf: pemFile, encoding: .utf8) else { throw ActionError(String(localized: "cannot read: \(pemFile.path)", bundle: .module)) }
+        guard pemMatches(pem, tag: tag) else { throw ActionError(String(localized: "\(pemFile.lastPathComponent) doesn't look like <\(tag)> content", bundle: .module)) }
         let text = try String(contentsOfFile: path, encoding: .utf8)
         guard let updated = replaceBlock(text, tag: tag, with: pem) else {
-            throw ActionError("у профілі немає вбудованого <\(tag)> — заміни профіль цілком")
+            throw ActionError(String(localized: "the profile has no embedded <\(tag)> — replace the whole profile", bundle: .module))
         }
         try backup(path)
         try Data(updated.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
@@ -76,8 +76,8 @@ public enum OvpnFiles {
     }
 
     private static func readProfile(_ src: URL) throws -> String {
-        guard let text = try? String(contentsOf: src, encoding: .utf8) else { throw ActionError("не читається: \(src.path)") }
-        guard looksLikeProfile(text) else { throw ActionError("\(src.lastPathComponent) не схожий на профіль OpenVPN (немає remote / <ca>)") }
+        guard let text = try? String(contentsOf: src, encoding: .utf8) else { throw ActionError(String(localized: "cannot read: \(src.path)", bundle: .module)) }
+        guard looksLikeProfile(text) else { throw ActionError(String(localized: "\(src.lastPathComponent) doesn't look like an OpenVPN profile (no remote / <ca>)", bundle: .module)) }
         return text
     }
 

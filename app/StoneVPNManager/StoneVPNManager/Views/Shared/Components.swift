@@ -76,14 +76,15 @@ struct ProfileSwitch: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
-        .accessibilityValue(status.isActive ? "увімкнено" : "вимкнено")
+        .accessibilityValue(status.isActive ? "on" : "off")
     }
 }
 
 struct SectionLabel: View {
-    var text: String
+    var text: LocalizedStringKey
     var body: some View {
-        Text(text.uppercased())
+        Text(text)
+            .textCase(.uppercase)
             .font(.system(size: 10.5, weight: .semibold))
             .tracking(0.4)
             .foregroundStyle(.secondary)

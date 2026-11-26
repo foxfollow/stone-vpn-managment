@@ -161,9 +161,14 @@ public enum Parse {
     /// etime "[[dd-]hh:]mm:ss" → компактно "1:42:10" / "12:03" / "2д 03:04".
     public static func prettyElapsed(_ e: String) -> String {
         if let dash = e.firstIndex(of: "-") {
-            return "\(e[..<dash])д \(e[e.index(after: dash)...].prefix(5))"
+            return withDays(String(e[..<dash]), String(e[e.index(after: dash)...].prefix(5)))
         }
         return e.hasPrefix("00:") && e.count == 8 ? String(e.dropFirst(3)) : e
+    }
+
+    /// "2d 03:04" / «2д 03:04» — тривалість із днями мовою інтерфейсу.
+    public static func withDays(_ days: String, _ hm: String) -> String {
+        String(localized: "\(days)d \(hm)", bundle: .module, comment: "Elapsed time with days, e.g. 2d 03:04")
     }
 
     // MARK: OpenVPN

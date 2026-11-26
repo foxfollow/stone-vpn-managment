@@ -111,7 +111,10 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(inst.count, 1)
         XCTAssertEqual(inst[0].id, "1712")
         XCTAssertEqual(inst[0].log, "/tmp/openvpn-1712.log")
-        XCTAssertEqual(Parse.prettyElapsed("01-02:03:04"), "01д 02:03")
+        // Формат днів локалізований ("01d 02:03" / «01д 02:03») — тест не залежить від мови системи.
+        XCTAssertEqual(Parse.prettyElapsed("01-02:03:04"), Parse.withDays("01", "02:03"))
+        XCTAssertTrue(Parse.withDays("01", "02:03").hasPrefix("01"))
+        XCTAssertTrue(Parse.withDays("01", "02:03").hasSuffix(" 02:03"))
         XCTAssertEqual(rows[1].command, "/Applications/Defguard.app/Contents/MacOS/defguard-client")
     }
 

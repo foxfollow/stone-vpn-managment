@@ -6,6 +6,8 @@ import PackageDescription
 
 let package = Package(
     name: "StoneVPNKit",
+    // Мова розробки — англійська; переклади в Sources/StoneVPNCore/Resources/Localizable.xcstrings.
+    defaultLocalization: "en",
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "StoneVPNShared", targets: ["StoneVPNShared"]),
@@ -16,6 +18,7 @@ let package = Package(
         .target(
             name: "StoneVPNCore",
             dependencies: ["StoneVPNShared"],
+            resources: [.process("Resources")],
             linkerSettings: [.linkedFramework("SystemConfiguration")]
         ),
         .testTarget(name: "StoneVPNCoreTests", dependencies: ["StoneVPNCore", "StoneVPNShared"]),
