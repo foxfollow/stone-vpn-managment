@@ -712,6 +712,11 @@ final class AppModel {
             } else {
                 connect?.group = r.defaultGroup ?? r.groups.first ?? ""
             }
+            if let sso = r.ssoGroup {
+                // Група сервера за замовчуванням — SAML/SSO: з CLI в неї не увійти, її прибрано зі списку.
+                let name = sso.isEmpty ? String(localized: "the server's default group") : "“\(sso)”"
+                connect?.groupsNote = String(localized: "\(name) signs in through a browser (SSO) — not possible via the Cisco CLI")
+            }
         } catch {
             guard latest(), connect?.hostKey == host else { return }
             connect?.groupsNote = error.localizedDescription

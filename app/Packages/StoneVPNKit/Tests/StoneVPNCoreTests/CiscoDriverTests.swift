@@ -67,6 +67,53 @@ final class CiscoDriverTests: XCTestCase {
         }
     }
 
+    /// Head-end, де група за замовчуванням (PORTAL) — SAML, CLI на ній пише
+    /// «not supported» і знову показує меню; STAFF (1) — звичайний логін.
+    let ssoDefault = """
+    [ -t 0 ] || exit 1
+    while :; do
+      echo "  >> The requested authentication type is not supported in AnyConnect CLI."
+      echo "    0) PORTAL"
+      echo "    1) STAFF"
+      echo "    2) OPS"
+      printf 'Group: [PORTAL] '; read g; [ "$g" = 1 ] && break
+    done
+    echo "$g" > "$OUT.group"
+    printf 'Username: '; read u
+    printf 'Password: '; read -s p; echo
+    echo "  >> state: Connected"
+    """
+
+    func testSSODefaultGroupFailsFastInsteadOfLooping() async throws {
+        let cli = try fakeCLI("OUT=/dev/null\n" + ssoDefault)
+        let start = Date()
+        do {
+            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+            XCTFail("мало впасти")
+        } catch {
+            let m = error.localizedDescription
+            XCTAssertTrue(m.contains("PORTAL") && m.contains("STAFF, OPS") && !m.contains("PORTAL, STAFF"), m)
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+    }
+
+    func testSSOGroupChosenExplicitlyFails() async throws {
+        let cli = try fakeCLI("OUT=/dev/null\n" + ssoDefault)
+        do {
+            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "OPS", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+            XCTFail("мало впасти")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("“OPS”"), error.localizedDescription)
+        }
+    }
+
+    func testNonSSOGroupConnectsPastSSODefault() async throws {
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("cisco-\(UUID())").path
+        let cli = try fakeCLI("OUT=\(out)\n" + ssoDefault)
+        try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "STAFF", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+        XCTAssertEqual(try String(contentsOfFile: out + ".group", encoding: .utf8), "1\n")
+    }
+
     func testSuggestedHostKeepsPort() {
         var p = CiscoPrefs()
         p.hostName = "training.example"
@@ -128,6 +175,35 @@ final class CiscoGroupProbeTests: XCTestCase {
         XCTAssertEqual(r.defaultGroup, "Employees")
         try await Task.sleep(for: .milliseconds(300))
         // Нічого не відповіли на запит групи (EOF ≠ рядок) — облікові дані не надсилались.
+        XCTAssertFalse(FileManager.default.fileExists(atPath: marker))
+    }
+}
+
+extension CiscoGroupProbeTests {
+    /// `vpn -s` на SAML-групі сервера лише пише помилку; меню видно тільки під pty (`vpn connect`).
+    func testProbeReadsMenuUnderPtyWhenDefaultGroupIsSSO() async throws {
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("probe-\(UUID())").path
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("fake-vpn-\(UUID().uuidString).sh")
+        try """
+        #!/bin/bash
+        if [ "$1" = "-s" ]; then
+          read cmd
+          echo "  >> error: The requested authentication type is not supported in AnyConnect CLI."
+          sleep 30
+          exit 0
+        fi
+        [ "$1 $2" = "connect vpn.example.com" ] || exit 1
+        echo "  >> The requested authentication type is not supported in AnyConnect CLI."
+        echo "    0) PORTAL"
+        echo "    1) STAFF"
+        echo "    2) OPS"
+        printf 'Group: [PORTAL] '
+        read g && echo "got:$g" > \(marker)
+        """.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        let r = try await CiscoDriver.probeGroups(cli: url.path, host: "vpn.example.com", timeout: 5)
+        XCTAssertEqual(r, .init(groups: ["STAFF", "OPS"], defaultGroup: nil, asksGroup: true, ssoGroup: "PORTAL"))
+        try await Task.sleep(for: .milliseconds(300))
         XCTAssertFalse(FileManager.default.fileExists(atPath: marker))
     }
 }

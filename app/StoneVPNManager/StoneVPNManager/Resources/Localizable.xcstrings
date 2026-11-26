@@ -134,6 +134,16 @@
         }
       }
     },
+    "%@ signs in through a browser (SSO) — not possible via the Cisco CLI" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ входить через браузер (SSO) — через Cisco CLI не вийде"
+          }
+        }
+      }
+    },
     "%@ stays via %@ on the network “%@”. Reset it in Routes → Decisions." : {
       "localizations" : {
         "uk" : {
@@ -4737,6 +4747,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "helper не відповів"
+          }
+        }
+      }
+    },
+    "the server's default group" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "група сервера за замовчуванням"
           }
         }
       }

@@ -120,7 +120,11 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   wiped → empty password → "Login failed" in <1 s), and a group change reloads the login form.
   Groups are answered by their menu number (`Group: [VPN1] 1`, as typed in the CLI); the name
   made the head-end fall back to another group. The group probe still uses `vpn -s`
-  (no secrets involved) and stops at the first prompt. Defaults come from
+  (no secrets involved) and stops at the first prompt. A group with browser (SAML/SSO) login
+  makes the CLI print `The requested authentication type is not supported in AnyConnect CLI` and
+  re-show the menu (under a pty; `vpn -s` prints only the error when it is the server's default
+  group) — the probe then re-reads the menu under a pty and drops that group (`ssoGroup`), and the
+  driver fails fast naming the other groups instead of answering Enter until the timeout. Defaults come from
   Cisco's own prefs (`~/.vpn/.anyconnect`, `/opt/cisco/secureclient/vpn/.anyconnect_global`:
   DefaultUser/DefaultGroup/DefaultHostName + port from DefaultHostAddress).
   `defaultClientProfile.xml` is useless for custom ports — the head-end rewrites it on every

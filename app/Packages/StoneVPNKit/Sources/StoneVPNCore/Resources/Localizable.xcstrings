@@ -52,6 +52,16 @@
         }
       }
     },
+    "(default)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(за замовчуванням)"
+          }
+        }
+      }
+    },
     "Another Cisco client holds the connect capability: the Cisco Secure Client GUI or `vpn` in Terminal. Close it and try again." : {
       "localizations" : {
         "uk" : {
@@ -78,6 +88,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Банер прийнято"
+          }
+        }
+      }
+    },
+    "Choose another group: %@." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оберіть іншу групу: %@."
           }
         }
       }
@@ -238,6 +258,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "TLS handshake"
+          }
+        }
+      }
+    },
+    "The group “%@” signs in through a browser (SAML/SSO), which the Cisco CLI can't do." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Група «%@» входить через браузер (SAML/SSO) — Cisco CLI так не вміє."
           }
         }
       }
@@ -438,6 +468,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "сервер повторно питає другий фактор:"
+          }
+        }
+      }
+    },
+    "the server keeps asking for the group — check the group name:" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сервер знову й знову питає групу — перевірте її назву:"
           }
         }
       }

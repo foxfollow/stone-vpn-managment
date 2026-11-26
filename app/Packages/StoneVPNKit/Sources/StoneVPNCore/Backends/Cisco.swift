@@ -115,7 +115,7 @@ public enum CiscoDriver {
         onEvent(.step("vpn connect \(c.host)"))
         // Duo: порожній другий фактор = "push" (конвенція Duo для secondary password).
         let second = c.secondPassword.isEmpty ? "push" : c.secondPassword
-        var passwordsSent = 0, secondSent = 0
+        var passwordsSent = 0, secondSent = 0, groupPrompts = 0
         var bannerSent = false
         var deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -150,6 +150,18 @@ public enum CiscoDriver {
             if !t.isEmpty, quiet < 0.6 { continue }
             var consumed = true
             if t.hasSuffix("group:") || t.contains("group: [") || (t.hasPrefix("group") && t.hasSuffix(":")) {
+                groupPrompts += 1
+                // Група з входом через браузер (SAML/SSO): CLI пише «authentication type is not
+                // supported» і знову показує меню. Без цієї перевірки Enter (група сервера) крутився б
+                // по колу до таймауту. Вперше це повідомлення — про групу за замовчуванням сервера.
+                if lower.contains(ssoMarker) && (c.group.isEmpty || groupPrompts > 1) {
+                    let bad = groupPrompts > 1 && !c.group.isEmpty ? c.group
+                        : (Parse.firstMatch(#"\[([^\]]*)\]"#, tail).flatMap { $0.isEmpty ? nil : $0 } ?? "")
+                    throw ActionError(ssoGroupError(bad, others: menuOrder(groupOptions).filter { $0 != bad }))
+                }
+                if groupPrompts > 3 {
+                    throw ActionError(String(localized: "the server keeps asking for the group — check the group name:", bundle: .module) + "\n" + transcriptTail())
+                }
                 // Меню груп приймає номер (як у CLI: «Group: [VPN1] 1»); назву — лише як запасний варіант.
                 let answer = c.group.isEmpty ? "" : (groupOptions[c.group] ?? c.group)
                 onEvent(.step(c.group.isEmpty ? String(localized: "Group: (default)", bundle: .module)
@@ -209,6 +221,26 @@ public enum CiscoDriver {
         public var groups: [String]
         public var defaultGroup: String?
         public var asksGroup: Bool          // false = сервер одразу питає логін (групи не обирають)
+        /// Група сервера за замовчуванням, що входить через браузер (SAML/SSO) — CLI так не вміє.
+        /// Її немає в `groups`, і `defaultGroup` тоді nil.
+        public var ssoGroup: String? = nil
+    }
+
+    /// Так CLI відповідає на групу з SAML/SSO-входом (Cisco Secure Client 5.x).
+    static let ssoMarker = "authentication type is not supported in anyconnect cli"
+
+    static func ssoGroupError(_ group: String, others: [String]) -> String {
+        let name = group.isEmpty ? String(localized: "(default)", bundle: .module) : group
+        var msg = String(localized: "The group “\(name)” signs in through a browser (SAML/SSO), which the Cisco CLI can't do.", bundle: .module)
+        if !others.isEmpty {
+            msg += " " + String(localized: "Choose another group: \(others.joined(separator: ", ")).", bundle: .module)
+        }
+        return msg
+    }
+
+    /// Назви груп у порядку меню сервера (номер → назва).
+    static func menuOrder(_ options: [String: String]) -> [String] {
+        options.sorted { (Int($0.value) ?? 0) < (Int($1.value) ?? 0) }.map(\.key)
     }
 
     /// Дізнатися групи до автентифікації: `connect <host>` → чекаємо перший запит
@@ -234,9 +266,34 @@ public enum CiscoDriver {
     }
 
     static func probe(cli: String, host: String, timeout: TimeInterval, cancelled: () -> Bool = { false }) throws -> GroupProbe {
+        do {
+            return try probeOnce(cli: cli, host: host, pty: false, timeout: timeout, cancelled: cancelled)
+        } catch SSODefault.hit {
+            // `vpn -s` на SSO-групі сервера лише пише помилку й не показує меню; під pty
+            // (`vpn connect`, як у Terminal) меню є. Нічого не надсилаємо — обриваємо на запиті.
+            guard var r = try? probeOnce(cli: cli, host: host, pty: true, timeout: timeout, cancelled: cancelled), r.asksGroup else {
+                if cancelled() { throw CancellationError() }
+                throw ActionError(ssoGroupError("", others: []))
+            }
+            let sso = r.defaultGroup ?? ""
+            r.groups.removeAll { $0 == sso }
+            r.ssoGroup = sso
+            r.defaultGroup = nil
+            return r
+        }
+    }
+
+    enum SSODefault: Error { case hit }
+
+    static func probeOnce(cli: String, host: String, pty: Bool, timeout: TimeInterval, cancelled: () -> Bool) throws -> GroupProbe {
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: cli)
-        p.arguments = ["-s"]
+        if pty {
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/script")
+            p.arguments = ["-q", "/dev/null", cli, "connect", host]
+        } else {
+            p.executableURL = URL(fileURLWithPath: cli)
+            p.arguments = ["-s"]
+        }
         reapOrphans(cli: cli)
         let inp = Pipe(), out = Pipe()
         p.standardInput = inp
@@ -256,13 +313,14 @@ public enum CiscoDriver {
             try? inp.fileHandleForWriting.close()
             stop(p)
         }
-        try? inp.fileHandleForWriting.write(contentsOf: Data("connect \(host)\n".utf8))
+        if !pty { try? inp.fileHandleForWriting.write(contentsOf: Data("connect \(host)\n".utf8)) }
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             Thread.sleep(forTimeInterval: 0.15)
             if cancelled() { throw CancellationError() }
             lock.lock(); let text = all; lock.unlock()
             if let r = parseGroupPrompt(text) { return r }
+            if !pty, text.lowercased().contains(ssoMarker) { throw SSODefault.hit }
             if let err = failure(text) { throw ActionError(explain(err, text)) }
             if !p.isRunning { break }
         }
