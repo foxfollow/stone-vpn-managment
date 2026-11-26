@@ -66,9 +66,20 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
 
     /// Перереєструвати демона з бінарником цього бандла (без пароля, якщо його вже схвалено).
     func reinstall() async throws {
-        if service.status != .notRegistered { try? await service.unregister() }
+        if service.status != .notRegistered {
+            try? await service.unregister()
+            // BTM ще прибирає стару реєстрацію: register одразу після unregister падає з
+            // «Operation not permitted» (SMAppService error 1), і демон лишається незареєстрованим.
+            for _ in 0..<10 where service.status != .notRegistered { try? await Task.sleep(for: .milliseconds(300)) }
+            try? await Task.sleep(for: .seconds(1))
+        }
         lock.withLock { daemonVersion = nil; denied = false }
-        try register()
+        var lastError: Error?
+        for attempt in 1...4 {
+            do { try register(); return } catch { lastError = error }
+            try? await Task.sleep(for: .seconds(attempt))
+        }
+        if let lastError { throw lastError }
     }
 
     static func cdhash(atPath path: String) -> String? {
