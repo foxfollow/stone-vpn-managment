@@ -35,6 +35,10 @@ struct ConnectView: View {
                 warning("The session was dropped on the server — the tunnel says “connected”, but no traffic flows. Enter a new code: the app will disconnect and reconnect the location itself.")
             }
 
+            if p.backend == .cisco, let from = r.ciscoSwitchFrom {
+                warning("Cisco Secure Client keeps only one session, and it is connected to \(from) now. “Switch Session” disconnects it first, then connects here; Cancel leaves it as it is.")
+            }
+
             if r.guiRunning {
                 warning(p.backend == .defguard
                         ? "Defguard.app is running — it stops an MFA session started from the CLI and asks for the code in its own window. It will be closed before connecting (the system extension keeps the tunnels)."
@@ -88,7 +92,7 @@ struct ConnectView: View {
                 .buttonStyle(.borderless).font(.system(size: 12))
                 Spacer()
                 Button("Cancel") { close() }.keyboardShortcut(.cancelAction)
-                Button(r.reconnect ? "Renew" : "Connect") { submit() }
+                Button(r.reconnect ? "Renew" : (p.backend == .cisco && r.ciscoSwitchFrom != nil ? "Switch Session" : "Connect")) { submit() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .disabled(r.running || (r.needsAuth && r.username.isEmpty) || (r.mfa && r.code.isEmpty)
@@ -139,8 +143,9 @@ struct ConnectView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.borderless)
-                    .disabled(r.hostKey.isEmpty)
-                    .help(r.guiRunning ? "Close the Cisco GUI and fetch groups from the server" : "Fetch groups from the server")
+                    .disabled(r.hostKey.isEmpty || r.ciscoActive != nil)
+                    .help(r.ciscoActive != nil ? "Not available while Cisco is connected: fetching groups would drop the session"
+                          : r.guiRunning ? "Close the Cisco GUI and fetch groups from the server" : "Fetch groups from the server")
                 }
             }
             field("Username") {
@@ -159,6 +164,10 @@ struct ConnectView: View {
             .padding(.top, 4)
         }
         .font(.system(size: 12))
+        if let used = model.prefs.ciscoMFA[Prefs.ciscoKey(r.hostKey)] {
+            Text(used ? "This server asked for a second factor last time." : "This server didn't ask for a second factor last time — no Duo push expected.")
+                .font(.system(size: 10.5)).foregroundStyle(.secondary)
+        }
         if let b = r.banner {
             ScrollView { Text(b).font(.system(size: 11)).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled) }
                 .frame(maxHeight: 90)

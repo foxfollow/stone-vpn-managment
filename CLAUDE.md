@@ -124,7 +124,16 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   makes the CLI print `The requested authentication type is not supported in AnyConnect CLI` and
   re-show the menu (under a pty; `vpn -s` prints only the error when it is the server's default
   group) — the probe then re-reads the menu under a pty and drops that group (`ssoGroup`), and the
-  driver fails fast naming the other groups instead of answering Enter until the timeout. Defaults come from
+  driver fails fast naming the other groups instead of answering Enter until the timeout.
+  **One session at a time**: the agent holds a single Cisco session. Connecting to another host
+  shows a warning + "Switch Session" in the Connect window (`ConnectRequest.ciscoSwitchFrom`,
+  `Prefs.ciscoSame`: case and `:443` ignored); `perform` disconnects the live one explicitly
+  first (marked in `stopping`, so no "tunnel dropped"). The group probe is skipped while any Cisco
+  session is up. **MFA memory per host** (UserDefaults `ciscoMFA`): a Duo/OTP prompt or > 5 s of
+  silence after the password (`mfaHold`, auto-push) = MFA; `false` is stored only after a successful
+  connect. It only picks the "waiting" text — the Duo answers are unchanged. **Head-end-forced client
+  update**: `Downloading Cisco Secure Client <ver>` → `Exiting. Upgrade in progress` ends the `vpn`
+  run; the driver explains it (wait for the installer, connect again) instead of "vpn exited". Defaults come from
   Cisco's own prefs (`~/.vpn/.anyconnect`, `/opt/cisco/secureclient/vpn/.anyconnect_global`:
   DefaultUser/DefaultGroup/DefaultHostName + port from DefaultHostAddress).
   `defaultClientProfile.xml` is useless for custom ports — the head-end rewrites it on every

@@ -990,6 +990,26 @@
         }
       }
     },
+    "Cisco Secure Client keeps only one session, and it is connected to %@ now. “Switch Session” disconnects it first, then connects here; Cancel leaves it as it is." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco Secure Client тримає лише одну сесію, і зараз вона підключена до %@. «Перемкнути сесію» спершу відключить її, а потім підключить сюди; «Скасувати» залишить усе як є."
+          }
+        }
+      }
+    },
+    "Cisco keeps one session: connecting here will disconnect %@ — the Connect window asks first." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco тримає одну сесію: підключення сюди відключить %@ — вікно підключення спершу перепитає."
+          }
+        }
+      }
+    },
     "Close the Cisco GUI and fetch groups from the server" : {
       "localizations" : {
         "uk" : {
@@ -1550,6 +1570,16 @@
         }
       }
     },
+    "Disconnecting Cisco from %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відключаю Cisco від %@"
+          }
+        }
+      }
+    },
     "Displaced while chosen: %@. Their internal domains go through split DNS." : {
       "localizations" : {
         "uk" : {
@@ -1806,6 +1836,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Група"
+          }
+        }
+      }
+    },
+    "Groups aren't fetched while Cisco is connected — the remembered group is used" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поки Cisco підключений, групи не запитуються — використовується запам'ятована"
           }
         }
       }
@@ -2306,6 +2346,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Не IP: %@"
+          }
+        }
+      }
+    },
+    "Not available while Cisco is connected: fetching groups would drop the session" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Недоступно, поки Cisco підключений: запит груп обірвав би сесію"
           }
         }
       }
@@ -3401,6 +3451,16 @@
         }
       }
     },
+    "Switch Session" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перемкнути сесію"
+          }
+        }
+      }
+    },
     "Symlinks are resolved: NetworkExtension finds the bundle by the exec path." : {
       "localizations" : {
         "uk" : {
@@ -3667,6 +3727,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LAN-шлюзу для обходу немає."
+          }
+        }
+      }
+    },
+    "This server asked for a second factor last time." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Минулого разу цей сервер просив другий фактор."
+          }
+        }
+      }
+    },
+    "This server didn't ask for a second factor last time — no Duo push expected." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Минулого разу цей сервер не просив другого фактора — Duo-push не очікується."
           }
         }
       }

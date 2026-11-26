@@ -64,6 +64,11 @@ struct ConnectRequest: Identifiable {
     var groupsLoading = false
     var groupsNote: String?
     var groupsFor = ""            // хост, для якого отримано список
+    /// Хост живої Cisco-сесії на момент відкриття вікна. Агент тримає лише одну сесію,
+    /// тож підключення до іншого хоста спершу розриває цю.
+    var ciscoActive: String?
+    /// Хост живої сесії, яку доведеться розірвати (інший, ніж у полі Host).
+    var ciscoSwitchFrom: String? { ciscoActive.flatMap { Prefs.ciscoSame($0, hostKey) ? nil : $0 } }
     /// Хост без пробілів/переносів (вставлений з буфера часто має хвіст) — ключ для груп.
     var hostKey: String { host.trimmingCharacters(in: .whitespacesAndNewlines) }
     var steps: [String] = []
@@ -426,6 +431,7 @@ final class AppModel {
             r.host = p.name
             if !p.name.contains(":"), let s = cp.suggestedHost, s.hasPrefix(p.name + ":") { r.host = s }
             (r.username, r.group) = ciscoLogin(for: r.host, cp)
+            r.ciscoActive = snap.sessions.first { $0.backend == .cisco }?.name
         }
         if r.needsAuth || r.askGateway || r.mfa || p.backend == .cisco {
             connect = r
@@ -514,17 +520,29 @@ final class AppModel {
                 if r.guiRunning { step(String(localized: "Closing the Cisco GUI")); await actions.ciscoQuitGUI() }
                 let host = r.hostKey
                 guard !host.isEmpty else { throw ActionError(String(localized: "enter a host")) }
+                let k = Prefs.ciscoKey(host)
+                // Агент тримає одну сесію: стару розриваємо явно (і бачимо, якщо не вийшло),
+                // а не покладаємось на те, що `vpn connect` перемкне її сам.
+                if let live = await actions.ciscoConnectedHost(), !Prefs.ciscoSame(live, host) {
+                    step(String(localized: "Disconnecting Cisco from \(live)"))
+                    stopping.insert("cisco:\(live)")          // не «тунель обірвався» — ми самі
+                    try await actions.ciscoDisconnect()
+                    await refresh()
+                }
                 for l in try await actions.purgeDeadHostRoutes([host]) { step(l) }
-                let creds = CiscoCredentials(host: host, group: r.group, user: r.username, password: r.password, secondPassword: r.secondPassword)
-                try await actions.ciscoConnect(creds) { ev in
+                let creds = CiscoCredentials(host: host, group: r.group, user: r.username, password: r.password,
+                                             secondPassword: r.secondPassword, expectsMFA: prefs.ciscoMFA[k])
+                let usedMFA = try await actions.ciscoConnect(creds) { ev in
                     Task { @MainActor in
                         switch ev {
                         case .step(let s): AppModel.shared.connect?.steps.append(s); AppModel.shared.busy[p.key] = s
                         case .banner(let b): AppModel.shared.connect?.banner = b
+                        case .secondFactor: AppModel.shared.prefs.ciscoMFA[k] = true
                         }
                     }
                 }
-                let k = Prefs.ciscoKey(host)
+                // «Без MFA» — лише після успіху: «Login failed» приходить ще до Duo.
+                prefs.ciscoMFA[k] = usedMFA
                 if prefs.rememberUser, !r.username.isEmpty { prefs.ciscoUsers[k] = r.username }
                 prefs.ciscoGroups[k] = r.group
                 if !(snap.profiles[.cisco] ?? []).contains(where: { $0.name == host }), !prefs.ciscoHosts.contains(host) {
@@ -593,7 +611,8 @@ final class AppModel {
         let ok = Prefs.ciscoKey(old), nk = Prefs.ciscoKey(host), moved = !prefs.ciscoHosts.contains(old)
         if prefs.ciscoUsers[nk] == nil, let u = prefs.ciscoUsers[ok] { prefs.ciscoUsers[nk] = u }
         if prefs.ciscoGroups[nk] == nil, let g = prefs.ciscoGroups[ok] { prefs.ciscoGroups[nk] = g }
-        if moved, ok != nk { prefs.ciscoUsers[ok] = nil; prefs.ciscoGroups[ok] = nil }
+        if prefs.ciscoMFA[nk] == nil, let m = prefs.ciscoMFA[ok] { prefs.ciscoMFA[nk] = m }
+        if moved, ok != nk { prefs.ciscoUsers[ok] = nil; prefs.ciscoGroups[ok] = nil; prefs.ciscoMFA[ok] = nil }
         profilesSelection = "cisco:\(host)"
     }
 
@@ -602,6 +621,7 @@ final class AppModel {
         prefs.favorites.removeAll { $0 == "cisco:\(h)" }
         prefs.ciscoUsers[Prefs.ciscoKey(h)] = nil
         prefs.ciscoGroups[Prefs.ciscoKey(h)] = nil
+        prefs.ciscoMFA[Prefs.ciscoKey(h)] = nil
         profilesSelection = nil
     }
 
@@ -668,6 +688,11 @@ final class AppModel {
     /// «хост той самий» лишала «Отримую групи…» назавжди, якщо поле відрізнялось хоч пробілом).
     func probeCiscoGroups(closeGUI: Bool = false) async {
         guard let host = connect?.hostKey, !host.isEmpty else { return }
+        // Probe = `connect`; поверх живої сесії він її перепідніме. Беремо запам'ятовану групу.
+        if connect?.ciscoActive != nil {
+            connect?.groupsNote = String(localized: "Groups aren't fetched while Cisco is connected — the remembered group is used")
+            return
+        }
         groupsProbeTask?.cancel()
         groupsProbeSeq += 1
         let id = groupsProbeSeq

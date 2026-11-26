@@ -63,6 +63,8 @@ final class Prefs {
     /// Логін і група — окремо для кожного хоста (ключ — ciscoKey(host)), не один на всіх.
     var ciscoUsers: [String: String] { didSet { d.set(ciscoUsers, forKey: "ciscoUsers") } }
     var ciscoGroups: [String: String] { didSet { d.set(ciscoGroups, forKey: "ciscoGroups") } }
+    /// Чи просив хост другий фактор (Duo/OTP) минулого разу — для підказок у вікні підключення.
+    var ciscoMFA: [String: Bool] { didSet { d.set(ciscoMFA, forKey: "ciscoMFA") } }
     // Сповіщення
     var notifyConnected: Bool { didSet { d.set(notifyConnected, forKey: "notifyConnected") } }
     var notifyDisconnected: Bool { didSet { d.set(notifyDisconnected, forKey: "notifyDisconnected") } }
@@ -112,6 +114,7 @@ final class Prefs {
         ciscoHosts = d.stringArray(forKey: "ciscoHosts") ?? []
         ciscoUsers = d.dictionary(forKey: "ciscoUsers") as? [String: String] ?? [:]
         ciscoGroups = d.dictionary(forKey: "ciscoGroups") as? [String: String] ?? [:]
+        ciscoMFA = d.dictionary(forKey: "ciscoMFA") as? [String: Bool] ?? [:]
         // Старий спільний логін для всіх хостів — не знаємо, чий він, тож не переносимо.
         d.removeObject(forKey: "ciscoLastUser")
         d.removeObject(forKey: "ciscoLastGroup")
@@ -146,5 +149,10 @@ final class Prefs {
 
     func setSettings(_ s: ProfileSettings, for p: Profile) { profileSettings[p.key] = s }
 
-    static func ciscoKey(_ host: String) -> String { host.trimmingCharacters(in: .whitespaces).lowercased() }
+    nonisolated static func ciscoKey(_ host: String) -> String { host.trimmingCharacters(in: .whitespaces).lowercased() }
+    /// Той самий head-end: регістр і стандартний порт не важать (`host` = `host:443`).
+    nonisolated static func ciscoSame(_ a: String, _ b: String) -> Bool {
+        func n(_ h: String) -> String { let k = ciscoKey(h); return k.hasSuffix(":443") ? String(k.dropLast(4)) : k }
+        return n(a) == n(b)
+    }
 }

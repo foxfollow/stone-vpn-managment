@@ -46,28 +46,36 @@ public struct CiscoCredentials: Sendable {
     public var user: String
     public var password: String
     public var secondPassword: String
-    public init(host: String, group: String, user: String, password: String, secondPassword: String) {
+    /// Чи просив цей сервер другий фактор минулого разу (nil = невідомо) — лише для підказок.
+    public var expectsMFA: Bool?
+    public init(host: String, group: String, user: String, password: String, secondPassword: String, expectsMFA: Bool? = nil) {
         self.host = host
         self.group = group
         self.user = user
         self.password = password
         self.secondPassword = secondPassword
+        self.expectsMFA = expectsMFA
     }
 }
 
 /// expect-подібний драйвер `vpn -s`: читає вивід і відповідає на запит, коли він з'являється
 /// (порядок і набір запитів залежать від head-end — групи може не бути, другого пароля теж).
 public enum CiscoDriver {
-    public enum Event: Sendable { case step(String), banner(String) }
+    /// `.secondFactor` — сервер точно хоче MFA (запит Duo/OTP або довга пауза після пароля).
+    public enum Event: Sendable { case step(String), banner(String), secondFactor }
 
+    /// Пауза після пароля, довша за цю, — це сервер чекає підтвердження Duo (auto-push без запиту).
+    /// Звичайна перевірка пароля відповідає за 1–2 с.
+    static let mfaHold: TimeInterval = 5
+
+    /// Повертає, чи знадобився другий фактор (для пам'яті «цей сервер без Duo»).
+    @discardableResult
     public static func connect(cli: String, _ c: CiscoCredentials, timeout: TimeInterval = 60,
-                               onEvent: @escaping @Sendable (Event) -> Void) async throws {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                               onEvent: @escaping @Sendable (Event) -> Void) async throws -> Bool {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Bool, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    try run(cli: cli, c, timeout: timeout, onEvent: onEvent)
-                    cont.resume()
-                } catch { cont.resume(throwing: error) }
+                do { cont.resume(returning: try run(cli: cli, c, timeout: timeout, onEvent: onEvent)) }
+                catch { cont.resume(throwing: error) }
             }
         }
     }
@@ -75,7 +83,7 @@ public enum CiscoDriver {
     /// `vpn connect <host>` під псевдотерміналом (`/usr/bin/script`) — так само, як у Terminal.
     /// Через голі pipe (`vpn -s`) пароль/другий фактор читаються з tty, якого немає, і сервер
     /// одразу відповідає «Login failed» — Duo-push навіть не стартує.
-    static func run(cli: String, _ c: CiscoCredentials, timeout: TimeInterval, onEvent: @escaping @Sendable (Event) -> Void) throws {
+    static func run(cli: String, _ c: CiscoCredentials, timeout: TimeInterval, onEvent: @escaping @Sendable (Event) -> Void) throws -> Bool {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/script")
         p.arguments = ["-q", "/dev/null", cli, "connect", c.host]
@@ -116,11 +124,28 @@ public enum CiscoDriver {
         // Duo: порожній другий фактор = "push" (конвенція Duo для secondary password).
         let second = c.secondPassword.isEmpty ? "push" : c.secondPassword
         var passwordsSent = 0, secondSent = 0, groupPrompts = 0
-        var bannerSent = false
+        var bannerSent = false, updateSeen = false
+        var mfa = false
+        func markMFA() { if !mfa { mfa = true; onEvent(.secondFactor) } }
+        var passwordAt: Date?          // чекаємо першої відповіді сервера після пароля
+        var holdNoted = false
         var deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             Thread.sleep(forTimeInterval: 0.15)
             lock.lock(); let chunk = buf; let quiet = Date().timeIntervalSince(lastData); lock.unlock()
+            if let at = passwordAt {
+                let held = Date().timeIntervalSince(at)
+                if !chunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if held > mfaHold { markMFA() }
+                    passwordAt = nil
+                } else if held > mfaHold, !holdNoted {
+                    holdNoted = true
+                    // Мовчить довше, ніж триває перевірка пароля, — найімовірніше, чекає Duo.
+                    if c.expectsMFA == false {
+                        onEvent(.step(String(localized: "The server is taking long — if it sent a Duo push, approve it on your phone", bundle: .module)))
+                    }
+                }
+            }
             guard !chunk.isEmpty else {
                 if !p.isRunning { break }
                 continue
@@ -136,7 +161,21 @@ public enum CiscoDriver {
 
             if lower.contains("state: connected") || lower.contains("connected to ") {
                 onEvent(.step("Connected"))
-                return
+                return mfa
+            }
+            // Head-end вимагає іншу версію клієнта: завантажує її, а `vpn` виходить
+            // («Exiting. Upgrade in progress») — підключення в цьому запуску вже не буде.
+            if !updateSeen, let v = Parse.firstMatch(#"(?i)downloading cisco secure client ([0-9.]+)"#, chunk) ?? (lower.contains("upgrade in progress") ? "" : nil) {
+                updateSeen = true
+                onEvent(.step(v.isEmpty ? String(localized: "The server requires a Cisco Secure Client update — downloading it…", bundle: .module)
+                                        : String(localized: "The server requires Cisco Secure Client \(v) — downloading it…", bundle: .module)))
+                deadline = max(deadline, Date().addingTimeInterval(180))
+            }
+            if lower.contains("upgrade in progress") {
+                let v = Parse.firstMatch(#"(?i)downloading cisco secure client ([0-9.]+)"#, all) ?? ""
+                throw ActionError(v.isEmpty
+                    ? String(localized: "Cisco Secure Client is updating itself because the server requires it. Wait until the installer window closes, then connect again.", bundle: .module)
+                    : String(localized: "Cisco Secure Client is updating itself to \(v) because the server requires it. Wait until the installer window closes, then connect again.", bundle: .module))
             }
             if failure(chunk) != nil {
                 Thread.sleep(forTimeInterval: 0.3)       // дочитати причину, якщо сервер її надсилає
@@ -173,6 +212,8 @@ public enum CiscoDriver {
             } else if t.contains("second password") || t.contains("secondary password") || t.contains("passcode")
                         || t.contains("duo") || t.hasPrefix("answer:") || t.hasPrefix("response:") {
                 secondSent += 1
+                passwordAt = nil
+                markMFA()
                 if secondSent > 2 { throw ActionError(String(localized: "the server asks for the second factor again:", bundle: .module) + "\n" + transcriptTail()) }
                 // Меню Duo «Passcode or option (1-3)»: 1 = Duo Push.
                 let answer = t.contains("option") && c.secondPassword.isEmpty ? "1" : second
@@ -186,8 +227,14 @@ public enum CiscoDriver {
                 if passwordsSent > 1 { throw ActionError(String(localized: "the server asks for the password again — wrong username or password:", bundle: .module) + "\n" + transcriptTail()) }
                 onEvent(.step(String(localized: "Password", bundle: .module)))
                 send(c.password)
+                passwordAt = Date()
                 // Сервер може тримати відповідь, поки ти підтверджуєш Duo-push (auto-push без запиту).
-                onEvent(.step(String(localized: "Waiting for the server (Duo/MFA — approve on your phone)…", bundle: .module)))
+                // Що писати — з пам'яті про цей хост: без MFA «approve on your phone» лише плутає.
+                switch c.expectsMFA {
+                case true?: onEvent(.step(String(localized: "Waiting for the server (Duo/MFA — approve on your phone)…", bundle: .module)))
+                case false?: onEvent(.step(String(localized: "Waiting for the server…", bundle: .module)))
+                case nil: onEvent(.step(String(localized: "Waiting for the server (if it uses Duo/MFA, approve on your phone)…", bundle: .module)))
+                }
                 deadline = max(deadline, Date().addingTimeInterval(120))
             } else if t.contains("accept?") || t.contains("[y/n]") {
                 if !bannerSent {
@@ -209,7 +256,7 @@ public enum CiscoDriver {
             if !p.isRunning { break }
         }
         lock.lock(); let text = all; lock.unlock()
-        if text.lowercased().contains("state: connected") { onEvent(.step("Connected")); return }
+        if text.lowercased().contains("state: connected") { onEvent(.step("Connected")); return mfa }
         let tailText = transcriptTail()
         if failure(text) != nil { throw ActionError(explain(tailText, text)) }
         let reason = p.isRunning ? String(localized: "Cisco did not connect in time", bundle: .module)

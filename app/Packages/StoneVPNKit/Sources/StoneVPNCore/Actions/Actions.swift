@@ -313,9 +313,17 @@ public final class Actions: @unchecked Sendable {
     }
 
     /// Підключення в застосунку: `vpn -s` + відповіді на його запити.
-    public func ciscoConnect(_ c: CiscoCredentials, onEvent: @escaping @Sendable (CiscoDriver.Event) -> Void) async throws {
+    /// true = сервер просив другий фактор (Duo/OTP).
+    @discardableResult
+    public func ciscoConnect(_ c: CiscoCredentials, onEvent: @escaping @Sendable (CiscoDriver.Event) -> Void) async throws -> Bool {
         guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError(String(localized: "Cisco CLI not found", bundle: .module)) }
-        try await CiscoDriver.connect(cli: cli, c, onEvent: onEvent)
+        return try await CiscoDriver.connect(cli: cli, c, onEvent: onEvent)
+    }
+
+    /// Хост живої Cisco-сесії (агент тримає лише одну).
+    public func ciscoConnectedHost() async -> String? {
+        guard let cli = Shell.which(Paths.ciscoCLI) else { return nil }
+        return Parse.ciscoConnectedHost(await Shell.run(cli, ["-s", "state"], timeout: 8).out)
     }
 
     /// Групи з сервера до автентифікації. Після обриву скидаємо агент із «connecting»,

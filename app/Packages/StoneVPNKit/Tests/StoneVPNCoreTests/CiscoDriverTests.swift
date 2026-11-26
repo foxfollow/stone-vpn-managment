@@ -38,10 +38,13 @@ final class CiscoDriverTests: XCTestCase {
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("cisco-\(UUID())").path
         let cli = try fakeCLI("OUT=\(out)\n" + happy)
         let steps = StepLog()
-        try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com:8448", group: "Staff", user: "j.doe", password: "s3cret", secondPassword: ""), timeout: 15) { ev in
+        let mfa = try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com:8448", group: "Staff", user: "j.doe", password: "s3cret", secondPassword: ""), timeout: 15) { ev in
             if case .step(let s) = ev { steps.add(s) }
             if case .banner(let b) = ev { steps.add("banner:" + b) }
+            if case .secondFactor = ev { steps.add("mfa") }
         }
+        XCTAssertTrue(mfa)
+        XCTAssertEqual(steps.all.filter { $0 == "mfa" }.count, 1)
         XCTAssertEqual(try String(contentsOfFile: out + ".group", encoding: .utf8), "1\n")   // номер, як у CLI
         XCTAssertEqual(try String(contentsOfFile: out + ".user", encoding: .utf8), "j.doe\n")
         XCTAssertEqual(try String(contentsOfFile: out + ".duo", encoding: .utf8), "push\n")   // порожній OTP = push
@@ -110,8 +113,49 @@ final class CiscoDriverTests: XCTestCase {
     func testNonSSOGroupConnectsPastSSODefault() async throws {
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("cisco-\(UUID())").path
         let cli = try fakeCLI("OUT=\(out)\n" + ssoDefault)
-        try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "STAFF", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+        let steps = StepLog()
+        let mfa = try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "STAFF", user: "j.doe", password: "x", secondPassword: "", expectsMFA: false), timeout: 15) { ev in
+            if case .step(let s) = ev { steps.add(s) }
+        }
         XCTAssertEqual(try String(contentsOfFile: out + ".group", encoding: .utf8), "1\n")
+        XCTAssertFalse(mfa)                                         // сервер без Duo — так і запам'ятаємо
+        XCTAssertFalse(steps.all.contains { $0.contains("phone") }, "\(steps.all)")   // і не просимо підтвердити push
+    }
+
+    /// Head-end з auto-push: після пароля мовчить, поки людина не підтвердить Duo, запиту немає.
+    func testLongHoldAfterPasswordCountsAsMFA() async throws {
+        let cli = try fakeCLI("""
+        [ -t 0 ] || exit 1
+        printf 'Username: '; read u
+        printf 'Password: '; read -s p; echo
+        sleep \(Int(CiscoDriver.mfaHold) + 1)
+        echo "  >> state: Connected"
+        """)
+        let steps = StepLog()
+        let mfa = try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "", user: "j.doe", password: "x", secondPassword: "", expectsMFA: false), timeout: 20) { ev in
+            if case .step(let s) = ev { steps.add(s) }
+        }
+        XCTAssertTrue(mfa)
+        XCTAssertTrue(steps.all.contains { $0.contains("Duo push") }, "\(steps.all)")    // «сервер довго — підтвердьте push»
+    }
+
+    /// Head-end вимагає іншу версію: клієнт завантажує її й виходить — пояснюємо, а не «vpn exited».
+    func testClientUpgradeIsExplained() async throws {
+        let cli = try fakeCLI("""
+        [ -t 0 ] || exit 1
+        printf 'Username: '; read u
+        printf 'Password: '; read -s p; echo
+        echo "  >> notice: Downloading Cisco Secure Client 5.1.18.314 - 100%"
+        echo "  >> notice: Performing any required updates..."
+        echo "  >> notice: Exiting.  Upgrade in progress."
+        echo "  >> state: Disconnected"
+        """)
+        do {
+            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+            XCTFail("мало впасти")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("5.1.18.314") && error.localizedDescription.contains("installer"), error.localizedDescription)
+        }
     }
 
     func testSuggestedHostKeepsPort() {
