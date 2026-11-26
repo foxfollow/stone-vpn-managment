@@ -100,6 +100,21 @@ final class CiscoDriverTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(start), 5)
     }
 
+    /// Відмова й меню різними порціями (пауза > 0.6 с): повні рядки встигають обрізатися з буфера,
+    /// маркер має пережити це, а не перетворитися на «сервер знову питає групу».
+    func testSSODefaultDetectedWhenMenuArrivesLater() async throws {
+        let slow = ssoDefault.replacingOccurrences(of: "not supported in AnyConnect CLI.\"\n", with: "not supported in AnyConnect CLI.\"\n  sleep 1\n")
+        XCTAssertNotEqual(slow, ssoDefault)
+        let cli = try fakeCLI("OUT=/dev/null\n" + slow)
+        do {
+            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+            XCTFail("мало впасти")
+        } catch {
+            let m = error.localizedDescription
+            XCTAssertTrue(m.contains("PORTAL") && m.contains("STAFF, OPS"), m)
+        }
+    }
+
     func testSSOGroupChosenExplicitlyFails() async throws {
         let cli = try fakeCLI("OUT=/dev/null\n" + ssoDefault)
         do {

@@ -125,6 +125,7 @@ public enum CiscoDriver {
         let second = c.secondPassword.isEmpty ? "push" : c.secondPassword
         var passwordsSent = 0, secondSent = 0, groupPrompts = 0
         var bannerSent = false, updateSeen = false
+        var ssoSeen = false            // SSO-відмова з моменту останньої відповіді на Group
         var mfa = false
         func markMFA() { if !mfa { mfa = true; onEvent(.secondFactor) } }
         var passwordAt: Date?          // чекаємо першої відповіді сервера після пароля
@@ -136,7 +137,8 @@ public enum CiscoDriver {
             if let at = passwordAt {
                 let held = Date().timeIntervalSince(at)
                 if !chunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    if held > mfaHold { markMFA() }
+                    // Повільне «Login failed» — не Duo.
+                    if held > mfaHold, failure(chunk) == nil { markMFA() }
                     passwordAt = nil
                 } else if held > mfaHold, !holdNoted {
                     holdNoted = true
@@ -158,6 +160,9 @@ public enum CiscoDriver {
             }
             let tail = chunk.split(separator: "\n", omittingEmptySubsequences: false).last.map(String.init) ?? ""
             let lower = chunk.lowercased()
+            // Повні рядки обрізаються з buf між проходами: якщо відмова й меню прийшли різними
+            // порціями, маркер у chunk на момент запиту Group вже зник — тож пам'ятаємо його.
+            if lower.contains(ssoMarker) { ssoSeen = true }
 
             if lower.contains("state: connected") || lower.contains("connected to ") {
                 onEvent(.step("Connected"))
@@ -193,7 +198,7 @@ public enum CiscoDriver {
                 // Група з входом через браузер (SAML/SSO): CLI пише «authentication type is not
                 // supported» і знову показує меню. Без цієї перевірки Enter (група сервера) крутився б
                 // по колу до таймауту. Вперше це повідомлення — про групу за замовчуванням сервера.
-                if lower.contains(ssoMarker) && (c.group.isEmpty || groupPrompts > 1) {
+                if ssoSeen && (c.group.isEmpty || groupPrompts > 1) {
                     let bad = groupPrompts > 1 && !c.group.isEmpty ? c.group
                         : (Parse.firstMatch(#"\[([^\]]*)\]"#, tail).flatMap { $0.isEmpty ? nil : $0 } ?? "")
                     throw ActionError(ssoGroupError(bad, others: menuOrder(groupOptions).filter { $0 != bad }))
@@ -206,6 +211,7 @@ public enum CiscoDriver {
                 onEvent(.step(c.group.isEmpty ? String(localized: "Group: (default)", bundle: .module)
                                                : String(localized: "Group: \(c.group)", bundle: .module)))
                 send(answer)
+                ssoSeen = false
             } else if t.hasPrefix("username:") || t.contains("username: [") {
                 onEvent(.step(String(localized: "Username: \(c.user)", bundle: .module)))
                 send(c.user)

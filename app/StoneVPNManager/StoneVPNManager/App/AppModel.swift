@@ -523,11 +523,17 @@ final class AppModel {
                 let k = Prefs.ciscoKey(host)
                 // Агент тримає одну сесію: стару розриваємо явно (і бачимо, якщо не вийшло),
                 // а не покладаємось на те, що `vpn connect` перемкне її сам.
-                if let live = await actions.ciscoConnectedHost(), !Prefs.ciscoSame(live, host) {
-                    step(String(localized: "Disconnecting Cisco from \(live)"))
-                    stopping.insert("cisco:\(live)")          // не «тунель обірвався» — ми самі
-                    try await actions.ciscoDisconnect()
-                    await refresh()
+                // `vpn -s state` пише хост без порту, а сесія названа за записом `hosts` (з :port) —
+                // беремо її назву, інакше host:8448 ≠ host і ключ у stopping не збігається з id.
+                if let bare = await actions.ciscoConnectedHost() {
+                    let ses = snap.sessions.first { $0.backend == .cisco && $0.name.split(separator: ":").first.map(String.init) == bare }
+                    let live = ses?.name ?? bare
+                    if !Prefs.ciscoSame(live, host) {
+                        step(String(localized: "Disconnecting Cisco from \(live)"))
+                        stopping.insert(ses?.id ?? "cisco:\(live)")   // не «тунель обірвався» — ми самі
+                        try await actions.ciscoDisconnect()
+                        await refresh()
+                    }
                 }
                 for l in try await actions.purgeDeadHostRoutes([host]) { step(l) }
                 let creds = CiscoCredentials(host: host, group: r.group, user: r.username, password: r.password,
