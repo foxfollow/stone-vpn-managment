@@ -500,6 +500,16 @@ There are no unit tests. Validate changes like this:
 
 ## Cautions
 
+- **TOP RULE: only anonymized data in git, on GitHub and on the landing.** No emails, client / VPN
+  head-end hostnames or domains, internal or client IPs, logins, people's names, real profile or
+  Defguard location names, router MACs or Claude session URLs, anywhere: files, tests, code
+  comments, commit messages, PR / issue titles, bodies and comments, release notes, `docs/`.
+  Placeholders only: `vpn-a.example.com`, RFC 5737 IPs (192.0.2.x, 198.51.100.x, 203.0.113.x),
+  `user@example.com`, `SSO-GROUP`. Describe a bug by its shape ("a head-end with a custom port"),
+  not by the server it happened on. What shows up in screenshots, logs, `defaults read`, `vpn -s`
+  or `scutil` output stays in the chat. Re-read every commit message, diff and PR text for it
+  before committing or publishing: commit messages can only be fixed by rewriting history, and
+  GitHub keeps PR refs and edit history.
 - **Do not change WireGuard system paths.** `wg-quick` expects configs in its standard dirs
   (`/etc/wireguard`, `/usr/local/etc/wireguard`, `/opt/homebrew/etc/wireguard`); the manager
   searches those. Don't relocate configs into the repo or rewrite these paths.
