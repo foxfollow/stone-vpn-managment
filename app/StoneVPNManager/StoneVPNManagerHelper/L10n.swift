@@ -37,10 +37,12 @@ enum HelperL10n {
 
     /// Локаль клієнта: правила множини (uk: one/few/many) і формат чисел. Без неї
     /// String(localized:) бере локаль процесу — root-демона з мовою системи.
-    static var locale: Locale { Locale(identifier: lang ?? "en") }
+    static var locale: Locale { Locale(identifier: lproj(lang) != nil ? lang ?? "en" : "en") }
 
     private static func lproj(_ lang: String?) -> Bundle? {
-        guard let lang, !lang.isEmpty, let resources else { return nil }
+        // Мову надсилає клієнт: лише код мови (en, uk, uk-UA, zh_Hans), без шляхів (`../`).
+        guard let lang, lang.range(of: #"^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})*$"#, options: .regularExpression) != nil,
+              let resources else { return nil }
         lock.lock(); defer { lock.unlock() }
         if let b = cache[lang] { return b }
         // "uk-UA" → uk.lproj, якщо точної теки немає.

@@ -52,6 +52,16 @@
         }
       }
     },
+    "(default)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(за замовчуванням)"
+          }
+        }
+      }
+    },
     "Another Cisco client holds the connect capability: the Cisco Secure Client GUI or `vpn` in Terminal. Close it and try again." : {
       "localizations" : {
         "uk" : {
@@ -82,12 +92,42 @@
         }
       }
     },
+    "Choose another group: %@." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оберіть іншу групу: %@."
+          }
+        }
+      }
+    },
     "Cisco CLI not found" : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cisco CLI не знайдено"
+          }
+        }
+      }
+    },
+    "Cisco Secure Client is updating itself because the server requires it. Wait until the installer window closes, then connect again." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco Secure Client оновлюється, бо цього вимагає сервер. Дочекайтеся, поки вікно інсталятора закриється, і підключіться ще раз."
+          }
+        }
+      }
+    },
+    "Cisco Secure Client is updating itself to %@ because the server requires it. Wait until the installer window closes, then connect again." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco Secure Client оновлюється до %@, бо цього вимагає сервер. Дочекайтеся, поки вікно інсталятора закриється, і підключіться ще раз."
           }
         }
       }
@@ -242,6 +282,46 @@
         }
       }
     },
+    "The group “%@” signs in through a browser (SAML/SSO), which the Cisco CLI can't do." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Група «%@» входить через браузер (SAML/SSO) — Cisco CLI так не вміє."
+          }
+        }
+      }
+    },
+    "The server is taking long — if it sent a Duo push, approve it on your phone" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер довго не відповідає — якщо прийшов Duo-push, підтвердьте його на телефоні"
+          }
+        }
+      }
+    },
+    "The server requires Cisco Secure Client %@ — downloading it…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер вимагає Cisco Secure Client %@ — завантажую…"
+          }
+        }
+      }
+    },
+    "The server requires a Cisco Secure Client update — downloading it…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервер вимагає оновити Cisco Secure Client — завантажую…"
+          }
+        }
+      }
+    },
     "Username: %@" : {
       "localizations" : {
         "uk" : {
@@ -268,6 +348,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Чекаю відповіді сервера (Duo/MFA — підтверди на телефоні)…"
+          }
+        }
+      }
+    },
+    "Waiting for the server (if it uses Duo/MFA, approve on your phone)…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чекаю на сервер (якщо він використовує Duo/MFA — підтвердьте на телефоні)…"
+          }
+        }
+      }
+    },
+    "Waiting for the server…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чекаю на сервер…"
           }
         }
       }
@@ -438,6 +538,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "сервер повторно питає другий фактор:"
+          }
+        }
+      }
+    },
+    "the server keeps asking for the group — check the group name:" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сервер знову й знову питає групу — перевірте її назву:"
           }
         }
       }

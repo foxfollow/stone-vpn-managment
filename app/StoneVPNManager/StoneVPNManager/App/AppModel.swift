@@ -64,6 +64,11 @@ struct ConnectRequest: Identifiable {
     var groupsLoading = false
     var groupsNote: String?
     var groupsFor = ""            // хост, для якого отримано список
+    /// Хост живої Cisco-сесії на момент відкриття вікна. Агент тримає лише одну сесію,
+    /// тож підключення до іншого хоста спершу розриває цю.
+    var ciscoActive: String?
+    /// Хост живої сесії, яку доведеться розірвати (інший, ніж у полі Host).
+    var ciscoSwitchFrom: String? { ciscoActive.flatMap { Prefs.ciscoSame($0, hostKey) ? nil : $0 } }
     /// Хост без пробілів/переносів (вставлений з буфера часто має хвіст) — ключ для груп.
     var hostKey: String { host.trimmingCharacters(in: .whitespacesAndNewlines) }
     var steps: [String] = []
@@ -123,6 +128,12 @@ final class AppModel {
     var dnsCandidates: [DNSCandidate] = []
     var helperStatus: SMAppService.Status = .notRegistered
     var helperVersion: Int?
+    /// v7: власник демона і чи обслуговує він цього користувача.
+    var helperAccess: HelperAccessInfo?
+    /// Helper зареєстровано, але він не працює як слід — банер + сповіщення (AppModel+Helper).
+    var helperProblem: HelperProblem?
+    var helperReinstalling = false
+    var helperNotified: HelperProblem?
     var launchAtLogin = SMAppService.mainApp.status == .enabled
     /// Після down WireGuard: вікно, в якому застосунок стежить за DNS і повертає еталон.
     var dnsGuardActive = false
@@ -173,7 +184,8 @@ final class AppModel {
         reader.store.watch { Task { @MainActor in AppModel.shared.scheduleRefresh() } }
         NotificationHandler.shared.install()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-        Task { await checkHelper() }
+        helper.onUnreachable = { Task { @MainActor in await AppModel.shared.helperDidNotRespond() } }
+        Task { await ensureHelperCurrent() }
         Task { await refresh(forceSlow: true) }
         Task {
             while true {
@@ -426,6 +438,7 @@ final class AppModel {
             r.host = p.name
             if !p.name.contains(":"), let s = cp.suggestedHost, s.hasPrefix(p.name + ":") { r.host = s }
             (r.username, r.group) = ciscoLogin(for: r.host, cp)
+            r.ciscoActive = snap.sessions.first { $0.backend == .cisco }?.name
         }
         if r.needsAuth || r.askGateway || r.mfa || p.backend == .cisco {
             connect = r
@@ -501,7 +514,7 @@ final class AppModel {
                 if r.reconnect, let st = await actions.dgSessionState(p.name), st != "Disconnected" {
                     step("defguard-client disconnect")
                     stopping.insert(p.key)
-                    try await actions.dgDownAndWait(p.name, kind: p.dgKind, cliPath: config.defguardCLI)
+                    try await actions.dgDown(p.name, kind: p.dgKind, cliPath: config.defguardCLI)
                 }
                 step("defguard-client connect")
                 try await actions.dgUp(p, code: r.code, cliPath: config.defguardCLI)
@@ -514,17 +527,35 @@ final class AppModel {
                 if r.guiRunning { step(String(localized: "Closing the Cisco GUI")); await actions.ciscoQuitGUI() }
                 let host = r.hostKey
                 guard !host.isEmpty else { throw ActionError(String(localized: "enter a host")) }
+                let k = Prefs.ciscoKey(host)
+                // Агент тримає одну сесію: стару розриваємо явно (і бачимо, якщо не вийшло),
+                // а не покладаємось на те, що `vpn connect` перемкне її сам.
+                // `vpn -s state` пише хост без порту, а сесія названа за записом `hosts` (з :port) —
+                // беремо її назву, інакше host:8448 ≠ host і ключ у stopping не збігається з id.
+                if let bare = await actions.ciscoConnectedHost() {
+                    let ses = snap.sessions.first { $0.backend == .cisco && $0.name.split(separator: ":").first.map(String.init) == bare }
+                    let live = ses?.name ?? bare
+                    if !Prefs.ciscoSame(live, host) {
+                        step(String(localized: "Disconnecting Cisco from \(live)"))
+                        stopping.insert(ses?.id ?? "cisco:\(live)")   // не «тунель обірвався» — ми самі
+                        try await actions.ciscoDisconnect()
+                        await refresh()
+                    }
+                }
                 for l in try await actions.purgeDeadHostRoutes([host]) { step(l) }
-                let creds = CiscoCredentials(host: host, group: r.group, user: r.username, password: r.password, secondPassword: r.secondPassword)
-                try await actions.ciscoConnect(creds) { ev in
+                let creds = CiscoCredentials(host: host, group: r.group, user: r.username, password: r.password,
+                                             secondPassword: r.secondPassword, expectsMFA: prefs.ciscoMFA[k])
+                let usedMFA = try await actions.ciscoConnect(creds) { ev in
                     Task { @MainActor in
                         switch ev {
                         case .step(let s): AppModel.shared.connect?.steps.append(s); AppModel.shared.busy[p.key] = s
                         case .banner(let b): AppModel.shared.connect?.banner = b
+                        case .secondFactor: AppModel.shared.prefs.ciscoMFA[k] = true
                         }
                     }
                 }
-                let k = Prefs.ciscoKey(host)
+                // «Без MFA» — лише після успіху: «Login failed» приходить ще до Duo.
+                prefs.ciscoMFA[k] = usedMFA
                 if prefs.rememberUser, !r.username.isEmpty { prefs.ciscoUsers[k] = r.username }
                 prefs.ciscoGroups[k] = r.group
                 if !(snap.profiles[.cisco] ?? []).contains(where: { $0.name == host }), !prefs.ciscoHosts.contains(host) {
@@ -593,7 +624,8 @@ final class AppModel {
         let ok = Prefs.ciscoKey(old), nk = Prefs.ciscoKey(host), moved = !prefs.ciscoHosts.contains(old)
         if prefs.ciscoUsers[nk] == nil, let u = prefs.ciscoUsers[ok] { prefs.ciscoUsers[nk] = u }
         if prefs.ciscoGroups[nk] == nil, let g = prefs.ciscoGroups[ok] { prefs.ciscoGroups[nk] = g }
-        if moved, ok != nk { prefs.ciscoUsers[ok] = nil; prefs.ciscoGroups[ok] = nil }
+        if prefs.ciscoMFA[nk] == nil, let m = prefs.ciscoMFA[ok] { prefs.ciscoMFA[nk] = m }
+        if moved, ok != nk { prefs.ciscoUsers[ok] = nil; prefs.ciscoGroups[ok] = nil; prefs.ciscoMFA[ok] = nil }
         profilesSelection = "cisco:\(host)"
     }
 
@@ -602,6 +634,7 @@ final class AppModel {
         prefs.favorites.removeAll { $0 == "cisco:\(h)" }
         prefs.ciscoUsers[Prefs.ciscoKey(h)] = nil
         prefs.ciscoGroups[Prefs.ciscoKey(h)] = nil
+        prefs.ciscoMFA[Prefs.ciscoKey(h)] = nil
         profilesSelection = nil
     }
 
@@ -668,6 +701,11 @@ final class AppModel {
     /// «хост той самий» лишала «Отримую групи…» назавжди, якщо поле відрізнялось хоч пробілом).
     func probeCiscoGroups(closeGUI: Bool = false) async {
         guard let host = connect?.hostKey, !host.isEmpty else { return }
+        // Probe = `connect`; поверх живої сесії він її перепідніме. Беремо запам'ятовану групу.
+        if connect?.ciscoActive != nil {
+            connect?.groupsNote = String(localized: "Groups aren't fetched while Cisco is connected — the remembered group is used")
+            return
+        }
         groupsProbeTask?.cancel()
         groupsProbeSeq += 1
         let id = groupsProbeSeq
@@ -711,6 +749,11 @@ final class AppModel {
                 // залишаємо обрану (з минулого разу)
             } else {
                 connect?.group = r.defaultGroup ?? r.groups.first ?? ""
+            }
+            if let sso = r.ssoGroup {
+                // Група сервера за замовчуванням — SAML/SSO: з CLI в неї не увійти, її прибрано зі списку.
+                let name = sso.isEmpty ? String(localized: "the server's default group") : "“\(sso)”"
+                connect?.groupsNote = String(localized: "\(name) signs in through a browser (SSO) — not possible via the Cisco CLI")
             }
         } catch {
             guard latest(), connect?.hostKey == host else { return }
@@ -775,6 +818,8 @@ final class AppModel {
         } catch {
             errors[p.key] = error.localizedDescription
             stopping.remove(p.key)
+            // Сесія жива → рядок показує її стан, а не errors[]; без тосту невдача була б невидимою.
+            toast = "\(p.backend.title) · \(prefs.display(p)): \(error.localizedDescription)"
         }
         busy[p.key] = nil
         await refresh()
@@ -1331,6 +1376,8 @@ final class AppModel {
     func checkHelper() async {
         helperStatus = helper.status
         helperVersion = await helper.version()
+        helperAccess = await helper.accessInfo()
+        updateHelperProblem()
     }
 
     func installHelper() {
@@ -1346,7 +1393,7 @@ final class AppModel {
 
     func uninstallHelper() {
         Task {
-            try? await helper.unregister()
+            try? await helper.remove()
             await checkHelper()
         }
     }

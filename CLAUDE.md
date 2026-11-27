@@ -90,12 +90,29 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   validates every argument (WG paths inside WG dirs, IPs via inet_pton, service names against
   networksetup, kill only tunnel-proc PIDs) and accepts XPC only from the same Team ID — or, in
   ad-hoc builds (CI releases have no Team ID), only from the designated requirement (= cdhash) of the
-  app bundle it lives in, re-read per connection (`clientRequirement()` in helper `main.swift`). Never
+  app bundle it lives in, re-read per connection (`clientRequirement()` in helper `main.swift`) **and**
+  only from a process running from that very bundle (`peerBundle()`: audit token → `SecCodeCopyPath`).
+  The path check matters because ad-hoc releases carry `disable-library-validation`: the cdhash covers
+  only the main executable, so a copy of the bundle elsewhere (another user's home) with a patched
+  Sparkle.framework would pass the requirement. Never
   fall back to a bare `identifier "…"`: anyone can `codesign -s - -i com.foxfollow.stonevpnmanager`, and
   `ovpnStart` runs openvpn with `--script-security 2` as root. Without
   the daemon, the same binary runs once as root via `osascript … with administrator privileges`
   (`--run-file`, request in a 600 temp file — passwords never in argv; always exits 0 so
   `do shell script` returns the JSON).
+- **The code check says *what* connected, `Access` (helper, protocol v7) says *who***: any local user
+  can launch the genuine /Applications bundle, and `ovpnStart` (root, `--script-security 2`) would run
+  their profile's `up` script as root. So the daemon serves only its **owner** — a uid in root-owned
+  `/Library/Application Support/StoneVPNManager/helper-access.json` — unless the owner chose
+  `HelperAccessPolicy` admins/everyone (Settings → Helper → Access). The owner is recorded on the first
+  XPC request from the uid that owns the enclosing bundle (brew cask / drag-install = the installing
+  user; a root-owned bundle assigns nobody); `accessClaim` (take over) works only via `--run-file`, i.e.
+  with the administrator password, which is never gated. A refused request returns `PrivResult.denied`:
+  `HelperClient.isEnabled` turns false (background helper-only work stops, status reads return nil) and
+  user actions fall back to the password prompt. `ovpnStart` also requires the profile to belong to the
+  caller and hands openvpn a root copy (`/var/run/stonevpn/<id>.ovpn`, read via O_NOFOLLOW + fstat,
+  `--cd` = original dir for relative files) so the path can't be swapped after the check; `<id>` = the
+  profile basename, which is all `--config` parsing (app, CLI, vpn-down.sh) uses.
 - **WG config paths in the helper go through `WGConfGuard`** (StoneVPNShared, helper protocol v5):
   path directly inside one of `WGPaths.dirs`, no `.`/`..`; the dir may be a symlink, but if it
   resolves outside `WGPaths.canonical` both dir and file must belong to the requesting uid (XPC
@@ -105,6 +122,16 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   resolved path. Don't "simplify" back to a realpath-prefix check: `realpath(wgDir)` of a swapped
   dir matches whatever it points at. This does not make a user-owned conf safe from its own
   `PostUp` (root) — same-user code can also replace brew's wg-quick; that is the accepted model.
+- **Helper registration is per binary**: after the app is updated or rebuilt, launchd keeps the old
+  registration and refuses to start the new helper binary (taskgated: "no eligible provisioning profiles"),
+  XPC silently fails and every action falls back to the password prompt. The app stores the helper's cdhash
+  at `register()` (UserDefaults `helperRegisteredHash`). It **never re-registers by itself**: registering
+  starts whatever helper binary is in the (user-owned) bundle as root, so a swapped binary would become
+  root silently — re-registration is always the user's "Reinstall Helper". A registered daemon that is
+  outdated, unreachable, lost after an update (`helperWanted` but not registered) or awaiting approval →
+  `helperProblem`: popover banner + notification with "Reinstall Helper" (category `helper`); a daemon
+  owned by another user → `.notAllowed`, dismissable banner with "Take Over…", no notification. `HelperClient.onUnreachable` fires when XPC to an enabled
+  daemon fails. The helper allowlists the client's `lang` (no paths into `<lang>.lproj`).
 - **Status never prompts**: root-only reads go through `PrivilegedReader.readIfAvailable`,
   which returns nil unless the daemon is installed.
 - **Interop with the CLI is deliberate**: OpenVPN is launched with exactly vpn-up.sh's flags and
@@ -120,7 +147,20 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   wiped → empty password → "Login failed" in <1 s), and a group change reloads the login form.
   Groups are answered by their menu number (`Group: [VPN1] 1`, as typed in the CLI); the name
   made the head-end fall back to another group. The group probe still uses `vpn -s`
-  (no secrets involved) and stops at the first prompt. Defaults come from
+  (no secrets involved) and stops at the first prompt. A group with browser (SAML/SSO) login
+  makes the CLI print `The requested authentication type is not supported in AnyConnect CLI` and
+  re-show the menu (under a pty; `vpn -s` prints only the error when it is the server's default
+  group) — the probe then re-reads the menu under a pty and drops that group (`ssoGroup`), and the
+  driver fails fast naming the other groups instead of answering Enter until the timeout.
+  **One session at a time**: the agent holds a single Cisco session. Connecting to another host
+  shows a warning + "Switch Session" in the Connect window (`ConnectRequest.ciscoSwitchFrom`,
+  `Prefs.ciscoSame`: case and `:443` ignored); `perform` disconnects the live one explicitly
+  first (marked in `stopping`, so no "tunnel dropped"). The group probe is skipped while any Cisco
+  session is up. **MFA memory per host** (UserDefaults `ciscoMFA`): a Duo/OTP prompt or > 5 s of
+  silence after the password (`mfaHold`, auto-push) = MFA; `false` is stored only after a successful
+  connect. It only picks the "waiting" text — the Duo answers are unchanged. **Head-end-forced client
+  update**: `Downloading Cisco Secure Client <ver>` → `Exiting. Upgrade in progress` ends the `vpn`
+  run; the driver explains it (wait for the installer, connect again) instead of "vpn exited". Defaults come from
   Cisco's own prefs (`~/.vpn/.anyconnect`, `/opt/cisco/secureclient/vpn/.anyconnect_global`:
   DefaultUser/DefaultGroup/DefaultHostName + port from DefaultHostAddress).
   `defaultClientProfile.xml` is useless for custom ports — the head-end rewrites it on every
@@ -172,7 +212,7 @@ which SMAppService needs for the helper; test = `swift test` in the package).
   for that location name in `log show` (nesessionmanager, sudo-free, ~1.5 s; the adapter's own lines
   don't name the location) after our last connect, older than 15 s; no DNS in the session → ≥2
   reasserting events. Then: status `.stale`, red icon, banner + "Оновити" (MFA → asks only for the
-  TOTP; perform quits Defguard.app, `dgDownAndWait`, `dgUp`), and a DNS failover via the helper's
+  TOTP; perform quits Defguard.app, `dgDown`, `dgUp`), and a DNS failover via the helper's
   `dnsOverride` to a live candidate / the primary service DNS. It is undone once the session is
   renewed or gone. DNS Fix does not help here and says so.
 - **ClearVPN in IKEv2 mode is `ipsec0`, not a utun** (personal VPN, no Setup service — only a UUID
@@ -466,8 +506,11 @@ There are no unit tests. Validate changes like this:
   key never reaches the profile).
   `dg_cli` prefers the bundle path and `realpath`s symlinks. The CLI prints `Connected to …`
   even when the tunnel then dies, so `dg_up` waits on the session state (`dg_wait`).
-  Connect/disconnect only via the CLI (shares the GUI's DB, handles MFA prompts itself);
-  `scutil --nc stop` is only the no-CLI fallback in `dg_down`. After `down`, Defguard (like
+  Connect/disconnect via the CLI (shares the GUI's DB, handles MFA prompts itself), but
+  **`disconnect` judges by its own DB, not NE**: for an expired MFA session (NE still Connected)
+  it prints `'X' is not currently connected` with **exit 0** and sends no stop — the toggle "did
+  nothing". So `dg_down` / `Actions.dgDown` verify `scutil --nc list` afterwards and fall back to
+  `scutil --nc stop <uuid>` (also the no-CLI path), then wait for Disconnected. After `down`, Defguard (like
   Cisco) restores its own DNS → `dns_flush` only, not `restore_dns` (`down_is_foreign`).
   Bare names in `up`/`down` go to Defguard only when no WG config/active WG tunnel has that name.
 - **`DISABLED_BACKENDS` (config.env or env) turns backends off entirely**: wireguard | openvpn |

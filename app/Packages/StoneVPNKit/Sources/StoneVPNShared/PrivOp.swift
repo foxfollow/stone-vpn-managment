@@ -31,6 +31,10 @@ public enum PrivOp: Codable, Sendable, Equatable {
     // Мережа / процеси
     case orderServices(names: [String])
     case killPid(pid: Int32)
+    // Доступ (v7): хто з користувачів Mac може користуватися helper-ом
+    case accessInfo                                  // → JSON HelperAccessInfo; дозволено всім
+    case accessSetPolicy(policy: HelperAccessPolicy) // лише власник (або пароль адміністратора)
+    case accessClaim                                 // зробити запитувача власником; лише з паролем адміністратора
     /// Кілька дій за один виклик (у fallback-режимі — один запит пароля).
     case batch([PrivOp])
 }
@@ -52,13 +56,18 @@ public struct PrivRequest: Codable, Sendable {
 public struct PrivResult: Codable, Sendable {
     public var ok: Bool
     public var output: String
+    /// v7: helper відмовив, бо запитувачу не дозволено ним користуватися (HelperAccessPolicy).
+    /// Застосунок тоді виконує дію з паролем адміністратора, а не показує помилку.
+    public var denied: Bool?
 
-    public init(ok: Bool, output: String) {
+    public init(ok: Bool, output: String, denied: Bool? = nil) {
         self.ok = ok
         self.output = output
+        self.denied = denied
     }
 
     public static func fail(_ msg: String) -> PrivResult { PrivResult(ok: false, output: msg) }
+    public static func deny(_ msg: String) -> PrivResult { PrivResult(ok: false, output: msg, denied: true) }
 }
 
 public enum HelperConst {
@@ -67,7 +76,7 @@ public enum HelperConst {
     public static let appBundleID = "com.foxfollow.stonevpnmanager"
     public static let helperExecutable = "StoneVPNManagerHelper"
     /// Підняти при зміні PrivOp — застосунок запропонує перевстановити helper.
-    public static let version = 6   // 5: WGConfGuard; 6: PrivRequest (мова відповідей)
+    public static let version = 7   // 5: WGConfGuard; 6: PrivRequest (мова відповідей); 7: доступ за uid
     /// State-ключ основного DNS, який публікує helper (service id не має Setup-запису, як і Cisco).
     public static let dnsOverrideService = "com.foxfollow.stonevpnmanager.dns"
     public static var dnsOverrideKey: String { "State:/Network/Service/\(dnsOverrideService)/DNS" }

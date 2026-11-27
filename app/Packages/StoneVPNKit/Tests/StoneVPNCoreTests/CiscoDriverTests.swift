@@ -38,10 +38,13 @@ final class CiscoDriverTests: XCTestCase {
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("cisco-\(UUID())").path
         let cli = try fakeCLI("OUT=\(out)\n" + happy)
         let steps = StepLog()
-        try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com:8448", group: "Staff", user: "j.doe", password: "s3cret", secondPassword: ""), timeout: 15) { ev in
+        let mfa = try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com:8448", group: "Staff", user: "j.doe", password: "s3cret", secondPassword: ""), timeout: 15) { ev in
             if case .step(let s) = ev { steps.add(s) }
             if case .banner(let b) = ev { steps.add("banner:" + b) }
+            if case .secondFactor = ev { steps.add("mfa") }
         }
+        XCTAssertTrue(mfa)
+        XCTAssertEqual(steps.all.filter { $0 == "mfa" }.count, 1)
         XCTAssertEqual(try String(contentsOfFile: out + ".group", encoding: .utf8), "1\n")   // номер, як у CLI
         XCTAssertEqual(try String(contentsOfFile: out + ".user", encoding: .utf8), "j.doe\n")
         XCTAssertEqual(try String(contentsOfFile: out + ".duo", encoding: .utf8), "push\n")   // порожній OTP = push
@@ -64,6 +67,109 @@ final class CiscoDriverTests: XCTestCase {
             XCTFail("мало впасти")
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("Login failed"), error.localizedDescription)
+        }
+    }
+
+    /// Head-end, де група за замовчуванням (PORTAL) — SAML, CLI на ній пише
+    /// «not supported» і знову показує меню; STAFF (1) — звичайний логін.
+    let ssoDefault = """
+    [ -t 0 ] || exit 1
+    while :; do
+      echo "  >> The requested authentication type is not supported in AnyConnect CLI."
+      echo "    0) PORTAL"
+      echo "    1) STAFF"
+      echo "    2) OPS"
+      printf 'Group: [PORTAL] '; read g; [ "$g" = 1 ] && break
+    done
+    echo "$g" > "$OUT.group"
+    printf 'Username: '; read u
+    printf 'Password: '; read -s p; echo
+    echo "  >> state: Connected"
+    """
+
+    func testSSODefaultGroupFailsFastInsteadOfLooping() async throws {
+        let cli = try fakeCLI("OUT=/dev/null\n" + ssoDefault)
+        let start = Date()
+        do {
+            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+            XCTFail("мало впасти")
+        } catch {
+            let m = error.localizedDescription
+            XCTAssertTrue(m.contains("PORTAL") && m.contains("STAFF, OPS") && !m.contains("PORTAL, STAFF"), m)
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+    }
+
+    /// Відмова й меню різними порціями (пауза > 0.6 с): повні рядки встигають обрізатися з буфера,
+    /// маркер має пережити це, а не перетворитися на «сервер знову питає групу».
+    func testSSODefaultDetectedWhenMenuArrivesLater() async throws {
+        let slow = ssoDefault.replacingOccurrences(of: "not supported in AnyConnect CLI.\"\n", with: "not supported in AnyConnect CLI.\"\n  sleep 1\n")
+        XCTAssertNotEqual(slow, ssoDefault)
+        let cli = try fakeCLI("OUT=/dev/null\n" + slow)
+        do {
+            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+            XCTFail("мало впасти")
+        } catch {
+            let m = error.localizedDescription
+            XCTAssertTrue(m.contains("PORTAL") && m.contains("STAFF, OPS"), m)
+        }
+    }
+
+    func testSSOGroupChosenExplicitlyFails() async throws {
+        let cli = try fakeCLI("OUT=/dev/null\n" + ssoDefault)
+        do {
+            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "OPS", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+            XCTFail("мало впасти")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("“OPS”"), error.localizedDescription)
+        }
+    }
+
+    func testNonSSOGroupConnectsPastSSODefault() async throws {
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("cisco-\(UUID())").path
+        let cli = try fakeCLI("OUT=\(out)\n" + ssoDefault)
+        let steps = StepLog()
+        let mfa = try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "STAFF", user: "j.doe", password: "x", secondPassword: "", expectsMFA: false), timeout: 15) { ev in
+            if case .step(let s) = ev { steps.add(s) }
+        }
+        XCTAssertEqual(try String(contentsOfFile: out + ".group", encoding: .utf8), "1\n")
+        XCTAssertFalse(mfa)                                         // сервер без Duo — так і запам'ятаємо
+        XCTAssertFalse(steps.all.contains { $0.contains("phone") }, "\(steps.all)")   // і не просимо підтвердити push
+    }
+
+    /// Head-end з auto-push: після пароля мовчить, поки людина не підтвердить Duo, запиту немає.
+    func testLongHoldAfterPasswordCountsAsMFA() async throws {
+        let cli = try fakeCLI("""
+        [ -t 0 ] || exit 1
+        printf 'Username: '; read u
+        printf 'Password: '; read -s p; echo
+        sleep \(Int(CiscoDriver.mfaHold) + 1)
+        echo "  >> state: Connected"
+        """)
+        let steps = StepLog()
+        let mfa = try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "", user: "j.doe", password: "x", secondPassword: "", expectsMFA: false), timeout: 20) { ev in
+            if case .step(let s) = ev { steps.add(s) }
+        }
+        XCTAssertTrue(mfa)
+        XCTAssertTrue(steps.all.contains { $0.contains("Duo push") }, "\(steps.all)")    // «сервер довго — підтвердьте push»
+    }
+
+    /// Head-end вимагає іншу версію: клієнт завантажує її й виходить — пояснюємо, а не «vpn exited».
+    func testClientUpgradeIsExplained() async throws {
+        let cli = try fakeCLI("""
+        [ -t 0 ] || exit 1
+        printf 'Username: '; read u
+        printf 'Password: '; read -s p; echo
+        echo "  >> notice: Downloading Cisco Secure Client 5.1.18.314 - 100%"
+        echo "  >> notice: Performing any required updates..."
+        echo "  >> notice: Exiting.  Upgrade in progress."
+        echo "  >> state: Disconnected"
+        """)
+        do {
+            try await CiscoDriver.connect(cli: cli, CiscoCredentials(host: "vpn.example.com", group: "", user: "j.doe", password: "x", secondPassword: ""), timeout: 15) { _ in }
+            XCTFail("мало впасти")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("5.1.18.314") && error.localizedDescription.contains("installer"), error.localizedDescription)
         }
     }
 
@@ -128,6 +234,35 @@ final class CiscoGroupProbeTests: XCTestCase {
         XCTAssertEqual(r.defaultGroup, "Employees")
         try await Task.sleep(for: .milliseconds(300))
         // Нічого не відповіли на запит групи (EOF ≠ рядок) — облікові дані не надсилались.
+        XCTAssertFalse(FileManager.default.fileExists(atPath: marker))
+    }
+}
+
+extension CiscoGroupProbeTests {
+    /// `vpn -s` на SAML-групі сервера лише пише помилку; меню видно тільки під pty (`vpn connect`).
+    func testProbeReadsMenuUnderPtyWhenDefaultGroupIsSSO() async throws {
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("probe-\(UUID())").path
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("fake-vpn-\(UUID().uuidString).sh")
+        try """
+        #!/bin/bash
+        if [ "$1" = "-s" ]; then
+          read cmd
+          echo "  >> error: The requested authentication type is not supported in AnyConnect CLI."
+          sleep 30
+          exit 0
+        fi
+        [ "$1 $2" = "connect vpn.example.com" ] || exit 1
+        echo "  >> The requested authentication type is not supported in AnyConnect CLI."
+        echo "    0) PORTAL"
+        echo "    1) STAFF"
+        echo "    2) OPS"
+        printf 'Group: [PORTAL] '
+        read g && echo "got:$g" > \(marker)
+        """.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        let r = try await CiscoDriver.probeGroups(cli: url.path, host: "vpn.example.com", timeout: 5)
+        XCTAssertEqual(r, .init(groups: ["STAFF", "OPS"], defaultGroup: nil, asksGroup: true, ssoGroup: "PORTAL"))
+        try await Task.sleep(for: .milliseconds(300))
         XCTAssertFalse(FileManager.default.fileExists(atPath: marker))
     }
 }

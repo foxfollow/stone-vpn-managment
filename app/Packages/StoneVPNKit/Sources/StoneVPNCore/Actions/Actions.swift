@@ -241,17 +241,6 @@ public final class Actions: @unchecked Sendable {
         try? await Task.sleep(for: .seconds(1))
     }
 
-    /// Перепідключення протухлої сесії: down і чекати Disconnected (інакше dgUp вважає, що вже up).
-    public func dgDownAndWait(_ name: String, kind: String?, cliPath: String) async throws {
-        try await dgDown(name, kind: kind, cliPath: cliPath)
-        for _ in 0..<15 {
-            if await dgSessionState(name) ?? "Disconnected" == "Disconnected" { return }
-            try await Task.sleep(for: .seconds(1))
-        }
-        let state = await dgSessionState(name) ?? "?"
-        throw ActionError(String(localized: "session '\(name)' did not disconnect (state: \(state))", bundle: .module))
-    }
-
     public func dgUp(_ p: Profile, code: String?, cliPath: String) async throws {
         guard let cli = Paths.defguardCLI(cliPath) else { throw ActionError(String(localized: "defguard-client not found", bundle: .module)) }
         if await dgSessionState(p.name) == "Connected" { return }
@@ -282,18 +271,33 @@ public final class Actions: @unchecked Sendable {
         }
     }
 
+    /// Відключити й дочекатися Disconnected (інакше dgUp при перепідключенні вважає, що вже up).
+    /// CLI судить за своєю БД, а не за NE: протухлу MFA-сесію (пір видалено на gateway, NE каже
+    /// Connected) він вважає відключеною — друкує «'X' is not currently connected» з exit 0 і stop
+    /// не шле. Тож правда — `scutil --nc list`, а якщо сесія жива — `scutil --nc stop` (як без CLI).
     public func dgDown(_ name: String, kind: String?, cliPath: String) async throws {
         if let cli = Paths.defguardCLI(cliPath) {
             var args = ["disconnect", name]
             if kind == "tunnel" { args.append("--tunnel") }
-            let r = await Shell.run(cli, args, timeout: 30)
-            if !r.ok { throw ActionError(r.err.isEmpty ? r.out : r.err) }
-            return
+            _ = await Shell.run(cli, args, timeout: 30)
+            if try await dgWaitDisconnected(name, seconds: 5) { return }
         }
-        // Без CLI — scutil --nc stop (GUI може показувати застарілий стан).
-        if let s = Parse.ncList(await Shell.run("/usr/sbin/scutil", ["--nc", "list"]).out).first(where: { $0.name == name }) {
+        if let s = Parse.ncList(await Shell.run("/usr/sbin/scutil", ["--nc", "list"]).out).first(where: { $0.name == name }),
+           s.state != "Disconnected" {
             _ = await Shell.run("/usr/sbin/scutil", ["--nc", "stop", s.uuid])
         }
+        if try await dgWaitDisconnected(name, seconds: 10) { return }
+        let state = await dgSessionState(name) ?? "?"
+        throw ActionError(String(localized: "session '\(name)' did not disconnect (state: \(state))", bundle: .module))
+    }
+
+    /// Сесії немає або вона Disconnected — опитування кожні 0.5 с.
+    private func dgWaitDisconnected(_ name: String, seconds: Int) async throws -> Bool {
+        for i in 0...(seconds * 2) {
+            if await dgSessionState(name) ?? "Disconnected" == "Disconnected" { return true }
+            if i < seconds * 2 { try await Task.sleep(for: .milliseconds(500)) }
+        }
+        return false
     }
 
     // MARK: Cisco
@@ -309,9 +313,17 @@ public final class Actions: @unchecked Sendable {
     }
 
     /// Підключення в застосунку: `vpn -s` + відповіді на його запити.
-    public func ciscoConnect(_ c: CiscoCredentials, onEvent: @escaping @Sendable (CiscoDriver.Event) -> Void) async throws {
+    /// true = сервер просив другий фактор (Duo/OTP).
+    @discardableResult
+    public func ciscoConnect(_ c: CiscoCredentials, onEvent: @escaping @Sendable (CiscoDriver.Event) -> Void) async throws -> Bool {
         guard let cli = Shell.which(Paths.ciscoCLI) else { throw ActionError(String(localized: "Cisco CLI not found", bundle: .module)) }
-        try await CiscoDriver.connect(cli: cli, c, onEvent: onEvent)
+        return try await CiscoDriver.connect(cli: cli, c, onEvent: onEvent)
+    }
+
+    /// Хост живої Cisco-сесії (агент тримає лише одну).
+    public func ciscoConnectedHost() async -> String? {
+        guard let cli = Shell.which(Paths.ciscoCLI) else { return nil }
+        return Parse.ciscoConnectedHost(await Shell.run(cli, ["-s", "state"], timeout: 8).out)
     }
 
     /// Групи з сервера до автентифікації. Після обриву скидаємо агент із «connecting»,

@@ -546,8 +546,15 @@ dg_up() {
 
 # Відключити одну ціль або все (all). Без CLI — запасний `scutil --nc stop`
 # (GUI тоді може показувати застарілий стан до перезапуску).
+# CLI судить за своєю БД, а не за NE: протухлу MFA-сесію (NE каже Connected) вважає
+# відключеною — «'X' is not currently connected», exit 0, stop не шле. Тому після CLI
+# перевіряємо scutil і, якщо сесія жива, зупиняємо її через scutil --nc stop.
+dg_live() {
+    dg_sessions | awk -F'\t' -v n="$1" '$1 != "Disconnected" && (n == "all" || $3 == n) { f = 1 } END { exit !f }'
+}
+
 dg_down() {
-    local name="${1:-all}" cli uuid
+    local name="${1:-all}" cli uuid n i
     if cli=$(dg_cli); then
         if [ "$name" = all ]; then
             "$cli" disconnect --all
@@ -556,13 +563,17 @@ dg_down() {
             [ "$(dg_kind "$name")" = tunnel ] && args+=(--tunnel)
             "$cli" "${args[@]}"
         fi
-        return
+        for i in 1 2 3 4 5 6 7 8 9 10; do dg_live "$name" || return 0; sleep 0.5; done
+        echo "  ${Y}defguard-client не зупинив сесію — scutil --nc stop${N}"
     fi
     while IFS=$'\t' read -r _ uuid n; do
         [ -n "$uuid" ] || continue
         [ "$name" = all ] || [ "$n" = "$name" ] || continue
         scutil --nc stop "$uuid"
     done <<< "$(dg_sessions | awk -F'\t' '$1 != "Disconnected"')"
+    for i in $(seq 1 20); do dg_live "$name" || return 0; sleep 0.5; done
+    echo "  ${R}сесія Defguard '$name' не відключилась${N}" >&2
+    return 1
 }
 
 # ─── DNS ────────────────────────────────────────────────────────────────────

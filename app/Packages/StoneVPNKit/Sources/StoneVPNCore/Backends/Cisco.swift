@@ -46,28 +46,36 @@ public struct CiscoCredentials: Sendable {
     public var user: String
     public var password: String
     public var secondPassword: String
-    public init(host: String, group: String, user: String, password: String, secondPassword: String) {
+    /// Чи просив цей сервер другий фактор минулого разу (nil = невідомо) — лише для підказок.
+    public var expectsMFA: Bool?
+    public init(host: String, group: String, user: String, password: String, secondPassword: String, expectsMFA: Bool? = nil) {
         self.host = host
         self.group = group
         self.user = user
         self.password = password
         self.secondPassword = secondPassword
+        self.expectsMFA = expectsMFA
     }
 }
 
 /// expect-подібний драйвер `vpn -s`: читає вивід і відповідає на запит, коли він з'являється
 /// (порядок і набір запитів залежать від head-end — групи може не бути, другого пароля теж).
 public enum CiscoDriver {
-    public enum Event: Sendable { case step(String), banner(String) }
+    /// `.secondFactor` — сервер точно хоче MFA (запит Duo/OTP або довга пауза після пароля).
+    public enum Event: Sendable { case step(String), banner(String), secondFactor }
 
+    /// Пауза після пароля, довша за цю, — це сервер чекає підтвердження Duo (auto-push без запиту).
+    /// Звичайна перевірка пароля відповідає за 1–2 с.
+    static let mfaHold: TimeInterval = 5
+
+    /// Повертає, чи знадобився другий фактор (для пам'яті «цей сервер без Duo»).
+    @discardableResult
     public static func connect(cli: String, _ c: CiscoCredentials, timeout: TimeInterval = 60,
-                               onEvent: @escaping @Sendable (Event) -> Void) async throws {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                               onEvent: @escaping @Sendable (Event) -> Void) async throws -> Bool {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Bool, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    try run(cli: cli, c, timeout: timeout, onEvent: onEvent)
-                    cont.resume()
-                } catch { cont.resume(throwing: error) }
+                do { cont.resume(returning: try run(cli: cli, c, timeout: timeout, onEvent: onEvent)) }
+                catch { cont.resume(throwing: error) }
             }
         }
     }
@@ -75,7 +83,7 @@ public enum CiscoDriver {
     /// `vpn connect <host>` під псевдотерміналом (`/usr/bin/script`) — так само, як у Terminal.
     /// Через голі pipe (`vpn -s`) пароль/другий фактор читаються з tty, якого немає, і сервер
     /// одразу відповідає «Login failed» — Duo-push навіть не стартує.
-    static func run(cli: String, _ c: CiscoCredentials, timeout: TimeInterval, onEvent: @escaping @Sendable (Event) -> Void) throws {
+    static func run(cli: String, _ c: CiscoCredentials, timeout: TimeInterval, onEvent: @escaping @Sendable (Event) -> Void) throws -> Bool {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/script")
         p.arguments = ["-q", "/dev/null", cli, "connect", c.host]
@@ -115,12 +123,31 @@ public enum CiscoDriver {
         onEvent(.step("vpn connect \(c.host)"))
         // Duo: порожній другий фактор = "push" (конвенція Duo для secondary password).
         let second = c.secondPassword.isEmpty ? "push" : c.secondPassword
-        var passwordsSent = 0, secondSent = 0
-        var bannerSent = false
+        var passwordsSent = 0, secondSent = 0, groupPrompts = 0
+        var bannerSent = false, updateSeen = false
+        var ssoSeen = false            // SSO-відмова з моменту останньої відповіді на Group
+        var mfa = false
+        func markMFA() { if !mfa { mfa = true; onEvent(.secondFactor) } }
+        var passwordAt: Date?          // чекаємо першої відповіді сервера після пароля
+        var holdNoted = false
         var deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             Thread.sleep(forTimeInterval: 0.15)
             lock.lock(); let chunk = buf; let quiet = Date().timeIntervalSince(lastData); lock.unlock()
+            if let at = passwordAt {
+                let held = Date().timeIntervalSince(at)
+                if !chunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    // Повільне «Login failed» — не Duo.
+                    if held > mfaHold, failure(chunk) == nil { markMFA() }
+                    passwordAt = nil
+                } else if held > mfaHold, !holdNoted {
+                    holdNoted = true
+                    // Мовчить довше, ніж триває перевірка пароля, — найімовірніше, чекає Duo.
+                    if c.expectsMFA == false {
+                        onEvent(.step(String(localized: "The server is taking long — if it sent a Duo push, approve it on your phone", bundle: .module)))
+                    }
+                }
+            }
             guard !chunk.isEmpty else {
                 if !p.isRunning { break }
                 continue
@@ -133,10 +160,27 @@ public enum CiscoDriver {
             }
             let tail = chunk.split(separator: "\n", omittingEmptySubsequences: false).last.map(String.init) ?? ""
             let lower = chunk.lowercased()
+            // Повні рядки обрізаються з buf між проходами: якщо відмова й меню прийшли різними
+            // порціями, маркер у chunk на момент запиту Group вже зник — тож пам'ятаємо його.
+            if lower.contains(ssoMarker) { ssoSeen = true }
 
             if lower.contains("state: connected") || lower.contains("connected to ") {
                 onEvent(.step("Connected"))
-                return
+                return mfa
+            }
+            // Head-end вимагає іншу версію клієнта: завантажує її, а `vpn` виходить
+            // («Exiting. Upgrade in progress») — підключення в цьому запуску вже не буде.
+            if !updateSeen, let v = Parse.firstMatch(#"(?i)downloading cisco secure client ([0-9.]+)"#, chunk) ?? (lower.contains("upgrade in progress") ? "" : nil) {
+                updateSeen = true
+                onEvent(.step(v.isEmpty ? String(localized: "The server requires a Cisco Secure Client update — downloading it…", bundle: .module)
+                                        : String(localized: "The server requires Cisco Secure Client \(v) — downloading it…", bundle: .module)))
+                deadline = max(deadline, Date().addingTimeInterval(180))
+            }
+            if lower.contains("upgrade in progress") {
+                let v = Parse.firstMatch(#"(?i)downloading cisco secure client ([0-9.]+)"#, all) ?? ""
+                throw ActionError(v.isEmpty
+                    ? String(localized: "Cisco Secure Client is updating itself because the server requires it. Wait until the installer window closes, then connect again.", bundle: .module)
+                    : String(localized: "Cisco Secure Client is updating itself to \(v) because the server requires it. Wait until the installer window closes, then connect again.", bundle: .module))
             }
             if failure(chunk) != nil {
                 Thread.sleep(forTimeInterval: 0.3)       // дочитати причину, якщо сервер її надсилає
@@ -150,17 +194,32 @@ public enum CiscoDriver {
             if !t.isEmpty, quiet < 0.6 { continue }
             var consumed = true
             if t.hasSuffix("group:") || t.contains("group: [") || (t.hasPrefix("group") && t.hasSuffix(":")) {
+                groupPrompts += 1
+                // Група з входом через браузер (SAML/SSO): CLI пише «authentication type is not
+                // supported» і знову показує меню. Без цієї перевірки Enter (група сервера) крутився б
+                // по колу до таймауту. Вперше це повідомлення — про групу за замовчуванням сервера.
+                if ssoSeen && (c.group.isEmpty || groupPrompts > 1) {
+                    let bad = groupPrompts > 1 && !c.group.isEmpty ? c.group
+                        : (Parse.firstMatch(#"\[([^\]]*)\]"#, tail).flatMap { $0.isEmpty ? nil : $0 } ?? "")
+                    throw ActionError(ssoGroupError(bad, others: menuOrder(groupOptions).filter { $0 != bad }))
+                }
+                if groupPrompts > 3 {
+                    throw ActionError(String(localized: "the server keeps asking for the group — check the group name:", bundle: .module) + "\n" + transcriptTail())
+                }
                 // Меню груп приймає номер (як у CLI: «Group: [VPN1] 1»); назву — лише як запасний варіант.
                 let answer = c.group.isEmpty ? "" : (groupOptions[c.group] ?? c.group)
                 onEvent(.step(c.group.isEmpty ? String(localized: "Group: (default)", bundle: .module)
                                                : String(localized: "Group: \(c.group)", bundle: .module)))
                 send(answer)
+                ssoSeen = false
             } else if t.hasPrefix("username:") || t.contains("username: [") {
                 onEvent(.step(String(localized: "Username: \(c.user)", bundle: .module)))
                 send(c.user)
             } else if t.contains("second password") || t.contains("secondary password") || t.contains("passcode")
                         || t.contains("duo") || t.hasPrefix("answer:") || t.hasPrefix("response:") {
                 secondSent += 1
+                passwordAt = nil
+                markMFA()
                 if secondSent > 2 { throw ActionError(String(localized: "the server asks for the second factor again:", bundle: .module) + "\n" + transcriptTail()) }
                 // Меню Duo «Passcode or option (1-3)»: 1 = Duo Push.
                 let answer = t.contains("option") && c.secondPassword.isEmpty ? "1" : second
@@ -174,8 +233,14 @@ public enum CiscoDriver {
                 if passwordsSent > 1 { throw ActionError(String(localized: "the server asks for the password again — wrong username or password:", bundle: .module) + "\n" + transcriptTail()) }
                 onEvent(.step(String(localized: "Password", bundle: .module)))
                 send(c.password)
+                passwordAt = Date()
                 // Сервер може тримати відповідь, поки ти підтверджуєш Duo-push (auto-push без запиту).
-                onEvent(.step(String(localized: "Waiting for the server (Duo/MFA — approve on your phone)…", bundle: .module)))
+                // Що писати — з пам'яті про цей хост: без MFA «approve on your phone» лише плутає.
+                switch c.expectsMFA {
+                case true?: onEvent(.step(String(localized: "Waiting for the server (Duo/MFA — approve on your phone)…", bundle: .module)))
+                case false?: onEvent(.step(String(localized: "Waiting for the server…", bundle: .module)))
+                case nil: onEvent(.step(String(localized: "Waiting for the server (if it uses Duo/MFA, approve on your phone)…", bundle: .module)))
+                }
                 deadline = max(deadline, Date().addingTimeInterval(120))
             } else if t.contains("accept?") || t.contains("[y/n]") {
                 if !bannerSent {
@@ -197,7 +262,7 @@ public enum CiscoDriver {
             if !p.isRunning { break }
         }
         lock.lock(); let text = all; lock.unlock()
-        if text.lowercased().contains("state: connected") { onEvent(.step("Connected")); return }
+        if text.lowercased().contains("state: connected") { onEvent(.step("Connected")); return mfa }
         let tailText = transcriptTail()
         if failure(text) != nil { throw ActionError(explain(tailText, text)) }
         let reason = p.isRunning ? String(localized: "Cisco did not connect in time", bundle: .module)
@@ -209,6 +274,26 @@ public enum CiscoDriver {
         public var groups: [String]
         public var defaultGroup: String?
         public var asksGroup: Bool          // false = сервер одразу питає логін (групи не обирають)
+        /// Група сервера за замовчуванням, що входить через браузер (SAML/SSO) — CLI так не вміє.
+        /// Її немає в `groups`, і `defaultGroup` тоді nil.
+        public var ssoGroup: String? = nil
+    }
+
+    /// Так CLI відповідає на групу з SAML/SSO-входом (Cisco Secure Client 5.x).
+    static let ssoMarker = "authentication type is not supported in anyconnect cli"
+
+    static func ssoGroupError(_ group: String, others: [String]) -> String {
+        let name = group.isEmpty ? String(localized: "(default)", bundle: .module) : group
+        var msg = String(localized: "The group “\(name)” signs in through a browser (SAML/SSO), which the Cisco CLI can't do.", bundle: .module)
+        if !others.isEmpty {
+            msg += " " + String(localized: "Choose another group: \(others.joined(separator: ", ")).", bundle: .module)
+        }
+        return msg
+    }
+
+    /// Назви груп у порядку меню сервера (номер → назва).
+    static func menuOrder(_ options: [String: String]) -> [String] {
+        options.sorted { (Int($0.value) ?? 0) < (Int($1.value) ?? 0) }.map(\.key)
     }
 
     /// Дізнатися групи до автентифікації: `connect <host>` → чекаємо перший запит
@@ -234,9 +319,34 @@ public enum CiscoDriver {
     }
 
     static func probe(cli: String, host: String, timeout: TimeInterval, cancelled: () -> Bool = { false }) throws -> GroupProbe {
+        do {
+            return try probeOnce(cli: cli, host: host, pty: false, timeout: timeout, cancelled: cancelled)
+        } catch SSODefault.hit {
+            // `vpn -s` на SSO-групі сервера лише пише помилку й не показує меню; під pty
+            // (`vpn connect`, як у Terminal) меню є. Нічого не надсилаємо — обриваємо на запиті.
+            guard var r = try? probeOnce(cli: cli, host: host, pty: true, timeout: timeout, cancelled: cancelled), r.asksGroup else {
+                if cancelled() { throw CancellationError() }
+                throw ActionError(ssoGroupError("", others: []))
+            }
+            let sso = r.defaultGroup ?? ""
+            r.groups.removeAll { $0 == sso }
+            r.ssoGroup = sso
+            r.defaultGroup = nil
+            return r
+        }
+    }
+
+    enum SSODefault: Error { case hit }
+
+    static func probeOnce(cli: String, host: String, pty: Bool, timeout: TimeInterval, cancelled: () -> Bool) throws -> GroupProbe {
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: cli)
-        p.arguments = ["-s"]
+        if pty {
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/script")
+            p.arguments = ["-q", "/dev/null", cli, "connect", host]
+        } else {
+            p.executableURL = URL(fileURLWithPath: cli)
+            p.arguments = ["-s"]
+        }
         reapOrphans(cli: cli)
         let inp = Pipe(), out = Pipe()
         p.standardInput = inp
@@ -256,13 +366,14 @@ public enum CiscoDriver {
             try? inp.fileHandleForWriting.close()
             stop(p)
         }
-        try? inp.fileHandleForWriting.write(contentsOf: Data("connect \(host)\n".utf8))
+        if !pty { try? inp.fileHandleForWriting.write(contentsOf: Data("connect \(host)\n".utf8)) }
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             Thread.sleep(forTimeInterval: 0.15)
             if cancelled() { throw CancellationError() }
             lock.lock(); let text = all; lock.unlock()
             if let r = parseGroupPrompt(text) { return r }
+            if !pty, text.lowercased().contains(ssoMarker) { throw SSODefault.hit }
             if let err = failure(text) { throw ActionError(explain(err, text)) }
             if !p.isRunning { break }
         }

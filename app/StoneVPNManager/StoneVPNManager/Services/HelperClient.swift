@@ -10,29 +10,135 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
     /// Версія встановленого демона (з останнього `version()`): до v6 він не знає PrivRequest.
     private let lock = NSLock()
     private var daemonVersion: Int?
+    /// v7: демон обслуговує лише власника (або адмінів / всіх — HelperAccessPolicy). Не дозволено →
+    /// дії йдуть через пароль адміністратора, а фонові (лише через helper) не виконуються.
+    private var denied = false
 
     var status: SMAppService.Status { service.status }
-    var isEnabled: Bool { service.status == .enabled }
+    /// Демон встановлено *і* він обслуговує цього користувача: лише тоді дії без пароля.
+    var isEnabled: Bool { service.status == .enabled && !lock.withLock { denied } }
 
     var helperPath: String { Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/\(HelperConst.helperExecutable)").path }
 
-    func register() throws { try service.register() }
-    func unregister() async throws { try await service.unregister() }
+    /// Викликається, коли зареєстрований демон не відповідає по XPC (дія тоді питає пароль).
+    var onUnreachable: (@Sendable () -> Void)? {
+        get { lock.withLock { unreachableHandler } }
+        set { lock.withLock { unreachableHandler = newValue } }
+    }
+    private var unreachableHandler: (@Sendable () -> Void)?
+
+    private static let registeredHashKey = "helperRegisteredHash"
+    private static let wantedKey = "helperWanted"
+
+    /// Чи хоче користувач helper: true після встановлення, false після «Remove», nil — ще не вирішив.
+    /// Заміна бандла (`make install`, оновлення) скидає реєстрацію в launchd — тоді за цим
+    /// прапорцем застосунок реєструє демона знову сам.
+    var wanted: Bool? {
+        get { UserDefaults.standard.object(forKey: Self.wantedKey) as? Bool }
+        set { UserDefaults.standard.set(newValue, forKey: Self.wantedKey) }
+    }
+
+    /// Реєстрація launchd належить конкретному бінарнику helper-а: після оновлення чи перезбирання
+    /// застосунку новий бінарник не запускається (taskgated: «Disallowing … no eligible provisioning
+    /// profiles»), доки демона не перереєструвати, а XPC мовчки падає — і все питає пароль.
+    /// Тому пам'ятаємо cdhash бінарника, з яким реєстрували.
+    var registeredForThisBuild: Bool {
+        guard let current = Self.cdhash(atPath: helperPath) else { return true }  // непідписана збірка — не знаємо
+        return UserDefaults.standard.string(forKey: Self.registeredHashKey) == current
+    }
+
+    func register() throws {
+        try service.register()
+        UserDefaults.standard.set(Self.cdhash(atPath: helperPath), forKey: Self.registeredHashKey)
+        wanted = true
+    }
+
+    /// «Remove» у налаштуваннях: більше не ставити самому.
+    func remove() async throws {
+        wanted = false
+        try await unregister()
+    }
+
+    func unregister() async throws {
+        try await service.unregister()
+        UserDefaults.standard.removeObject(forKey: Self.registeredHashKey)
+    }
+
+    /// Перереєструвати демона з бінарником цього бандла (без пароля, якщо його вже схвалено).
+    func reinstall() async throws {
+        if service.status != .notRegistered {
+            try? await service.unregister()
+            // BTM ще прибирає стару реєстрацію: register одразу після unregister падає з
+            // «Operation not permitted» (SMAppService error 1), і демон лишається незареєстрованим.
+            for _ in 0..<10 where service.status != .notRegistered { try? await Task.sleep(for: .milliseconds(300)) }
+            try? await Task.sleep(for: .seconds(1))
+        }
+        lock.withLock { daemonVersion = nil; denied = false }
+        var lastError: Error?
+        for attempt in 1...4 {
+            do { try register(); return } catch { lastError = error }
+            try? await Task.sleep(for: .seconds(attempt))
+        }
+        if let lastError { throw lastError }
+    }
+
+    static func cdhash(atPath path: String) -> String? {
+        var sc: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(URL(fileURLWithPath: path) as CFURL, [], &sc) == errSecSuccess, let sc else { return nil }
+        var info: CFDictionary?
+        guard SecCodeCopySigningInformation(sc, [], &info) == errSecSuccess,
+              let d = info as? [String: Any], let h = d[kSecCodeInfoUnique as String] as? Data else { return nil }
+        return h.map { String(format: "%02x", $0) }.joined()
+    }
 
     // MARK: PrivilegedRunner / Reader
 
     func run(_ op: PrivOp) async -> PrivResult {
-        if isEnabled, let r = await xpc(op) { return r }
+        if isEnabled {
+            if let r = await xpc(op) {
+                guard r.denied == true else { return r }
+                lock.withLock { denied = true }       // не наш демон — пароль адміністратора
+            } else {
+                onUnreachable?()
+            }
+        }
         return await viaAppleScript(op)
     }
 
     func readIfAvailable(_ op: PrivOp) async -> PrivResult? {
         guard isEnabled else { return nil }
-        return await xpc(op)
+        let r = await xpc(op)
+        if r == nil { onUnreachable?() }
+        if r?.denied == true { lock.withLock { denied = true }; return nil }
+        return r
+    }
+
+    /// Хто власник демона і чи можна цьому користувачу (v7+). Оновлює `isEnabled`.
+    func accessInfo() async -> HelperAccessInfo? {
+        guard service.status == .enabled, (lock.withLock { daemonVersion } ?? 0) >= 7 else {
+            lock.withLock { denied = false }          // старий демон про доступ не знає
+            return nil
+        }
+        guard let r = await xpc(.accessInfo), r.ok,
+              let info = try? JSONDecoder().decode(HelperAccessInfo.self, from: Data(r.output.utf8)) else { return nil }
+        lock.withLock { denied = !info.callerAllowed }
+        return info
+    }
+
+    /// Власник — через демон; інший користувач — з паролем адміністратора.
+    func setAccessPolicy(_ p: HelperAccessPolicy) async -> PrivResult {
+        guard service.status == .enabled else { return .fail(String(localized: "the helper is not installed")) }
+        if let r = await xpc(.accessSetPolicy(policy: p)), r.denied != true { return r }
+        return await viaAppleScript(.accessSetPolicy(policy: p))
+    }
+
+    /// Стати власником демона: лише з паролем адміністратора (XPC це завжди відхиляє).
+    func claimAccess() async -> PrivResult {
+        await viaAppleScript(.accessClaim)
     }
 
     func version() async -> Int? {
-        guard isEnabled else { return nil }
+        guard service.status == .enabled else { return nil }
         let v: Int? = await withCheckedContinuation { cont in
             let once = Once()
             let c = connection()
@@ -109,6 +215,8 @@ final class HelperClient: PrivilegedRunner, PrivilegedReader, @unchecked Sendabl
         case .dnsOverride, .dnsOverrideClear: String(localized: "switch the primary DNS")
         case .orderServices: String(localized: "change the network service order")
         case .killPid: String(localized: "stop a VPN tunnel process")
+        case .accessSetPolicy: String(localized: "change who may use the helper")
+        case .accessClaim: String(localized: "take over the helper")
         case .batch(let ops): ops.first.map(describe) ?? String(localized: "action")
         default: String(localized: "privileged action")
         }

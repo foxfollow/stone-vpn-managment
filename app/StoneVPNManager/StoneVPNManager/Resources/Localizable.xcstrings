@@ -74,6 +74,16 @@
         }
       }
     },
+    "%@ (you)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (ви)"
+          }
+        }
+      }
+    },
     "%@ does not resolve (DNS: %@) — the connection will most likely fail. DNS → Fix or a split rule." : {
       "localizations" : {
         "uk" : {
@@ -130,6 +140,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ повернув свій DNS. Тримати вибір без пароля може лише актуальний helper (Settings → Helper)."
+          }
+        }
+      }
+    },
+    "%@ signs in through a browser (SSO) — not possible via the Cisco CLI" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ входить через браузер (SSO) — через Cisco CLI не вийде"
           }
         }
       }
@@ -600,6 +620,16 @@
         }
       }
     },
+    "Access" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступ"
+          }
+        }
+      }
+    },
     "Add" : {
       "localizations" : {
         "uk" : {
@@ -736,6 +766,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Все здорове: резолвер відповідає, осиротілих записів немає."
+          }
+        }
+      }
+    },
+    "All users of this Mac" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Усі користувачі цього Mac"
           }
         }
       }
@@ -976,6 +1016,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Як вирішила система"
+          }
+        }
+      }
+    },
+    "Cisco Secure Client keeps only one session, and it is connected to %@ now. “Switch Session” disconnects it first, then connects here; Cancel leaves it as it is." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco Secure Client тримає лише одну сесію, і зараз вона підключена до %@. «Перемкнути сесію» спершу відключить її, а потім підключить сюди; «Скасувати» залишить усе як є."
+          }
+        }
+      }
+    },
+    "Cisco keeps one session: connecting here will disconnect %@ — the Connect window asks first." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cisco тримає одну сесію: підключення сюди відключить %@ — вікно підключення спершу перепитає."
           }
         }
       }
@@ -1540,6 +1600,16 @@
         }
       }
     },
+    "Disconnecting Cisco from %@" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відключаю Cisco від %@"
+          }
+        }
+      }
+    },
     "Displaced while chosen: %@. Their internal domains go through split DNS." : {
       "localizations" : {
         "uk" : {
@@ -1800,6 +1870,26 @@
         }
       }
     },
+    "Groups aren't fetched while Cisco is connected — the remembered group is used" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поки Cisco підключений, групи не запитуються — використовується запам'ятована"
+          }
+        }
+      }
+    },
+    "Helper reinstalled." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper перевстановлено."
+          }
+        }
+      }
+    },
     "Hidden:" : {
       "localizations" : {
         "uk" : {
@@ -1896,6 +1986,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Встановити"
+          }
+        }
+      }
+    },
+    "Install Helper" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Встановити helper"
+          }
+        }
+      }
+    },
+    "Install the helper so connecting, DNS fixes and routes stop asking for the administrator password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Встанови helper, щоб підключення, ремонт DNS і маршрути не питали пароль адміністратора."
           }
         }
       }
@@ -2300,6 +2410,16 @@
         }
       }
     },
+    "Not available while Cisco is connected: fetching groups would drop the session" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Недоступно, поки Cisco підключений: запит груп обірвав би сесію"
+          }
+        }
+      }
+    },
     "Not stored (the username is remembered for the profile). The temporary auth file is deleted after connecting." : {
       "localizations" : {
         "uk" : {
@@ -2356,6 +2476,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Переключити DNS на інший резолвер без пароля може лише актуальний helper (Settings → Helper). Або натисни «Оновити»."
+          }
+        }
+      }
+    },
+    "Only the owner" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Лише власник"
           }
         }
       }
@@ -2736,6 +2866,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Перевстановити"
+          }
+        }
+      }
+    },
+    "Reinstall Helper" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевстановити helper"
+          }
+        }
+      }
+    },
+    "Reinstalling…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевстановлення…"
           }
         }
       }
@@ -3380,6 +3530,16 @@
         }
       }
     },
+    "StoneVPN helper needs attention" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper StoneVPN потребує уваги"
+          }
+        }
+      }
+    },
     "StoneVPN: %@" : {
       "comment" : "Administrator password prompt; the argument is the action, e.g. “connect WireGuard”",
       "localizations" : {
@@ -3387,6 +3547,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "StoneVPN: %@"
+          }
+        }
+      }
+    },
+    "Switch Session" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перемкнути сесію"
           }
         }
       }
@@ -3427,6 +3597,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Розірвати…"
+          }
+        }
+      }
+    },
+    "Take Over…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Забрати собі…"
           }
         }
       }
@@ -3511,12 +3691,82 @@
         }
       }
     },
+    "The helper belongs to %@, so privileged actions ask for the administrator password. %@ can allow administrators or everyone in Settings → Helper." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper належить користувачу %1$@, тож привілейовані дії питають пароль адміністратора. %2$@ може дозволити його адміністраторам або всім у Налаштуваннях → Helper."
+          }
+        }
+      }
+    },
+    "The helper doesn't respond (usually after the app was updated), so every privileged action asks for the password. Reinstall it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper не відповідає (зазвичай після оновлення застосунку), тож кожна привілейована дія питає пароль. Перевстанови його."
+          }
+        }
+      }
+    },
+    "The helper doesn't serve you, so privileged actions ask for the administrator password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper вас не обслуговує, тож привілейовані дії питають пароль адміністратора."
+          }
+        }
+      }
+    },
+    "The helper has no owner yet, so privileged actions ask for the administrator password. Take it over in Settings → Helper." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper ще не має власника, тож привілейовані дії питають пароль адміністратора. Заберіть його собі в Налаштуваннях → Helper."
+          }
+        }
+      }
+    },
     "The helper is outdated (v%lld, needs v%lld) — Settings → Helper → Reinstall" : {
       "localizations" : {
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Helper застарий (v%1$lld, треба v%2$lld) — Settings → Helper → Перевстановити"
+          }
+        }
+      }
+    },
+    "The helper is outdated (v%lld, the app needs v%lld), so every privileged action asks for the password. Reinstall it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper застарий (v%1$lld, застосунку потрібна v%2$lld), тож кожна привілейована дія питає пароль. Перевстанови його."
+          }
+        }
+      }
+    },
+    "The helper runs actions as root, including OpenVPN profile scripts, so it serves only its owner unless the owner allows more. The owner is the user who installed the app; another user can take it over with the administrator password. OpenVPN profiles must belong to the user who connects them." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper виконує дії від root, зокрема скрипти OpenVPN-профілів, тому обслуговує лише власника, якщо той не дозволив більше. Власник — користувач, що встановив застосунок; інший користувач може забрати helper собі паролем адміністратора. OpenVPN-профілі мають належати тому, хто їх підключає."
+          }
+        }
+      }
+    },
+    "The helper waits for your approval in System Settings → Login Items; until then every privileged action asks for the password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper чекає схвалення в System Settings → Login Items; доти кожна привілейована дія питає пароль."
           }
         }
       }
@@ -3537,6 +3787,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Нова мова застосується після перезапуску."
+          }
+        }
+      }
+    },
+    "The owner and administrators" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Власник і адміністратори"
           }
         }
       }
@@ -3657,6 +3917,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LAN-шлюзу для обходу немає."
+          }
+        }
+      }
+    },
+    "This server asked for a second factor last time." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Минулого разу цей сервер просив другий фактор."
+          }
+        }
+      }
+    },
+    "This server didn't ask for a second factor last time — no Duo push expected." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Минулого разу цей сервер не просив другого фактора — Duo-push не очікується."
           }
         }
       }
@@ -3931,6 +4211,16 @@
         }
       }
     },
+    "Who May Use It" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хто може користуватися"
+          }
+        }
+      }
+    },
     "Whole Profile (.ovpn)…" : {
       "localizations" : {
         "uk" : {
@@ -4097,6 +4387,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "змінити маршрут до VPN-сервера"
+          }
+        }
+      }
+    },
+    "change who may use the helper" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "змінити, хто може користуватися helper-ом"
           }
         }
       }
@@ -4431,6 +4731,16 @@
         }
       }
     },
+    "nobody yet" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ще немає"
+          }
+        }
+      }
+    },
     "none" : {
       "localizations" : {
         "uk" : {
@@ -4721,6 +5031,16 @@
         }
       }
     },
+    "take over the helper" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "забрати helper собі"
+          }
+        }
+      }
+    },
     "the gateway doesn't answer the handshake" : {
       "localizations" : {
         "uk" : {
@@ -4737,6 +5057,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "helper не відповів"
+          }
+        }
+      }
+    },
+    "the helper is not installed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "helper не встановлено"
+          }
+        }
+      }
+    },
+    "the server's default group" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "група сервера за замовчуванням"
           }
         }
       }

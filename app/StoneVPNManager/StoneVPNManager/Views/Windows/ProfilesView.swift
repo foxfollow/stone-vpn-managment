@@ -217,6 +217,12 @@ struct ProfileDetail: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 11))
 
+                if p.backend == .cisco, !item.status.isActive,
+                   let live = model.snap.sessions.first(where: { $0.backend == .cisco })?.name, !Prefs.ciscoSame(live, p.name) {
+                    Label("Cisco keeps one session: connecting here will disconnect \(live) — the Connect window asks first.",
+                          systemImage: "arrow.triangle.swap")
+                        .font(.system(size: 12)).foregroundStyle(.orange)
+                }
                 HStack(spacing: 8) {
                     Button(item.status.isActive ? "Disconnect" : "Connect") { model.toggle(item) }
                         .buttonStyle(.borderedProminent)

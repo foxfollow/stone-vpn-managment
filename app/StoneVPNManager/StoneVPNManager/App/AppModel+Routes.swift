@@ -222,8 +222,11 @@ final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate {
         c.delegate = self
         let keep = UNNotificationAction(identifier: "keep", title: String(localized: "Accept — keep it this way"))
         let direct = UNNotificationAction(identifier: "direct", title: String(localized: "Decline — go direct via LAN"))
-        c.setNotificationCategories([UNNotificationCategory(identifier: AppModel.routeCategory, actions: [keep, direct],
-                                                            intentIdentifiers: [])])
+        let reinstall = UNNotificationAction(identifier: "reinstall", title: String(localized: "Reinstall Helper"))
+        c.setNotificationCategories([
+            UNNotificationCategory(identifier: AppModel.routeCategory, actions: [keep, direct], intentIdentifiers: []),
+            UNNotificationCategory(identifier: AppModel.helperCategory, actions: [reinstall], intentIdentifiers: []),
+        ])
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
@@ -233,9 +236,17 @@ final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        let id = response.notification.request.content.userInfo["issue"] as? String
+        let content = response.notification.request.content
+        let id = content.userInfo["issue"] as? String
         let action = response.actionIdentifier
-        Task { @MainActor in AppModel.shared.handleRouteAction(id: id, action: action) }
+        if content.categoryIdentifier == "helper" {
+            // Кнопка або тап по сповіщенню — те саме, що «Reinstall» у банері.
+            if action == "reinstall" || action == UNNotificationDefaultActionIdentifier {
+                Task { @MainActor in AppModel.shared.fixHelper() }
+            }
+        } else {
+            Task { @MainActor in AppModel.shared.handleRouteAction(id: id, action: action) }
+        }
         completionHandler()
     }
 }

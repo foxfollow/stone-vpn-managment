@@ -133,6 +133,17 @@
         }
       }
     },
+    "Only the helper's owner can change who may use it" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Лише власник helper-а може змінити, хто ним користується"
+          }
+        }
+      }
+    },
     "OpenVPN PID %@ stopped" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -188,6 +199,39 @@
         }
       }
     },
+    "Taking over the helper needs the administrator password" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Щоб забрати helper собі, потрібен пароль адміністратора"
+          }
+        }
+      }
+    },
+    "The helper belongs to %@ — this action needs the administrator password" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper належить користувачу %@ — для цієї дії потрібен пароль адміністратора"
+          }
+        }
+      }
+    },
+    "The helper has no owner yet — this action needs the administrator password" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Helper ще не має власника — для цієї дії потрібен пароль адміністратора"
+          }
+        }
+      }
+    },
     "cannot read: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -206,6 +250,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "не прочитав запит"
+          }
+        }
+      }
+    },
+    "could not save the helper access settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не вдалося зберегти налаштування доступу до helper-а"
           }
         }
       }
@@ -474,6 +529,17 @@
         }
       }
     },
+    "the profile must belong to you: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "профіль має належати вам: %@"
+          }
+        }
+      }
+    },
     "unknown request (update the helper)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -481,6 +547,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "невідомий запит (оновіть helper)"
+          }
+        }
+      }
+    },
+    "unknown user" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "невідомий користувач"
           }
         }
       }

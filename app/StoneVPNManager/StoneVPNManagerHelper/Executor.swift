@@ -85,7 +85,7 @@ enum Executor {
 
         // ── OpenVPN ──────────────────────────────────────────────────────────
         case .ovpnStart(let profilePath, let user, let pass, let addDev):
-            return ovpnStart(profilePath, user: user, pass: pass, addDev: addDev, waitAuthCleanup: waitAuthCleanup)
+            return ovpnStart(profilePath, user: user, pass: pass, addDev: addDev, waitAuthCleanup: waitAuthCleanup, caller: caller)
         case .ovpnStop(let pid):
             guard pid > 1 else { return .fail(L("PID \(String(pid)) is not openvpn")) }
             // Процес уже зник (впав / зупинений з CLI) — лишається тільки прибрати pid-файл.
@@ -182,6 +182,15 @@ enum Executor {
             _ = execute(.dnsFlush, waitAuthCleanup: false, caller: caller)
             return PrivResult(ok: true, output: L("removed \(domain)"))
 
+        // ── Доступ (v7) — XPC сюди доходить лише після Access.gate ─────────────
+        case .accessInfo:
+            let data = (try? JSONEncoder().encode(Access.info(caller))) ?? Data()
+            return PrivResult(ok: true, output: String(decoding: data, as: UTF8.self))
+        case .accessSetPolicy(let p):
+            return Access.setPolicy(p, caller: caller)
+        case .accessClaim:
+            return Access.claim(caller: caller)
+
         // ── Мережа / процеси ────────────────────────────────────────────────
         case .orderServices(let names):
             // networksetup приймає лише ПОВНИЙ список (інакше «parameters were not valid»).
@@ -202,8 +211,24 @@ enum Executor {
         }
     }
 
+    /// /var/run/stonevpn (root 0700) — копії профілів, які читає openvpn (там ключі: лише root).
+    static func writeRootCopy(_ data: Data, name: String) -> String? {
+        let dir = "/var/run/stonevpn"
+        var st = stat()
+        if lstat(dir, &st) != 0 { guard mkdir(dir, 0o700) == 0 else { return nil } }
+        else if (st.st_mode & S_IFMT) != S_IFDIR || st.st_uid != 0 { return nil }
+        chmod(dir, 0o700)
+        let path = "\(dir)/\(name)"
+        unlink(path)
+        let fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        guard fd >= 0 else { return nil }
+        defer { close(fd) }
+        let ok = data.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) } == data.count
+        return ok ? path : nil
+    }
+
     // ── OpenVPN start (дзеркало vpn-up.sh) ──────────────────────────────────
-    static func ovpnStart(_ profilePath: String, user: String?, pass: String?, addDev: Bool, waitAuthCleanup: Bool) -> PrivResult {
+    static func ovpnStart(_ profilePath: String, user: String?, pass: String?, addDev: Bool, waitAuthCleanup: Bool, caller: uid_t?) -> PrivResult {
         let url = URL(fileURLWithPath: profilePath).standardizedFileURL
         let path = url.path
         guard path.hasSuffix(".ovpn"), !isSymlink(path), FileManager.default.isReadableFile(atPath: path) else {
@@ -211,6 +236,21 @@ enum Executor {
         }
         let id = url.deletingPathExtension().lastPathComponent
         guard id.range(of: #"^[A-Za-z0-9._ -]+$"#, options: .regularExpression) != nil else { return .fail(L("invalid profile name")) }
+        // Лише власний профіль запитувача: скрипти профілю (up/down…, script-security 2) виконуються
+        // від root — прийнятно для власних файлів (як PostUp у WireGuard), але не для чужих (інакше
+        // будь-хто підключився б чужим профілем). Читаємо через дескриптор (O_NOFOLLOW + fstat) і
+        // віддаємо openvpn root-копію: шлях не підмінити симлінком між перевіркою і запуском.
+        // `--cd` — тека оригіналу, щоб відносні ca/cert/key знаходились як раніше.
+        let fd = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+        guard fd >= 0 else { return .fail(L("profile unavailable: \(profilePath)")) }
+        var st = stat()
+        guard fstat(fd, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG,
+              caller == nil || caller == 0 || st.st_uid == caller else {
+            close(fd)
+            return .fail(L("the profile must belong to you: \(profilePath)"))
+        }
+        let content = FileHandle(fileDescriptor: fd, closeOnDealloc: true).readDataToEndOfFile()
+        guard let config = writeRootCopy(content, name: "\(id).ovpn") else { return .fail(L("profile unavailable: \(profilePath)")) }
         guard let ovpn = firstExecutable(["/opt/homebrew/sbin/openvpn", "/usr/local/sbin/openvpn"]) else {
             return .fail(L("openvpn not found (brew install openvpn)"))
         }
@@ -218,7 +258,7 @@ enum Executor {
         try? FileManager.default.removeItem(atPath: pidFile)
         try? FileManager.default.removeItem(atPath: logFile)
 
-        var args = ["--config", path]
+        var args = ["--cd", url.deletingLastPathComponent().path, "--config", config]
         if addDev { args += ["--dev", "tun"] }
         var authFile: String?
         if let user, !user.isEmpty {

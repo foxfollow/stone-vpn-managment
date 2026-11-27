@@ -88,7 +88,7 @@ Until the secret exists the Sonar job only prints a warning. Coverage = StoneVPN
 3. Commit to `main`, then:
 
    ```bash
-   git tag v0.2.0 && git push origin v0.2.0
+   git tag v1.0.0 && git push origin v1.0.0
    ```
 
    or run the workflow manually (Actions → Build and Release → version `X.Y.Z`).
